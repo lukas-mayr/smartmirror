@@ -254,6 +254,18 @@ cp -a "$STAGING/." "$TARGET/"
 chmod +x "$TARGET/deploy/cage-session.sh" 2>/dev/null || true
 chmod +x "$TARGET/shell/smartmirror-shell" 2>/dev/null || true
 
+# Electrons Sandbox-Helfer braucht setuid-root, sonst startet die Anwendung mit
+# "The SUID sandbox helper binary was found, but is not configured correctly".
+# Bei einem entpackten Build – und genau das liefern wir aus – setzt das kein
+# Paketmanager, es muss hier passieren. Die Alternative waere --no-sandbox, also
+# den Schutz abzuschalten; das ist kein Tausch, den man auf einem dauerhaft
+# laufenden Netzwerkgeraet machen sollte.
+if [[ -f "$TARGET/shell/chrome-sandbox" ]]; then
+  chown root:root "$TARGET/shell/chrome-sandbox"
+  chmod 4755 "$TARGET/shell/chrome-sandbox"
+  log "Sandbox-Helfer der Anzeige eingerichtet."
+fi
+
 # Gegenprobe: fehlt Electron eine Bibliothek, startet die Anzeige spaeter
 # wortlos nicht. Lieber jetzt sagen, welche.
 if command -v ldd >/dev/null 2>&1 && [[ -x "$TARGET/shell/smartmirror-shell" ]]; then

@@ -22,10 +22,16 @@ for _ in $(seq 1 30); do
   sleep 1
 done
 
-# -s = Software-Cursor aus, -d = keine Dekorationen.
-exec cage -s -- "$APP" \
+# Bewusst ohne zusaetzliche cage-Optionen.
+#
+# Die Optionsnamen haben sich zwischen cage-Versionen geaendert, und eine
+# unbekannte Option laesst cage sofort beenden – auf einem Spiegel ohne
+# Tastatur heisst das: schwarzer Bildschirm ohne Hinweis. Gebraucht wird hier
+# ohnehin keine: VT-Umschaltung braucht ein Geraet ohne Tastatur nicht, und der
+# Mauszeiger ist bereits per CSS ausgeblendet.
+exec cage -- "$APP" \
   --ozone-platform=wayland \
-  --enable-features=UseOzonePlatform,WaylandWindowDecorations \
+  --enable-features=UseOzonePlatform \
   --disable-features=Translate,MediaRouter \
   --disable-pinch \
   --overscroll-history-navigation=0
