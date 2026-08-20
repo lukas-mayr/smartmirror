@@ -1,0 +1,30 @@
+appId: app.smartmirror.shell
+productName: smartmirror-shell
+copyright: Smartmirror
+
+directories:
+  output: release
+
+# Nur das Gebaute und das Manifest. Quellen und Werkzeuge gehoeren nicht auf
+# den Pi – sie machen das Release nur groesser und die Angriffsflaeche breiter.
+files:
+  - dist/**/*
+  - package.json
+
+linux:
+  # "dir" statt AppImage oder deb: das Release-Bundle bringt die Anwendung
+  # bereits entpackt mit, und der Updater tauscht ohnehin ganze Verzeichnisse.
+  # Ein Paketformat dazwischen wuerde nur eine zweite Installationslogik
+  # einfuehren, die zur ersten passen muss.
+  target:
+    - target: dir
+      arch:
+        - arm64
+  executableName: smartmirror-shell
+  category: Utility
+  description: Anzeige des Smartmirrors
+
+# Es gibt bewusst keine nativen Abhaengigkeiten, daher entfaellt der Rebuild.
+# Das ist die Voraussetzung dafuer, arm64 auf einem x86-Runner bauen zu koennen.
+npmRebuild: false
+buildDependenciesFromSource: false

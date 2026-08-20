@@ -1,0 +1,43 @@
+{
+  "id": "clock",
+  "name": "Uhr",
+  "version": "0.1.0",
+  "description": "Uhrzeit, Wochentag und Datum. Laeuft vollstaendig in der Anzeige und braucht kein Netzwerk.",
+  "author": "smartmirror",
+  "preferredZone": "top-center",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "format24h": {
+        "type": "boolean",
+        "title": "24-Stunden-Format",
+        "default": true
+      },
+      "showSeconds": {
+        "type": "boolean",
+        "title": "Sekunden anzeigen",
+        "description": "Auf einem Spiegel meist unruhig – standardmaessig aus.",
+        "default": false
+      },
+      "showDate": {
+        "type": "boolean",
+        "title": "Datum anzeigen",
+        "default": true
+      },
+      "dateStyle": {
+        "type": "string",
+        "title": "Datumsformat",
+        "enum": ["full", "long", "medium"],
+        "enumLabels": ["Montag, 1. Januar 2026", "1. Januar 2026", "01.01.2026"],
+        "default": "full"
+      },
+      "size": {
+        "type": "string",
+        "title": "Groesse",
+        "enum": ["s", "m", "l", "xl"],
+        "enumLabels": ["Klein", "Mittel", "Gross", "Sehr gross"],
+        "default": "l"
+      }
+    }
+  }
+}

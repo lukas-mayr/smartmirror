@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!--
+      Strikte Content-Security-Policy. Die Oberflaeche selbst kommt aus dem
+      App-Bundle; Modul-Frontends duerfen ausschliesslich vom lokalen Core
+      geladen werden. Damit kann ein Modul keinen fremden Code nachladen.
+      Der Port bleibt offen, weil er ueber MIRROR_PORT konfigurierbar ist – die
+      Beschraenkung auf 127.0.0.1/localhost ist die eigentliche Grenze.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self' app:; script-src 'self' app: http://127.0.0.1:* http://localhost:*; style-src 'self' app: 'unsafe-inline'; img-src 'self' app: data:; connect-src 'self' app: http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:*; font-src 'self' app: data:; object-src 'none'; base-uri 'none';"
+    />
+    <title>Smartmirror</title>
+    <link rel="stylesheet" href="fonts.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="stage" class="stage">
+      <main id="grid" class="grid" aria-hidden="true"></main>
+      <div id="dim" class="dim"></div>
+      <div id="overlay" class="overlay"></div>
+    </div>
+    <script type="module" src="main.js"></script>
+  </body>
+</html>

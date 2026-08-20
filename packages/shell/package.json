@@ -1,0 +1,23 @@
+{
+  "name": "@mirror/shell",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Anzeige-Anwendung des Spiegels",
+  "main": "dist/main/index.cjs",
+  "scripts": {
+    "build": "node build.mjs",
+    "start": "electron .",
+    "dev": "node build.mjs --watch",
+    "package": "electron-builder --linux --config electron-builder.yml",
+    "clean": "rm -rf dist release"
+  },
+  "dependencies": {
+    "@mirror/sdk": "0.1.0",
+    "lit": "^3.2.1"
+  },
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "author": "Smartmirror"
+}

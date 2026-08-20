@@ -1,0 +1,116 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version ohne v, z.B. 0.2.0'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Version bestimmen
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION"
+
+      - name: Abhaengigkeiten installieren
+        run: npm ci
+
+      - name: Alles bauen
+        run: npm run build
+
+      - name: Tests
+        run: npm test
+
+      # Der arm64-Build laeuft auf einem x86-Runner, weil es keine nativen
+      # Node-Module gibt: electron-builder laedt die fertige arm64-Laufzeit
+      # herunter und packt nur unsere Dateien dazu.
+      - name: Anzeige-Anwendung fuer arm64 packen
+        run: npm run package --workspace @mirror/shell
+
+      - name: Release-Bundle schnueren
+        env:
+          MIRROR_VERSION: ${{ steps.version.outputs.version }}
+        run: node scripts/bundle.mjs
+
+      - name: Archiv und Pruefsumme erzeugen
+        id: archive
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          NAME="smartmirror-${VERSION}-arm64.tar.gz"
+          tar -czf "$NAME" -C dist/bundle .
+          sha256sum "$NAME" > "${NAME}.sha256"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          ls -lh "$NAME"
+
+      - name: minisign installieren
+        run: sudo apt-get update -qq && sudo apt-get install -y minisign
+
+      - name: Signieren
+        env:
+          MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
+          NAME: ${{ steps.archive.outputs.name }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if [ -z "$MINISIGN_SECRET_KEY" ]; then
+            echo "::error::Secret MINISIGN_SECRET_KEY fehlt. Ohne Signatur installiert kein Spiegel dieses Release."
+            exit 1
+          fi
+          printf '%s' "$MINISIGN_SECRET_KEY" > minisign.key
+          chmod 600 minisign.key
+          # Der Schluessel wird ohne Passwort erzeugt (minisign -G -W) und liegt
+          # in den GitHub-Secrets; ein interaktiver Prompt waere hier nicht
+          # bedienbar.
+          minisign -S -s minisign.key -m "$NAME" \
+            -t "smartmirror ${VERSION} · $(date -u +%Y-%m-%dT%H:%M:%SZ) · ${GITHUB_SHA}"
+          rm -f minisign.key
+
+      # Gegenprobe mit genau dem Verifizierer, der auch auf dem Pi laeuft.
+      # Sonst faellt eine Abweichung zwischen minisign und unserer eigenen
+      # Implementierung erst auf einem Geraet auf, das sich dann nicht mehr
+      # aktualisieren laesst.
+      - name: Signatur mit dem Updater-Code gegenpruefen
+        env:
+          MINISIGN_PUBLIC_KEY: ${{ secrets.MINISIGN_PUBLIC_KEY }}
+          NAME: ${{ steps.archive.outputs.name }}
+        run: |
+          if [ -z "$MINISIGN_PUBLIC_KEY" ]; then
+            echo "::error::Secret MINISIGN_PUBLIC_KEY fehlt – die Gegenprobe kann nicht laufen."
+            exit 1
+          fi
+          printf '%s' "$MINISIGN_PUBLIC_KEY" > minisign.pub
+          node scripts/verify-release.mjs "$NAME" "${NAME}.minisig" minisign.pub "${NAME}.sha256"
+
+      - name: Release veroeffentlichen
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
+          generate_release_notes: true
+          files: |
+            ${{ steps.archive.outputs.name }}
+            ${{ steps.archive.outputs.name }}.sha256
+            ${{ steps.archive.outputs.name }}.minisig

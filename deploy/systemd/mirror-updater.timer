@@ -1,0 +1,14 @@
+[Unit]
+Description=Regelmaessige Update-Pruefung fuer den Smartmirror
+
+[Timer]
+# Erste Pruefung ein paar Minuten nach dem Start – nicht sofort, damit der
+# Spiegel zuerst ein Bild zeigt.
+OnBootSec=5min
+OnUnitActiveSec=15min
+# Streuung, damit nicht alle Geraete zur selben Sekunde bei GitHub anklopfen.
+RandomizedDelaySec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

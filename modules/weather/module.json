@@ -1,0 +1,52 @@
+{
+  "id": "weather",
+  "name": "Wetter",
+  "version": "0.1.0",
+  "description": "Aktuelles Wetter und Vorhersage von Open-Meteo. Ohne API-Schluessel nutzbar.",
+  "author": "smartmirror",
+  "preferredZone": "top-right",
+  "permissions": ["network", "commands"],
+  "network": {
+    "allow": ["api.open-meteo.com", "geocoding-api.open-meteo.com"]
+  },
+  "refreshInterval": "15m",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "location": {
+        "type": "string",
+        "title": "Ort",
+        "description": "Ortsname, z.B. \"Innsbruck\" oder \"Wien, AT\".",
+        "default": "Wien",
+        "minLength": 2
+      },
+      "units": {
+        "type": "string",
+        "title": "Einheiten",
+        "enum": ["metric", "imperial"],
+        "enumLabels": ["Celsius / km/h", "Fahrenheit / mph"],
+        "default": "metric"
+      },
+      "forecastDays": {
+        "type": "integer",
+        "title": "Tage in der Vorhersage",
+        "minimum": 0,
+        "maximum": 7,
+        "default": 4
+      },
+      "showWind": {
+        "type": "boolean",
+        "title": "Wind anzeigen",
+        "default": true
+      },
+      "refreshMinutes": {
+        "type": "integer",
+        "title": "Aktualisierung (Minuten)",
+        "minimum": 5,
+        "maximum": 180,
+        "default": 15
+      }
+    },
+    "required": ["location"]
+  }
+}

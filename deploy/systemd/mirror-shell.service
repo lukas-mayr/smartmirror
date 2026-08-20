@@ -1,0 +1,37 @@
+[Unit]
+Description=Smartmirror Anzeige (Electron unter cage)
+After=mirror-core.service systemd-udev-settle.service
+Wants=mirror-core.service
+
+[Service]
+Type=simple
+User=mirror
+Group=mirror
+WorkingDirectory=/opt/smartmirror/current
+
+# cage ist ein Wayland-Compositor fuer genau ein Fenster: kein Desktop, keine
+# Leiste, kein Mauszeiger. Damit bootet der Pi in diese Anwendung statt in eine
+# Arbeitsumgebung, aus der heraus ein Browser gestartet wuerde.
+# Eigenes Laufzeitverzeichnis statt /run/user/<uid>: das legt sonst nur logind
+# an, und der Spiegel soll ohne Benutzeranmeldung starten.
+RuntimeDirectory=mirror
+RuntimeDirectoryMode=0700
+Environment=XDG_RUNTIME_DIR=/run/mirror
+Environment=WLR_LIBINPUT_NO_DEVICES=1
+Environment=MIRROR_CORE_URL=http://127.0.0.1:8080
+ExecStart=/opt/smartmirror/current/deploy/cage-session.sh
+
+Restart=always
+RestartSec=5
+
+# Zugriff auf Grafik und Eingabe – mehr nicht.
+SupplementaryGroups=video render input
+PrivateTmp=yes
+NoNewPrivileges=yes
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mirror-shell
+
+[Install]
+WantedBy=graphical.target

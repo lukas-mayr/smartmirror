@@ -1,0 +1,392 @@
+/*
+ * Fernbedienung: dunkel, grossflaechig antippbar, einhaendig bedienbar.
+ * Anders als die Anzeige darf sie ruhig Grauwerte und Flaechen nutzen –
+ * sie haengt nicht hinter einem Spiegel.
+ */
+
+:root {
+  color-scheme: dark;
+  --bg: #0b0b0c;
+  --surface: #17171a;
+  --surface-2: #202025;
+  --border: #2c2c33;
+  --fg: #f2f2f3;
+  --muted: #9a9aa3;
+  --accent: #6ea8fe;
+  --danger: #ff6b6b;
+  --radius: 14px;
+  --tap: 48px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  /* Sichere Bereiche auf Geraeten mit Notch respektieren. */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+mirror-remote {
+  display: block;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 1rem 1rem 4rem;
+}
+
+h1 {
+  font-size: 1.4rem;
+  margin: 0;
+  font-weight: 600;
+}
+
+h2 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin: 2rem 0 0.75rem;
+  font-weight: 600;
+}
+
+.muted {
+  color: var(--muted);
+}
+.small {
+  font-size: 0.85rem;
+}
+
+/* -------------------------------- Kopfleiste ------------------------------- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 0 1rem;
+}
+
+.topbar__status {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.topbar__status.is-offline {
+  color: var(--danger);
+}
+
+.power {
+  min-width: 72px;
+  height: var(--tap);
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--fg);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.power--on {
+  background: var(--surface-2);
+}
+
+/* ---------------------------------- Tabs ---------------------------------- */
+
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.25rem;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.tabs button {
+  height: 40px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.tabs button.is-active {
+  background: var(--surface-2);
+  color: var(--fg);
+}
+
+/* ---------------------------- Karten und Felder ---------------------------- */
+
+.cards,
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.panel {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+
+.card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.card--off {
+  opacity: 0.55;
+}
+
+.card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  min-height: var(--tap);
+}
+
+.card__head strong {
+  display: block;
+}
+
+.card__body {
+  padding: 0 1rem 1rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.card--add {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+}
+
+.card--add strong {
+  display: block;
+}
+
+.card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.field--switch {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: var(--tap);
+}
+
+.field__label {
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.field__label b {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.field__hint {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+input[type='text'],
+input[type='password'],
+input[type='number'],
+input[type='time'],
+select {
+  height: var(--tap);
+  padding: 0 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--fg);
+  font-size: 1rem;
+  width: 100%;
+}
+
+input[type='range'] {
+  width: 100%;
+  height: var(--tap);
+  accent-color: var(--accent);
+}
+
+input[type='checkbox'] {
+  width: 30px;
+  height: 30px;
+  accent-color: var(--accent);
+  flex: none;
+}
+
+button {
+  min-height: var(--tap);
+  padding: 0 1rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--fg);
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+button:disabled {
+  opacity: 0.4;
+}
+
+button.danger {
+  color: var(--danger);
+  border-color: transparent;
+}
+
+/* -------------------------------- Zeitplan -------------------------------- */
+
+.rule {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: var(--surface-2);
+  border-radius: 10px;
+}
+
+.rule__days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.25rem;
+}
+
+.rule__days button {
+  min-height: 40px;
+  padding: 0;
+  font-size: 0.8rem;
+  background: transparent;
+  color: var(--muted);
+}
+
+.rule__days button.is-active {
+  background: var(--accent);
+  color: #0b0b0c;
+  border-color: transparent;
+  font-weight: 600;
+}
+
+.rule__times {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.rule__times label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+/* --------------------------------- Sonstiges -------------------------------- */
+
+.banner {
+  padding: 0.6rem 0.8rem;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.banner--error {
+  background: rgba(255, 107, 107, 0.12);
+  color: var(--danger);
+}
+
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-left: 0.4rem;
+  vertical-align: middle;
+}
+
+.dot--error {
+  background: var(--danger);
+}
+
+.update {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.update strong {
+  display: block;
+}
+
+progress {
+  width: 100%;
+  height: 6px;
+  accent-color: var(--accent);
+}
+
+.switch input {
+  width: 44px;
+  height: 28px;
+}
+
+.pairing {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: center;
+  text-align: center;
+  padding: 3rem 1rem;
+}
+
+.pairing__input {
+  width: 100%;
+  max-width: 260px;
+  height: 64px;
+  text-align: center;
+  font-size: 2rem;
+  letter-spacing: 0.35em;
+  text-indent: 0.35em;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--fg);
+}

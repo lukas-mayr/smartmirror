@@ -1,0 +1,20 @@
+{
+  "name": "@mirror/remote",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Fernsteuerung des Spiegels als installierbare Web-App",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "preview": "vite preview",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@mirror/sdk": "0.1.0",
+    "lit": "^3.2.1"
+  },
+  "devDependencies": {
+    "vite": "^6.0.3"
+  }
+}

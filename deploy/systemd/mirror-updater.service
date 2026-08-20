@@ -1,0 +1,25 @@
+[Unit]
+Description=Smartmirror Updater (prueft GitHub Releases, installiert, rollt zurueck)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Laeuft als root, weil er Symlinks unter /opt/smartmirror umsetzt und die
+# beiden anderen Dienste neu startet. Das ist der einzige Teil mit erhoehten
+# Rechten – Core und Anzeige laufen unprivilegiert.
+User=root
+WorkingDirectory=/opt/smartmirror
+Environment=MIRROR_INSTALL_ROOT=/opt/smartmirror
+Environment=MIRROR_DATA_DIR=/opt/smartmirror/data
+Environment=MIRROR_CORE_URL=http://127.0.0.1:8080
+Environment=MIRROR_PUBLIC_KEY=/opt/smartmirror/minisign.pub
+ExecStart=/usr/bin/node /opt/smartmirror/current/updater/index.mjs
+
+# Download, Pruefung, Entpacken und Healthcheck brauchen in Summe Zeit; danach
+# ist der Lauf aber wirklich zu Ende.
+TimeoutStartSec=900
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mirror-updater

@@ -1,0 +1,285 @@
+/*
+ * Basis-Stylesheet fuer die Anzeige hinter einem Zwei-Wege-Spiegel.
+ *
+ * Die Regeln hier sind keine Geschmacksfrage, sondern Physik:
+ *  - Schwarz muss #000000 sein. Jeder Grauwert leuchtet sichtbar und verraet,
+ *    dass hinter dem Spiegel ein Bildschirm haengt.
+ *  - Keine Schatten, kein Blur: hinter halbdurchlaessigem Glas werden daraus
+ *    Lichthoefe.
+ *  - Keine grossen hellen Flaechen: sie blenden und zeichnen den Displayrand nach.
+ *  - Duenne Schriftschnitte wirken durch die Folie ausgewaschen, daher 300-400.
+ */
+
+:root {
+  --mirror-fg: #ffffff;
+  --mirror-fg-muted: #9a9a9a;
+  /* Nicht dunkler: hinter halbdurchlaessigem Glas verliert man darunter
+     liegende Grauwerte fast vollstaendig. */
+  --mirror-fg-dim: #707070;
+  --mirror-padding: 4%;
+  --mirror-shift-x: 0px;
+  --mirror-shift-y: 0px;
+  --mirror-gap: 2.5rem;
+  /* Wird aus der Konfiguration gesetzt; der Wert hier ist nur der Ausgangspunkt. */
+  --mirror-font: 'Nunito', 'Helvetica Neue', Arial, system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #000000;
+  color: var(--mirror-fg);
+  font-family: var(--mirror-font);
+  font-weight: 400;
+  /* Auf einem festen Bildschirm ohne Eingabegeraet hat ein Zeiger nichts verloren. */
+  cursor: none;
+  overflow: hidden;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.stage {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  background: #000000;
+}
+
+.grid {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: auto 1fr auto;
+  gap: var(--mirror-gap);
+  padding: var(--mirror-padding);
+  /* Einbrennschutz: das Layout wandert langsam um wenige Pixel. */
+  transform: translate(var(--mirror-shift-x), var(--mirror-shift-y));
+  transition: transform 4s linear, opacity 600ms ease;
+}
+
+.zone {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-width: 0;
+}
+
+.zone--top-left,
+.zone--middle-left,
+.zone--bottom-left {
+  align-items: flex-start;
+  text-align: left;
+}
+.zone--top-center,
+.zone--middle-center,
+.zone--bottom-center {
+  align-items: center;
+  text-align: center;
+}
+.zone--top-right,
+.zone--middle-right,
+.zone--bottom-right {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.zone--middle-left,
+.zone--middle-center,
+.zone--middle-right {
+  justify-content: center;
+}
+.zone--bottom-left,
+.zone--bottom-center,
+.zone--bottom-right {
+  justify-content: flex-end;
+}
+
+.module {
+  max-width: 100%;
+}
+
+.module--failed {
+  color: var(--mirror-fg-dim);
+  font-size: 0.9rem;
+}
+
+/* Abdunklung fuer Monitore ohne DDC/CI und fuer den ausgeschalteten Zustand. */
+.dim {
+  position: absolute;
+  inset: 0;
+  background: #000000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 1.2s ease;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  background: #000000;
+  text-align: center;
+}
+
+.overlay--visible {
+  display: flex;
+}
+
+.overlay__title {
+  font-size: 1.5rem;
+  font-weight: 300;
+  color: var(--mirror-fg-muted);
+  letter-spacing: 0.04em;
+}
+
+.overlay__code {
+  font-size: 5rem;
+  font-weight: 300;
+  letter-spacing: 0.35em;
+  /* Letter-spacing schiebt optisch nach rechts – rechnerisch ausgleichen. */
+  text-indent: 0.35em;
+}
+
+.overlay__hint {
+  font-size: 1rem;
+  color: var(--mirror-fg-dim);
+  max-width: 32ch;
+  line-height: 1.6;
+}
+
+/*
+ * Verbindungsverlust wird bewusst winzig angezeigt: der Spiegel soll nicht
+ * schreien, wenn der Server kurz neu startet – etwa waehrend eines Updates.
+ */
+.status {
+  position: absolute;
+  bottom: 1.2rem;
+  right: 1.4rem;
+  font-size: 0.75rem;
+  color: var(--mirror-fg-dim);
+  letter-spacing: 0.08em;
+  opacity: 0;
+  transition: opacity 800ms ease;
+}
+
+.status--visible {
+  opacity: 1;
+}
+
+/* ------------------------- Grundstile fuer Module ------------------------- */
+
+.clock__time {
+  font-size: var(--clock-size, 5.4rem);
+  font-weight: 300;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.clock__date {
+  margin-top: 0.5rem;
+  font-size: 1.35rem;
+  font-weight: 300;
+  color: var(--mirror-fg-muted);
+}
+
+.weather {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: inherit;
+}
+
+.weather--stale {
+  color: var(--mirror-fg-muted);
+}
+
+.weather__now {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.weather__icon {
+  font-size: 3rem;
+  line-height: 0;
+  display: inline-flex;
+}
+
+.weather__temp {
+  font-size: 3.2rem;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+}
+
+.weather__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-size: 1rem;
+  color: var(--mirror-fg-muted);
+}
+
+.weather__sep {
+  color: var(--mirror-fg-dim);
+}
+
+.weather__place {
+  font-size: 0.95rem;
+  color: var(--mirror-fg-dim);
+}
+
+.weather__forecast {
+  display: flex;
+  gap: 1.4rem;
+  margin-top: 0.6rem;
+}
+
+.weather__day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.95rem;
+  color: var(--mirror-fg-muted);
+}
+
+.weather__day-icon {
+  font-size: 1.5rem;
+  line-height: 0;
+  display: inline-flex;
+  color: var(--mirror-fg);
+}
+
+.weather__day-range {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.35;
+}
+
+.weather__day-range i {
+  font-style: normal;
+  color: var(--mirror-fg-muted);
+}
+
+.weather__hint,
+.weather__error {
+  font-size: 0.85rem;
+  color: var(--mirror-fg-dim);
+}
+
+.weather--empty {
+  font-size: 1rem;
+  color: var(--mirror-fg-dim);
+}

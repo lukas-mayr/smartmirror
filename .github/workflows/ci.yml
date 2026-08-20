@@ -1,0 +1,45 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Abhaengigkeiten installieren
+        run: npm ci
+
+      - name: Bauen
+        run: npm run build
+
+      - name: Typen pruefen
+        run: |
+          npx tsc --build
+          npx tsc --noEmit -p packages/shell
+          npx tsc --noEmit -p packages/remote
+          npx tsc --noEmit -p packages/icons
+          npx tsc --noEmit -p modules/clock
+          npx tsc --noEmit -p modules/weather
+
+      - name: Tests
+        run: npm test
+
+      - name: Erzeugte Dateien sind aktuell
+        # Schriftliste und Symbole werden aus node_modules erzeugt und liegen im
+        # Repository. Laufen sie auseinander, faellt es hier auf und nicht erst,
+        # wenn auf dem Spiegel ein Symbol fehlt.
+        run: |
+          node scripts/collect-fonts.mjs
+          node scripts/generate-icons.mjs
+          git diff --exit-code -- packages/sdk/src/fonts.ts packages/icons/src/generated.ts \
+            || { echo "::error::Erzeugte Dateien sind veraltet – bitte die Skripte laufen lassen und einchecken."; exit 1; }

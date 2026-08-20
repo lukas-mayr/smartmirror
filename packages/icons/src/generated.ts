@@ -1,0 +1,37 @@
+/* Automatisch erzeugt von scripts/generate-icons.mjs – nicht von Hand aendern.
+ * Quelle: lucide-static (ISC), https://lucide.dev
+ */
+
+export interface IconNode {
+  tag: string;
+  attrs: Record<string, string>;
+}
+
+export const ICONS = {
+  'sun': [{"tag":"circle","attrs":{"cx":"12","cy":"12","r":"4"}},{"tag":"path","attrs":{"d":"M12 2v2"}},{"tag":"path","attrs":{"d":"M12 20v2"}},{"tag":"path","attrs":{"d":"m4.93 4.93 1.41 1.41"}},{"tag":"path","attrs":{"d":"m17.66 17.66 1.41 1.41"}},{"tag":"path","attrs":{"d":"M2 12h2"}},{"tag":"path","attrs":{"d":"M20 12h2"}},{"tag":"path","attrs":{"d":"m6.34 17.66-1.41 1.41"}},{"tag":"path","attrs":{"d":"m19.07 4.93-1.41 1.41"}}],
+  'moon': [{"tag":"path","attrs":{"d":"M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"}}],
+  'cloud': [{"tag":"path","attrs":{"d":"M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"}}],
+  'cloudy': [{"tag":"path","attrs":{"d":"M17.5 21H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"}},{"tag":"path","attrs":{"d":"M22 10a3 3 0 0 0-3-3h-2.207a5.502 5.502 0 0 0-10.702.5"}}],
+  'cloud-sun': [{"tag":"path","attrs":{"d":"M12 2v2"}},{"tag":"path","attrs":{"d":"m4.93 4.93 1.41 1.41"}},{"tag":"path","attrs":{"d":"M20 12h2"}},{"tag":"path","attrs":{"d":"m19.07 4.93-1.41 1.41"}},{"tag":"path","attrs":{"d":"M15.947 12.65a4 4 0 0 0-5.925-4.128"}},{"tag":"path","attrs":{"d":"M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6Z"}}],
+  'cloud-moon': [{"tag":"path","attrs":{"d":"M10.188 8.5A6 6 0 0 1 16 4a1 1 0 0 0 6 6 6 6 0 0 1-3 5.197"}},{"tag":"path","attrs":{"d":"M13 16a3 3 0 1 1 0 6H7a5 5 0 1 1 4.9-6Z"}}],
+  'cloud-rain': [{"tag":"path","attrs":{"d":"M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"}},{"tag":"path","attrs":{"d":"M16 14v6"}},{"tag":"path","attrs":{"d":"M8 14v6"}},{"tag":"path","attrs":{"d":"M12 16v6"}}],
+  'cloud-drizzle': [{"tag":"path","attrs":{"d":"M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"}},{"tag":"path","attrs":{"d":"M8 19v1"}},{"tag":"path","attrs":{"d":"M8 14v1"}},{"tag":"path","attrs":{"d":"M16 19v1"}},{"tag":"path","attrs":{"d":"M16 14v1"}},{"tag":"path","attrs":{"d":"M12 21v1"}},{"tag":"path","attrs":{"d":"M12 16v1"}}],
+  'cloud-snow': [{"tag":"path","attrs":{"d":"M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"}},{"tag":"path","attrs":{"d":"M8 15h.01"}},{"tag":"path","attrs":{"d":"M8 19h.01"}},{"tag":"path","attrs":{"d":"M12 17h.01"}},{"tag":"path","attrs":{"d":"M12 21h.01"}},{"tag":"path","attrs":{"d":"M16 15h.01"}},{"tag":"path","attrs":{"d":"M16 19h.01"}}],
+  'cloud-lightning': [{"tag":"path","attrs":{"d":"M6 16.326A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 .5 8.973"}},{"tag":"path","attrs":{"d":"m13 12-3 5h4l-3 5"}}],
+  'cloud-fog': [{"tag":"path","attrs":{"d":"M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"}},{"tag":"path","attrs":{"d":"M16 17H7"}},{"tag":"path","attrs":{"d":"M17 21H9"}}],
+  'cloud-hail': [{"tag":"path","attrs":{"d":"M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"}},{"tag":"path","attrs":{"d":"M16 14v2"}},{"tag":"path","attrs":{"d":"M8 14v2"}},{"tag":"path","attrs":{"d":"M16 20h.01"}},{"tag":"path","attrs":{"d":"M8 20h.01"}},{"tag":"path","attrs":{"d":"M12 16v2"}},{"tag":"path","attrs":{"d":"M12 22h.01"}}],
+  'wind': [{"tag":"path","attrs":{"d":"M12.8 19.6A2 2 0 1 0 14 16H2"}},{"tag":"path","attrs":{"d":"M17.5 8a2.5 2.5 0 1 1 2 4H2"}},{"tag":"path","attrs":{"d":"M9.8 4.4A2 2 0 1 1 11 8H2"}}],
+  'snowflake': [{"tag":"path","attrs":{"d":"m10 20-1.25-2.5L6 18"}},{"tag":"path","attrs":{"d":"M10 4 8.75 6.5 6 6"}},{"tag":"path","attrs":{"d":"m14 20 1.25-2.5L18 18"}},{"tag":"path","attrs":{"d":"m14 4 1.25 2.5L18 6"}},{"tag":"path","attrs":{"d":"m17 21-3-6h-4"}},{"tag":"path","attrs":{"d":"m17 3-3 6 1.5 3"}},{"tag":"path","attrs":{"d":"M2 12h6.5L10 9"}},{"tag":"path","attrs":{"d":"m20 10-1.5 2 1.5 2"}},{"tag":"path","attrs":{"d":"M22 12h-6.5L14 15"}},{"tag":"path","attrs":{"d":"m4 10 1.5 2L4 14"}},{"tag":"path","attrs":{"d":"m7 21 3-6-1.5-3"}},{"tag":"path","attrs":{"d":"m7 3 3 6h4"}}],
+  'droplets': [{"tag":"path","attrs":{"d":"M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"}},{"tag":"path","attrs":{"d":"M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"}}],
+  'thermometer': [{"tag":"path","attrs":{"d":"M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"}}],
+  'sunrise': [{"tag":"path","attrs":{"d":"M12 2v8"}},{"tag":"path","attrs":{"d":"m4.93 10.93 1.41 1.41"}},{"tag":"path","attrs":{"d":"M2 18h2"}},{"tag":"path","attrs":{"d":"M20 18h2"}},{"tag":"path","attrs":{"d":"m19.07 10.93-1.41 1.41"}},{"tag":"path","attrs":{"d":"M22 22H2"}},{"tag":"path","attrs":{"d":"m8 6 4-4 4 4"}},{"tag":"path","attrs":{"d":"M16 18a4 4 0 0 0-8 0"}}],
+  'sunset': [{"tag":"path","attrs":{"d":"M12 10V2"}},{"tag":"path","attrs":{"d":"m4.93 10.93 1.41 1.41"}},{"tag":"path","attrs":{"d":"M2 18h2"}},{"tag":"path","attrs":{"d":"M20 18h2"}},{"tag":"path","attrs":{"d":"m19.07 10.93-1.41 1.41"}},{"tag":"path","attrs":{"d":"M22 22H2"}},{"tag":"path","attrs":{"d":"m16 6-4 4-4-4"}},{"tag":"path","attrs":{"d":"M16 18a4 4 0 0 0-8 0"}}],
+  'clock': [{"tag":"circle","attrs":{"cx":"12","cy":"12","r":"10"}},{"tag":"polyline","attrs":{"points":"12 6 12 12 16 14"}}],
+  'calendar-days': [{"tag":"path","attrs":{"d":"M8 2v4"}},{"tag":"path","attrs":{"d":"M16 2v4"}},{"tag":"rect","attrs":{"width":"18","height":"18","x":"3","y":"4","rx":"2"}},{"tag":"path","attrs":{"d":"M3 10h18"}},{"tag":"path","attrs":{"d":"M8 14h.01"}},{"tag":"path","attrs":{"d":"M12 14h.01"}},{"tag":"path","attrs":{"d":"M16 14h.01"}},{"tag":"path","attrs":{"d":"M8 18h.01"}},{"tag":"path","attrs":{"d":"M12 18h.01"}},{"tag":"path","attrs":{"d":"M16 18h.01"}}],
+  'bell': [{"tag":"path","attrs":{"d":"M10.268 21a2 2 0 0 0 3.464 0"}},{"tag":"path","attrs":{"d":"M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"}}],
+  'triangle-alert': [{"tag":"path","attrs":{"d":"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"}},{"tag":"path","attrs":{"d":"M12 9v4"}},{"tag":"path","attrs":{"d":"M12 17h.01"}}],
+  'wifi-off': [{"tag":"path","attrs":{"d":"M12 20h.01"}},{"tag":"path","attrs":{"d":"M8.5 16.429a5 5 0 0 1 7 0"}},{"tag":"path","attrs":{"d":"M5 12.859a10 10 0 0 1 5.17-2.69"}},{"tag":"path","attrs":{"d":"M19 12.859a10 10 0 0 0-2.007-1.523"}},{"tag":"path","attrs":{"d":"M2 8.82a15 15 0 0 1 4.177-2.643"}},{"tag":"path","attrs":{"d":"M22 8.82a15 15 0 0 0-11.288-3.764"}},{"tag":"path","attrs":{"d":"m2 2 20 20"}}],
+  'refresh-cw': [{"tag":"path","attrs":{"d":"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"}},{"tag":"path","attrs":{"d":"M21 3v5h-5"}},{"tag":"path","attrs":{"d":"M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"}},{"tag":"path","attrs":{"d":"M8 16H3v5"}}],
+} as const satisfies Record<string, IconNode[]>;
+
+export type IconName = keyof typeof ICONS;

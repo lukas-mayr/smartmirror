@@ -1,0 +1,23 @@
+node_modules/
+dist/
+build/
+release/
+*.tsbuildinfo
+.DS_Store
+.env
+.env.local
+
+# Lokale Laufzeitdaten der Entwicklungsinstanz
+.data/
+*.log
+
+# Aus node_modules erzeugt (scripts/collect-fonts.mjs) – nicht einchecken.
+# packages/sdk/src/fonts.ts ist dagegen Quelltext und gehoert ins Repository.
+packages/shell/src/renderer/fonts/
+packages/shell/src/renderer/fonts.css
+
+# Signierschluessel. Der geheime Schluessel gehoert NIE ins Repository – wer ihn
+# hat, kann Updates signieren, die jeder Spiegel bereitwillig installiert.
+minisign.key
+*.key
+!device.key

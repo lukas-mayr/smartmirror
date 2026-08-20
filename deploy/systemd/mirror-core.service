@@ -1,0 +1,37 @@
+[Unit]
+Description=Smartmirror Core (Modul-Host und Fernsteuerungs-API)
+Documentation=https://github.com/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mirror
+Group=mirror
+WorkingDirectory=/opt/smartmirror/current
+Environment=NODE_ENV=production
+Environment=MIRROR_APP_ROOT=/opt/smartmirror/current
+Environment=MIRROR_DATA_DIR=/opt/smartmirror/data
+Environment=MIRROR_PORT=8080
+ExecStart=/usr/bin/node /opt/smartmirror/current/core/index.mjs
+
+Restart=always
+RestartSec=3
+# Nach dauerhaftem Scheitern nicht weiter im Sekundentakt neu starten – sonst
+# verdeckt das Neustart-Karussell im Journal die eigentliche Ursache.
+StartLimitIntervalSec=120
+StartLimitBurst=10
+
+# Der Core braucht nur sein Datenverzeichnis beschreibbar.
+ProtectSystem=strict
+ReadWritePaths=/opt/smartmirror/data
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mirror-core
+
+[Install]
+WantedBy=multi-user.target
