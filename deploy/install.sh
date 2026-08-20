@@ -115,38 +115,46 @@ log "Systempakete installieren"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 
-# Pflicht: ohne diese startet nichts.
+# Pflicht: ohne diese startet nichts. cage zieht den kompletten
+# wlroots-/Mesa-Unterbau nach, das dauert auf einer SD-Karte einige Minuten.
+log "Compositor und Grundpakete (das dauert ein paar Minuten) ..."
 apt-get install -y --no-install-recommends \
   ca-certificates curl tar \
   cage wlr-randr \
-  avahi-daemon \
-  >/dev/null
+  avahi-daemon
 
 # Bibliotheken, die Electron braucht.
 #
 # Die Namen wandern zwischen Debian-Versionen: auf Trixie heissen einige wegen
-# der 64-Bit-time_t-Umstellung "...t64". Deshalb pro Paket erst die neue, dann
-# die alte Schreibweise probieren – und einen einzelnen Fehlschlag nicht die
-# ganze Installation abbrechen lassen. Ob wirklich alles da ist, prueft weiter
-# unten ohnehin ldd am fertigen Programm; das ist verlaesslicher als eine
-# Paketliste, die mit jeder Debian-Version verrottet.
-install_optional() {
+# der 64-Bit-time_t-Umstellung "...t64". Deshalb erst mit apt-cache nachsehen,
+# welcher Name auf diesem System existiert – das ist eine lokale Abfrage und
+# kostet nichts – und danach alles in einem einzigen Durchgang installieren.
+# Sieben einzelne apt-get-Aufrufe waeren deutlich langsamer, weil jeder die
+# Paketdatenbank neu einliest.
+pick_package() {
   for candidate in "$@"; do
-    if apt-get install -y --no-install-recommends "$candidate" >/dev/null 2>&1; then
+    if apt-cache show "$candidate" >/dev/null 2>&1; then
+      printf '%s' "$candidate"
       return 0
     fi
   done
-  warn "Keines dieser Pakete war installierbar: $*"
+  warn "Keines dieser Pakete ist verfuegbar: $*"
   return 0
 }
 
-install_optional libgtk-3-0t64 libgtk-3-0
-install_optional libasound2t64 libasound2
-install_optional libnotify4
-install_optional libnss3
-install_optional libxss1
-install_optional libgbm1
-install_optional libdrm2
+ELECTRON_LIBS=()
+for entry in "libgtk-3-0t64 libgtk-3-0" "libasound2t64 libasound2" "libnotify4" \
+             "libnss3" "libxss1" "libgbm1" "libdrm2"; do
+  # shellcheck disable=SC2086
+  resolved="$(pick_package $entry)"
+  [[ -n "$resolved" ]] && ELECTRON_LIBS+=("$resolved")
+done
+
+log "Bibliotheken fuer die Anzeige: ${ELECTRON_LIBS[*]}"
+# Ausgabe bewusst sichtbar lassen: dieser Schritt dauert auf einer SD-Karte
+# mehrere Minuten, und ein stiller Installer sieht dabei aus wie ein haengender.
+apt-get install -y --no-install-recommends "${ELECTRON_LIBS[@]}" \
+  || warn "Nicht alle Bibliotheken liessen sich installieren – die ldd-Pruefung weiter unten sagt, was fehlt."
 
 # ddcutil ist optional: viele Monitore koennen kein DDC/CI, dann regelt die
 # Anzeige die Helligkeit selbst.
@@ -157,8 +165,8 @@ apt-get install -y --no-install-recommends ddcutil >/dev/null 2>&1 || \
 
 install_node() {
   log "Node.js ${NODE_MAJOR} installieren"
-  curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | bash - >/dev/null
-  apt-get install -y nodejs >/dev/null
+  curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | bash -
+  apt-get install -y nodejs
 }
 
 if command -v node >/dev/null 2>&1; then
