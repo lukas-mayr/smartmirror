@@ -53,6 +53,26 @@ done
 
 # --------------------------------- Pruefungen ---------------------------------
 
+# Plattform zuerst, noch vor der Rechtepruefung: dann bekommt man die richtige
+# Auskunft, ohne vorher ein Passwort eintippen zu muessen.
+#
+# Die Reihenfolge ist wichtig. "uname -m" allein reicht nicht: ein Mac mit
+# Apple Silicon meldet ebenfalls "arm64" und kaeme durch die Architekturpruefung
+# hindurch – um dann Schritte spaeter an einem fehlenden apt-get zu scheitern.
+if [[ "$(uname -s)" != "Linux" ]]; then
+  die "Dieses Skript richtet einen Raspberry Pi ein und laeuft nur unter Linux.
+Erkannt: $(uname -s).
+
+Fuehre es auf dem Pi aus, nicht auf dem Rechner, an dem du entwickelst:
+  ssh <benutzer>@smartmirror.local
+  curl -fsSL https://raw.githubusercontent.com/$REPO/main/deploy/install.sh -o /tmp/install.sh && sudo bash /tmp/install.sh"
+fi
+
+command -v apt-get >/dev/null 2>&1 \
+  || die "apt-get nicht gefunden. Erwartet wird Raspberry Pi OS oder ein anderes Debian-basiertes System."
+command -v systemctl >/dev/null 2>&1 \
+  || die "systemd nicht gefunden. Die Dienste des Spiegels werden von systemd gestartet."
+
 [[ $EUID -eq 0 ]] || die "Bitte mit sudo ausfuehren."
 
 ARCH="$(dpkg --print-architecture 2>/dev/null || uname -m)"
@@ -60,6 +80,13 @@ if [[ "$ARCH" != "arm64" && "$ARCH" != "aarch64" ]]; then
   die "Dieses Paket ist fuer arm64. Erkannt: $ARCH.
 Auf einem Pi 4 bedeutet das meist: es laeuft das 32-Bit-Image. Bitte Raspberry Pi OS 64-bit verwenden."
 fi
+
+# Andere arm64-Einplatinenrechner koennen funktionieren, sind aber ungetestet.
+MODEL="$(tr -d '\0' < /proc/device-tree/model 2>/dev/null || echo unbekannt)"
+case "$MODEL" in
+  *"Raspberry Pi"*) log "Erkannt: $MODEL" ;;
+  *) warn "Kein Raspberry Pi erkannt (${MODEL}). Ungetestet, wird aber versucht." ;;
+esac
 
 [[ -n "$REPO" || -n "$BUNDLE" ]] || die "Entweder --repo oder --bundle angeben."
 
