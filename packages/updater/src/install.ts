@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdir, readdir, readlink, rename, rm, symlink, unlink, writeFile } from 'node:fs/promises';
+import { chmod, chown, mkdir, readdir, readlink, rename, rm, symlink, unlink, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { promisify } from 'node:util';
@@ -67,7 +67,42 @@ export async function extractRelease(archive: Buffer, version: string): Promise<
   await rm(target, { recursive: true, force: true });
   await rename(source, target);
   if (source !== staging) await rm(staging, { recursive: true, force: true });
+  await prepareShell(target);
   return target;
+}
+
+/**
+ * Macht die entpackte Anzeige startfaehig.
+ *
+ * Electrons Sandbox-Helfer braucht setuid-root. Bei einem entpackten Build
+ * setzt das kein Paketmanager – und ohne diesen Schritt wuerde jedes Update
+ * eine Anzeige hinterlassen, die nicht startet, der Healthcheck scheitern und
+ * der Spiegel zurueckrollen. Der Installer macht dasselbe bei der
+ * Erstinstallation; hier steht es, weil danach nur noch der Updater Releases
+ * auf die Platte legt.
+ */
+async function prepareShell(releasePath: string): Promise<void> {
+  const executable = join(releasePath, 'shell', 'smartmirror-shell');
+  const sandbox = join(releasePath, 'shell', 'chrome-sandbox');
+  const session = join(releasePath, 'deploy', 'cage-session.sh');
+
+  for (const file of [executable, session]) {
+    if (existsSync(file)) await chmod(file, 0o755).catch(() => {});
+  }
+
+  if (!existsSync(sandbox)) return;
+  try {
+    await chown(sandbox, 0, 0);
+    await chmod(sandbox, 0o4755);
+  } catch (error) {
+    // Nicht abbrechen: laeuft der Updater ausnahmsweise ohne Root, soll das
+    // hier auffallen, ohne das ganze Update zu verwerfen. Der Healthcheck
+    // faengt den Fall danach ohnehin.
+    throw new Error(
+      `Sandbox-Helfer konnte nicht eingerichtet werden (${(error as Error).message}). ` +
+        'Der Updater braucht dafuer Root-Rechte.',
+    );
+  }
 }
 
 /** Ziel eines Symlinks, oder null wenn er nicht existiert. */
