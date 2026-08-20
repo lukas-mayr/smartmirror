@@ -111,6 +111,21 @@ log "Schluessel ${KEY_ID:-unbekannt} wird auf diesem Geraet verankert"
 
 # ------------------------------- Pakete ---------------------------------------
 
+# Vorab pruefen, statt mitten in der Installation an die Wand zu fahren.
+FREE_MB="$(df -Pm / | awk 'NR==2 {print $4}')"
+if [[ "$FREE_MB" -lt 2000 ]]; then
+  die "Zu wenig freier Speicher: ${FREE_MB} MB. Gebraucht werden mindestens 2 GB
+(Electron entpackt allein rund 300 MB, dazu Pakete und ein zweites Release fuer den Rueckfall)."
+fi
+
+# Ein bereits kaputter Paketzustand wird durch weitere Installationen nur
+# schlimmer. Einmal aufraeumen lassen, bevor wir etwas anfassen.
+if ! dpkg --audit 2>/dev/null | head -1 | grep -q '^$'; then
+  log "Paketzustand aufraeumen"
+  dpkg --configure -a >/dev/null 2>&1 || true
+  apt-get --fix-broken install -y >/dev/null 2>&1 || true
+fi
+
 log "Systempakete installieren"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
@@ -121,7 +136,9 @@ log "Compositor und Grundpakete (das dauert ein paar Minuten) ..."
 apt-get install -y --no-install-recommends \
   ca-certificates curl tar \
   cage wlr-randr \
-  avahi-daemon
+  avahi-daemon \
+  || die "Grundpakete liessen sich nicht installieren. Bitte zuerst:
+  sudo apt --fix-broken install && sudo apt update && sudo apt full-upgrade -y"
 
 # Bibliotheken, die Electron braucht.
 #
@@ -153,8 +170,27 @@ done
 log "Bibliotheken fuer die Anzeige: ${ELECTRON_LIBS[*]}"
 # Ausgabe bewusst sichtbar lassen: dieser Schritt dauert auf einer SD-Karte
 # mehrere Minuten, und ein stiller Installer sieht dabei aus wie ein haengender.
-apt-get install -y --no-install-recommends "${ELECTRON_LIBS[@]}" \
-  || warn "Nicht alle Bibliotheken liessen sich installieren – die ldd-Pruefung weiter unten sagt, was fehlt."
+if ! apt-get install -y --no-install-recommends "${ELECTRON_LIBS[@]}"; then
+  # Einmaliger Reparaturversuch. Haeufigste Ursache auf einem frischen Pi: ein
+  # nur teilweise aktualisiertes System, in dem sich Debian- und
+  # Raspberry-Pi-Paketquellen widersprechen.
+  warn "Installation fehlgeschlagen – versuche den Paketzustand zu reparieren."
+  apt-get --fix-broken install -y || true
+  if ! apt-get install -y --no-install-recommends "${ELECTRON_LIBS[@]}"; then
+    die "Die Bibliotheken der Anzeige liessen sich nicht installieren.
+
+Hier abzubrechen ist Absicht: Nach einem gescheiterten dpkg-Lauf ist die
+Paketdatenbank in einem Zwischenzustand, und alles Weitere – auch die
+Node-Installation – wuerde daran ebenfalls scheitern.
+
+Bitte zuerst das System auf einen sauberen Stand bringen:
+  sudo apt --fix-broken install
+  sudo apt update && sudo apt full-upgrade -y
+  sudo reboot
+
+Danach dieses Skript erneut ausfuehren."
+  fi
+fi
 
 # ddcutil ist optional: viele Monitore koennen kein DDC/CI, dann regelt die
 # Anzeige die Helligkeit selbst.
