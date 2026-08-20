@@ -179,8 +179,8 @@ eingeben kann. Beide Dateien als GitHub-Secrets hinterlegen:
 ### 2. Installieren
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/benutzer/smartmirror/main/deploy/install.sh -o install.sh
-sudo bash install.sh --repo benutzer/smartmirror --pubkey ./minisign.pub
+curl -fsSL https://raw.githubusercontent.com/lukas-mayr/smartmirror/main/deploy/install.sh -o install.sh
+sudo bash install.sh --repo lukas-mayr/smartmirror --pubkey ./minisign.pub
 ```
 
 Ohne GitHub-Repository geht es auch aus einem lokal gebauten Paket:

@@ -2,7 +2,7 @@
 #
 # Richtet einen Raspberry Pi als Smartmirror ein.
 #
-#   sudo ./install.sh --repo benutzer/smartmirror --pubkey ./minisign.pub
+#   sudo ./install.sh --repo lukas-mayr/smartmirror --pubkey ./minisign.pub
 #
 # Danach bootet der Pi ohne Anmeldung direkt in die Anzeige, und die
 # Fernbedienung ist unter http://smartmirror.local:8080 erreichbar.
