@@ -2,7 +2,7 @@
 #
 # Richtet einen Raspberry Pi als Smartmirror ein.
 #
-#   sudo ./install.sh --repo lukas-mayr/smartmirror --pubkey ./minisign.pub
+#   curl -fsSL https://raw.githubusercontent.com/lukas-mayr/smartmirror/main/deploy/install.sh -o /tmp/i.sh && sudo bash /tmp/i.sh
 #
 # Danach bootet der Pi ohne Anmeldung direkt in die Anzeige, und die
 # Fernbedienung ist unter http://smartmirror.local:8080 erreichbar.
@@ -15,7 +15,7 @@ INSTALL_ROOT="/opt/smartmirror"
 SERVICE_USER="mirror"
 NODE_MAJOR="22"
 
-REPO=""
+REPO="lukas-mayr/smartmirror"
 PUBKEY=""
 BUNDLE=""
 CHANNEL="stable"
@@ -29,7 +29,9 @@ usage() {
   cat <<'USAGE'
 Optionen:
   --repo <benutzer/repo>   GitHub-Repository, aus dem Updates geholt werden
-  --pubkey <datei>         Oeffentlicher minisign-Schluessel zur Update-Pruefung (Pflicht)
+                           (Standard: lukas-mayr/smartmirror)
+  --pubkey <datei>         Oeffentlicher minisign-Schluessel. Ohne Angabe wird er
+                           aus dem Repository geholt.
   --bundle <datei.tar.gz>  Lokales Release statt Download von GitHub
   --channel <stable|beta>  Update-Kanal (Standard: stable)
   --skip-boot-config       /boot/firmware/config.txt nicht anfassen
@@ -59,16 +61,26 @@ if [[ "$ARCH" != "arm64" && "$ARCH" != "aarch64" ]]; then
 Auf einem Pi 4 bedeutet das meist: es laeuft das 32-Bit-Image. Bitte Raspberry Pi OS 64-bit verwenden."
 fi
 
-if [[ -z "$PUBKEY" ]]; then
-  die "--pubkey fehlt.
-Ohne oeffentlichen Schluessel kann der Updater keine Signaturen pruefen, und ein
-uebernommener GitHub-Zugang oder manipuliertes DNS wuerde beliebigen Code auf
-diesem Geraet ausfuehren. Schluessel erzeugen: minisign -G -p minisign.pub -s minisign.key"
-fi
-[[ -f "$PUBKEY" ]] || die "Schluesseldatei nicht gefunden: $PUBKEY"
-grep -q '^untrusted comment' "$PUBKEY" || warn "Die Schluesseldatei sieht ungewoehnlich aus – bitte pruefen."
-
 [[ -n "$REPO" || -n "$BUNDLE" ]] || die "Entweder --repo oder --bundle angeben."
+
+# Der oeffentliche Schluessel ist kein Geheimnis und liegt im Repository. Ihn von
+# Hand herzutragen wuerde die Sicherheit nicht erhoehen: dieses Skript kommt aus
+# derselben Quelle. Entscheidend ist, dass der Schluessel ab jetzt fest auf dem
+# Geraet liegt – danach kann selbst ein uebernommener GitHub-Zugang kein Update
+# mehr unterschieben, weil dafuer der geheime Schluessel noetig waere.
+if [[ -z "$PUBKEY" ]]; then
+  [[ -n "$REPO" ]] || die "Ohne --repo muss --pubkey angegeben werden."
+  log "Signierschluessel aus $REPO holen"
+  PUBKEY="$(mktemp)"
+  curl -fsSL "https://raw.githubusercontent.com/$REPO/HEAD/minisign.pub" -o "$PUBKEY" \
+    || die "Signierschluessel nicht abrufbar. Erwartet: minisign.pub im Wurzelverzeichnis von $REPO"
+fi
+
+[[ -f "$PUBKEY" ]] || die "Schluesseldatei nicht gefunden: $PUBKEY"
+grep -q '^untrusted comment' "$PUBKEY" || die "Die Datei ist kein minisign-Schluessel: $PUBKEY"
+
+KEY_ID="$(head -1 "$PUBKEY" | grep -oE '[0-9A-F]{16}' || true)"
+log "Schluessel ${KEY_ID:-unbekannt} wird auf diesem Geraet verankert"
 
 # ------------------------------- Pakete ---------------------------------------
 

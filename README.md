@@ -160,45 +160,82 @@ Voraussetzung: **Raspberry Pi OS 64-bit (Bookworm oder neuer)** auf einem
 Pi 4B oder Pi 5. Ein Pi 4 mit dem 32-Bit-Image funktioniert nicht — der
 Installer bricht mit einem entsprechenden Hinweis ab.
 
-### 1. Signierschlüssel erzeugen (einmalig, auf dem eigenen Rechner)
+### Installieren
+
+Auf dem Pi, ein Befehl:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/lukas-mayr/smartmirror/main/deploy/install.sh -o /tmp/install.sh && sudo bash /tmp/install.sh
+```
+
+Erst vollständig herunterladen, dann ausführen — nicht `curl | bash`. Bei einer
+abgebrochenen Verbindung würde die Pipe-Variante ein halbes Skript ausführen,
+und das mitten in der Partitions- und Systemkonfiguration.
+
+Der Installer legt den Dienstbenutzer an, installiert `cage`, Node und die
+systemd-Units, holt den Signierschlüssel und das neueste Release, setzt
+`vc4-kms-v3d` in der `config.txt` und den Hostnamen auf `smartmirror`. Ein
+zweiter Lauf aktualisiert nur, was sich geändert hat, und lässt Konfiguration
+und Kopplungen unberührt.
+
+Danach: **`http://smartmirror.local:8080`** auf dem Handy öffnen und zum
+Startbildschirm hinzufügen.
+
+Ohne Internet geht es auch aus einem lokal gebauten Paket:
+
+```bash
+sudo bash install.sh --bundle smartmirror-0.1.0-arm64.tar.gz --pubkey ./minisign.pub
+```
+
+### Koppeln
+
+Beim ersten Verbinden zeigt der Spiegel einen sechsstelligen Code. Wer koppeln
+will, braucht also Sichtkontakt — für ein Gerät im eigenen WLAN die passende
+Hürde, und es erspart ein Passwort, das ohnehin niemand ändert.
+
+### Was der Installer mit dem Signierschlüssel macht
+
+Der öffentliche Schlüssel liegt als `minisign.pub` im Repository und wird beim
+Installieren geholt und fest auf dem Gerät verankert. Er ist kein Geheimnis —
+prüfen kann damit jeder, unterschreiben niemand.
+
+Damit ist die Erstinstallation ein Vertrauensvorschuss auf das, was GitHub in
+diesem Moment ausliefert. Das ist ohnehin so, denn dieses Installationsskript
+kommt aus derselben Quelle; den Schlüssel zusätzlich von Hand herüberzutragen
+würde daran nichts ändern, solange er vom selben Rechner stammt.
+
+Entscheidend ist, was **danach** gilt: Der Schlüssel liegt unter
+`/opt/smartmirror/minisign.pub`, und der Updater installiert nichts, was nicht
+dazu passt. Ein übernommener GitHub-Zugang reicht ab diesem Punkt nicht mehr,
+um Code auf den Spiegel zu bringen — dafür bräuchte es den geheimen Schlüssel,
+und der liegt nicht auf GitHub, sondern nur in den Actions-Secrets und in
+deinem Backup.
+
+Wer den Schlüssel über einen wirklich getrennten Kanal beziehen will, umgeht
+den Abruf mit `--pubkey ./minisign.pub`.
+
+### Eigenes Repository verwenden
+
+Nur nötig, wenn du einen eigenen Fork betreibst:
 
 ```bash
 minisign -G -W -p minisign.pub -s minisign.key
 ```
 
 `-W` erzeugt den Schlüssel ohne Passwort, weil die CI ihn nicht interaktiv
-eingeben kann. Beide Dateien als GitHub-Secrets hinterlegen:
+eingeben kann. Dann `minisign.pub` ins Repository-Wurzelverzeichnis committen
+und beide Dateien als Actions-Secrets hinterlegen:
 
 | Secret | Inhalt |
 |---|---|
 | `MINISIGN_SECRET_KEY` | vollständiger Inhalt von `minisign.key` |
 | `MINISIGN_PUBLIC_KEY` | vollständiger Inhalt von `minisign.pub` |
 
-`minisign.key` gehört **nicht** ins Repository.
+`minisign.key` gehört **nicht** ins Repository — `.gitignore` blockt `*.key`.
+Sichere ihn im Passwortmanager: ohne ihn lässt sich für bereits aufgehängte
+Spiegel kein Update mehr signieren.
 
-### 2. Installieren
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/lukas-mayr/smartmirror/main/deploy/install.sh -o install.sh
-sudo bash install.sh --repo lukas-mayr/smartmirror --pubkey ./minisign.pub
-```
-
-Ohne GitHub-Repository geht es auch aus einem lokal gebauten Paket:
-`sudo bash install.sh --bundle smartmirror-0.1.0-arm64.tar.gz --pubkey ./minisign.pub`
-
-Der Installer legt den Dienstbenutzer an, installiert `cage`, Node und die
-systemd-Units, holt das neueste Release, setzt `vc4-kms-v3d` in der
-`config.txt` und den Hostnamen auf `smartmirror`. Ein zweiter Lauf aktualisiert
-nur, was sich geändert hat, und lässt Konfiguration und Kopplungen unberührt.
-
-Danach: **`http://smartmirror.local:8080`** auf dem Handy öffnen und zum
-Startbildschirm hinzufügen.
-
-### 3. Koppeln
-
-Beim ersten Verbinden zeigt der Spiegel einen sechsstelligen Code. Wer koppeln
-will, braucht also Sichtkontakt — für ein Gerät im eigenen WLAN die passende
-Hürde, und es erspart ein Passwort, das ohnehin niemand ändert.
+Installation dann mit `--repo deinname/smartmirror`.
 
 ---
 
