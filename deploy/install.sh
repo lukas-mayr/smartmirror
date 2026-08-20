@@ -87,12 +87,39 @@ log "Schluessel ${KEY_ID:-unbekannt} wird auf diesem Geraet verankert"
 log "Systempakete installieren"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
+
+# Pflicht: ohne diese startet nichts.
 apt-get install -y --no-install-recommends \
   ca-certificates curl tar \
   cage wlr-randr \
-  libgtk-3-0 libnotify4 libnss3 libxss1 libasound2 libgbm1 libdrm2 \
   avahi-daemon \
   >/dev/null
+
+# Bibliotheken, die Electron braucht.
+#
+# Die Namen wandern zwischen Debian-Versionen: auf Trixie heissen einige wegen
+# der 64-Bit-time_t-Umstellung "...t64". Deshalb pro Paket erst die neue, dann
+# die alte Schreibweise probieren – und einen einzelnen Fehlschlag nicht die
+# ganze Installation abbrechen lassen. Ob wirklich alles da ist, prueft weiter
+# unten ohnehin ldd am fertigen Programm; das ist verlaesslicher als eine
+# Paketliste, die mit jeder Debian-Version verrottet.
+install_optional() {
+  for candidate in "$@"; do
+    if apt-get install -y --no-install-recommends "$candidate" >/dev/null 2>&1; then
+      return 0
+    fi
+  done
+  warn "Keines dieser Pakete war installierbar: $*"
+  return 0
+}
+
+install_optional libgtk-3-0t64 libgtk-3-0
+install_optional libasound2t64 libasound2
+install_optional libnotify4
+install_optional libnss3
+install_optional libxss1
+install_optional libgbm1
+install_optional libdrm2
 
 # ddcutil ist optional: viele Monitore koennen kein DDC/CI, dann regelt die
 # Anzeige die Helligkeit selbst.
@@ -191,6 +218,19 @@ mkdir -p "$TARGET"
 cp -a "$STAGING/." "$TARGET/"
 chmod +x "$TARGET/deploy/cage-session.sh" 2>/dev/null || true
 chmod +x "$TARGET/shell/smartmirror-shell" 2>/dev/null || true
+
+# Gegenprobe: fehlt Electron eine Bibliothek, startet die Anzeige spaeter
+# wortlos nicht. Lieber jetzt sagen, welche.
+if command -v ldd >/dev/null 2>&1 && [[ -x "$TARGET/shell/smartmirror-shell" ]]; then
+  MISSING="$(ldd "$TARGET/shell/smartmirror-shell" 2>/dev/null | awk '/not found/ {print "  " $1}' | sort -u)"
+  if [[ -n "$MISSING" ]]; then
+    warn "Der Anzeige fehlen Bibliotheken:"
+    printf '%s\n' "$MISSING" >&2
+    warn "Installieren mit: sudo apt-get install -y <passendes Paket> (Suche: apt-file search <name>)"
+  else
+    log "Alle Bibliotheken der Anzeige sind vorhanden."
+  fi
+fi
 
 # Symlink atomar setzen, damit ein abgebrochener Lauf kein halbes "current" hinterlaesst.
 ln -sfn "$TARGET" "$INSTALL_ROOT/current.new"
