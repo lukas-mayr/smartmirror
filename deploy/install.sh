@@ -171,24 +171,41 @@ log "Bibliotheken fuer die Anzeige: ${ELECTRON_LIBS[*]}"
 # Ausgabe bewusst sichtbar lassen: dieser Schritt dauert auf einer SD-Karte
 # mehrere Minuten, und ein stiller Installer sieht dabei aus wie ein haengender.
 if ! apt-get install -y --no-install-recommends "${ELECTRON_LIBS[@]}"; then
-  # Einmaliger Reparaturversuch. Haeufigste Ursache auf einem frischen Pi: ein
-  # nur teilweise aktualisiertes System, in dem sich Debian- und
-  # Raspberry-Pi-Paketquellen widersprechen.
+  # Zwei Reparaturversuche, in der Reihenfolge ihrer Haeufigkeit.
   warn "Installation fehlgeschlagen – versuche den Paketzustand zu reparieren."
   apt-get --fix-broken install -y || true
+
   if ! apt-get install -y --no-install-recommends "${ELECTRON_LIBS[@]}"; then
-    die "Die Bibliotheken der Anzeige liessen sich nicht installieren.
+    # Zweiter Anlauf mit geleertem Cache. "Invalid archive signature" oder
+    # "is not a Debian format archive" bedeutet: die zwischengespeicherten
+    # .deb-Dateien sind beschaedigt. apt merkt das von sich aus nicht und laedt
+    # sie nicht neu – es haelt den Cache fuer gueltig und scheitert bei jedem
+    # Versuch aufs Neue an denselben kaputten Dateien.
+    warn "Paketcache leeren und erneut laden."
+    apt-get clean
+    apt-get update -qq || true
+    apt-get --fix-broken install -y || true
+
+    if ! apt-get install -y --no-install-recommends "${ELECTRON_LIBS[@]}"; then
+      die "Die Bibliotheken der Anzeige liessen sich nicht installieren.
 
 Hier abzubrechen ist Absicht: Nach einem gescheiterten dpkg-Lauf ist die
 Paketdatenbank in einem Zwischenzustand, und alles Weitere – auch die
 Node-Installation – wuerde daran ebenfalls scheitern.
 
-Bitte zuerst das System auf einen sauberen Stand bringen:
-  sudo apt --fix-broken install
-  sudo apt update && sudo apt full-upgrade -y
-  sudo reboot
+Ein geleerter Cache hat nicht geholfen. Damit bleiben zwei Ursachen, und beide
+liegen ausserhalb dieses Skripts:
+
+  1. Die SD-Karte schreibt oder liest fehlerhaft. Pruefen mit:
+       dmesg | grep -iE 'mmc|I/O error|EXT4-fs error' | tail -20
+     Kommen dort Fehler, hilft nur eine neue Karte und ein frisches Image.
+
+  2. Das Netzwerk liefert etwas anderes aus als angefordert – ein Captive
+     Portal oder filternder Router. Pruefen mit:
+       curl -sI http://deb.debian.org/debian/dists/trixie/Release | head -3
 
 Danach dieses Skript erneut ausfuehren."
+    fi
   fi
 fi
 
