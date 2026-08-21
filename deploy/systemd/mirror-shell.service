@@ -33,8 +33,10 @@ ExecStart=/opt/smartmirror/current/deploy/cage-session.sh
 Restart=always
 RestartSec=5
 
-# Zugriff auf Grafik, Eingabe und den seatd-Socket – mehr nicht.
-SupplementaryGroups=video render input _seatd
+# Zugriff auf Grafik und Eingabe. Die Gruppe des seatd-Sockets heisst je nach
+# Distribution anders und wird deshalb vom Installer ermittelt und per
+# Drop-in-Datei ergaenzt, statt hier geraten zu werden.
+SupplementaryGroups=video render input
 PrivateTmp=yes
 NoNewPrivileges=yes
 

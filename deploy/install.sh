@@ -252,7 +252,37 @@ done
 log "Seat-Verwaltung aktivieren"
 systemctl enable --now seatd >/dev/null 2>&1 \
   || warn "seatd liess sich nicht starten – die Anzeige kommt dann nicht an die Grafikausgabe."
-getent group _seatd >/dev/null && usermod -aG _seatd "$SERVICE_USER"
+
+# Welche Gruppe den seatd-Socket besitzt, ist von Distribution zu Distribution
+# verschieden ("seat" auf Arch, anderswo "_seatd", teils gar keine). Statt einen
+# Namen zu raten, wird der tatsaechliche Eigentuemer des Sockets ausgelesen –
+# das stimmt per Definition immer.
+SEAT_GROUP=""
+for _ in $(seq 1 10); do
+  [[ -S /run/seatd.sock ]] && break
+  sleep 1
+done
+if [[ -S /run/seatd.sock ]]; then
+  SEAT_GROUP="$(stat -c '%G' /run/seatd.sock 2>/dev/null || true)"
+fi
+# Fallback auf die gaengigen Namen, falls der Socket noch nicht da ist.
+if [[ -z "$SEAT_GROUP" || "$SEAT_GROUP" == "UNKNOWN" || "$SEAT_GROUP" == "root" ]]; then
+  for candidate in _seatd seat video; do
+    if getent group "$candidate" >/dev/null; then SEAT_GROUP="$candidate"; break; fi
+  done
+fi
+
+if [[ -n "$SEAT_GROUP" ]] && getent group "$SEAT_GROUP" >/dev/null; then
+  usermod -aG "$SEAT_GROUP" "$SERVICE_USER"
+  log "Dienstbenutzer der Gruppe '$SEAT_GROUP' hinzugefuegt (seatd-Socket)."
+  # Die Unit setzt die Gruppe zusaetzlich fest, damit sie auch ohne erneutes
+  # Anmelden greift – Systemdienste erben Gruppenaenderungen sonst nicht.
+  mkdir -p /etc/systemd/system/mirror-shell.service.d
+  printf '[Service]\nSupplementaryGroups=%s\n' "$SEAT_GROUP" \
+    > /etc/systemd/system/mirror-shell.service.d/seat-group.conf
+else
+  warn "Gruppe fuer den seatd-Socket nicht ermittelbar – die Anzeige kommt moeglicherweise nicht an die Grafikausgabe."
+fi
 
 log "Verzeichnisse unter $INSTALL_ROOT anlegen"
 mkdir -p "$INSTALL_ROOT/releases" "$INSTALL_ROOT/data"
