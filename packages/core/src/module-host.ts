@@ -6,7 +6,9 @@ import { pathToFileURL } from 'node:url';
 import {
   assertValidManifest,
   defaultsOf,
+  DEFAULT_WIDGET_SIZE,
   hostAllowed,
+  normalizeWidgetSizes,
   toMillis,
   validate,
   type BackendContext,
@@ -114,7 +116,11 @@ export class ModuleHost extends EventEmitter {
       version: module.manifest.version,
       description: module.manifest.description,
       singleton: module.manifest.singleton === true,
-      preferredSize: module.manifest.preferredSize,
+      sizes: normalizeWidgetSizes(module.manifest.sizes),
+      // Ohne Angabe die kleinste angebotene Groesse: ein Modul, das beim
+      // Hinzufuegen zu gross einsteigt, verdeckt fremde Bloecke.
+      preferredSize:
+        module.manifest.preferredSize ?? normalizeWidgetSizes(module.manifest.sizes)[0] ?? DEFAULT_WIDGET_SIZE,
       configSchema: module.manifest.configSchema,
       secrets: module.manifest.secrets ?? [],
       secretsPresent: this.#secrets.listFor(module.manifest.id),

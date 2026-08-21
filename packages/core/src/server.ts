@@ -9,6 +9,7 @@ import {
   defaultScreenName,
   findFreeSpot,
   isClientMessage,
+  nearestWidgetSize,
   nextScreenId,
   normalizeWidgetSize,
   rectFor,
@@ -176,6 +177,44 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
     void deps.modules.sync(deps.config.current);
     deps.power.onConfigChange(deps.config.current);
   });
+
+  /**
+   * Bringt die gespeicherten Blockgroessen mit dem in Einklang, was die Module
+   * anbieten.
+   *
+   * Noetig, weil die Groesse in der Konfiguration steht und die Liste der
+   * moeglichen Groessen im Modul: ein Update, das eine Groesse fallen laesst,
+   * oder eine von Hand bearbeitete Datei brechen sonst auseinander. Repariert
+   * wird in der Konfiguration und nicht erst beim Zeichnen – sonst zeigte die
+   * Wand etwas anderes als das Brett am Handy.
+   */
+  const alignSizesToModules = async (): Promise<void> => {
+    // Module, die nicht geladen haben, wissen nichts ueber ihre Groessen. Ihre
+    // Bloecke bleiben unangetastet, bis das Modul wieder laeuft.
+    const supported = new Map(
+      deps.modules
+        .descriptors()
+        .filter((descriptor) => !descriptor.loadError)
+        .map((descriptor) => [descriptor.id, descriptor.sizes]),
+    );
+    const affected = deps.config.current.instances.some((instance) => {
+      const sizes = supported.get(instance.moduleId);
+      return sizes !== undefined && !sizes.includes(instance.size);
+    });
+    if (!affected) return;
+
+    await deps.config.update((draft) => {
+      for (const instance of draft.instances) {
+        const sizes = supported.get(instance.moduleId);
+        if (!sizes || sizes.includes(instance.size)) continue;
+        const next = nearestWidgetSize(instance.size, sizes);
+        log.info(`"${instance.id}": Groesse ${instance.size} gibt es in "${instance.moduleId}" nicht – jetzt ${next}.`);
+        instance.size = next;
+      }
+    });
+  };
+
+  await alignSizesToModules();
 
   /* ---------------------------------- Routen ---------------------------------- */
 
@@ -363,7 +402,8 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
         });
         return;
 
-      case 'admin:setLayout':
+      case 'admin:setLayout': {
+        const descriptors = deps.modules.descriptors();
         await deps.config.update((draft) => {
           for (const update of message.instances) {
             const instance = draft.instances.find((entry) => entry.id === update.id);
@@ -376,11 +416,19 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
             }
             if (Number.isFinite(update.x)) instance.x = Number(update.x);
             if (Number.isFinite(update.y)) instance.y = Number(update.y);
-            if (update.size !== undefined) instance.size = normalizeWidgetSize(update.size, instance.size);
+            if (update.size !== undefined) {
+              // Nicht jedes Modul gibt es in jeder Groesse. Eine Groesse, die
+              // es nicht anbietet, wird auf die naechstliegende gezogen statt
+              // abgelehnt – am Handy steht sie ohnehin nicht zur Auswahl.
+              const sizes = descriptors.find((entry) => entry.id === instance.moduleId)?.sizes;
+              const requested = normalizeWidgetSize(update.size, instance.size);
+              instance.size = sizes ? nearestWidgetSize(requested, sizes) : requested;
+            }
             if (typeof update.enabled === 'boolean') instance.enabled = update.enabled;
           }
         });
         return;
+      }
 
       case 'admin:addInstance': {
         const descriptor = deps.modules.descriptors().find((entry) => entry.id === message.moduleId);
@@ -390,7 +438,10 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
             throw new Error(`Von "${descriptor.id}" ist nur eine Instanz erlaubt`);
           }
           const screen = draft.screens.find((entry) => entry.id === message.screenId) ?? draft.screens[0]!;
-          const size = normalizeWidgetSize(message.size, descriptor.preferredSize);
+          const size = nearestWidgetSize(
+            normalizeWidgetSize(message.size, descriptor.preferredSize),
+            descriptor.sizes,
+          );
           const occupied = draft.instances
             .filter((entry) => entry.screenId === screen.id)
             .map((entry) => rectFor(entry, draft.display.grid));

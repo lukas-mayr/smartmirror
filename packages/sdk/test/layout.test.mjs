@@ -7,11 +7,15 @@ import {
   GRID_MAX,
   GRID_MIN,
   normalizeGrid,
+  formatWidgetSizes,
+  nearestWidgetSize,
   normalizeWidgetSize,
+  normalizeWidgetSizes,
   rectFor,
   rectsOverlap,
   sizeCells,
   WIDGET_SIZE_SPECS,
+  WIDGET_SIZES,
 } from '../dist/layout.js';
 
 test('begrenzt das Raster auf brauchbare Kantenlaengen', () => {
@@ -79,4 +83,32 @@ test('jede Groesse ist ein Vielfaches der kleinsten', () => {
     assert.ok(spec.columns >= 1 && spec.rows >= 1, `${spec.id} ist leer`);
     assert.equal(Number.isInteger(spec.columns) && Number.isInteger(spec.rows), true);
   }
+});
+
+test('ein Modul ohne Angabe kann alle Groessen', () => {
+  // Die haeufigere Haelfte: eine Uhrzeit passt in jeden Block.
+  assert.deepEqual(normalizeWidgetSizes(undefined), WIDGET_SIZES);
+  assert.deepEqual(normalizeWidgetSizes([]), WIDGET_SIZES);
+  assert.deepEqual(normalizeWidgetSizes(['nichts davon']), WIDGET_SIZES);
+});
+
+test('sortiert die angebotenen Groessen und wirft Wiederholungen weg', () => {
+  // Die Auswahl am Handy darf nicht davon abhaengen, in welcher Reihenfolge
+  // jemand sein Manifest geschrieben hat.
+  assert.deepEqual(normalizeWidgetSizes(['xl', 'm', 'm']), ['m', 'xl']);
+});
+
+test('zieht eine nicht angebotene Groesse auf die naechstliegende', () => {
+  const supported = ['m', 'l', 'xl'];
+  assert.equal(nearestWidgetSize('m', supported), 'm');
+  assert.equal(nearestWidgetSize('s', supported), 'm');
+  // Bei gleichem Abstand die kleinere: ein zu grosser Block schoebe die
+  // Nachbarn beiseite, ein zu kleiner faellt nur selbst kleiner aus.
+  assert.equal(nearestWidgetSize('m', ['s', 'l']), 's');
+  assert.equal(nearestWidgetSize('l', ['s']), 's');
+});
+
+test('zaehlt die Groessen fuer die Handy-App auf', () => {
+  assert.equal(formatWidgetSizes(['m', 'l', 'xl']), 'M, L und XL');
+  assert.equal(formatWidgetSizes(['l']), 'L');
 });

@@ -115,10 +115,9 @@ export default defineFrontend<State, Config>({
 
 **Die Einstellungsoberfläche entsteht von selbst.** Das `configSchema` im
 Manifest wird an die Handy-App geschickt, die daraus das Formular baut. Ein
-neues Modul braucht keinerlei eigene UI im Client. Wie groß der Block sein soll,
-in dem das Modul erscheint, schlägt das Manifest mit `preferredSize` vor
-(`"s"`, `"m"`, `"l"` oder `"xl"` — siehe [Screens, Raster und
-Blöcke](#screens-raster-und-blöcke)).
+neues Modul braucht keinerlei eigene UI im Client. In welchen Blockgrößen es das
+Modul gibt, sagt das Manifest mit `sizes` und `preferredSize` (`"s"`, `"m"`,
+`"l"`, `"xl"` — siehe [Screens, Raster und Blöcke](#screens-raster-und-blöcke)).
 
 **Rechte werden im Manifest angefordert**, sonst existieren sie nicht:
 
@@ -152,6 +151,13 @@ Widgets auf einem Telefon:
 Ein Block rastet ein: Abstände stimmen von selbst, und eine Anordnung lässt sich
 in einem Satz beschreiben. Freie Pixelpositionen gäbe es nur um den Preis, dass
 niemand sie mit dem Daumen auf einem Handybildschirm trifft.
+
+**Nicht jedes Modul gibt es in jeder Größe.** Eine Größe ist keine Einstellung,
+sondern eine Aussage über den Inhalt: eine Uhrzeit passt in ein einzelnes Feld,
+eine Wochenvorhersage braucht eine Reihe. Ein Modul zählt im Manifest auf, was
+es kann — `"sizes": ["m", "l", "xl"]` —, und am Handy sind die übrigen Größen gar
+nicht erst antippbar. Ohne Angabe kann ein Modul alle vier; das Wetter lässt S
+aus, weil davon nur eine Zahl ohne Zusammenhang übrig bliebe.
 
 **Mehrere Screens.** Ein Screen ist eine vollständige Anordnung. Der Spiegel
 schaltet sie im Kreis weiter; die Standzeit steht am Screen und nicht global —
@@ -189,8 +195,12 @@ passt, blendet eine Container-Query aus:
 }
 ```
 
-Das Manifest schlägt mit `"preferredSize": "l"` nur die Größe beim Hinzufügen
-vor. Wohin der Block gehört, weiß allein der Nutzer.
+Das Manifest zählt mit `sizes` auf, welche Größen inhaltlich aufgehen, und
+schlägt mit `"preferredSize": "l"` die beim Hinzufügen vor — sie muss in `sizes`
+stehen, sonst lädt das Modul nicht. Wohin der Block gehört, weiß allein der
+Nutzer. Verliert ein Modul im Update eine Größe, zieht der Core bestehende
+Blöcke auf die nächstliegende, die es noch gibt; bei gleichem Abstand auf die
+kleinere, denn ein zu großer Block schöbe seine Nachbarn beiseite.
 
 ---
 

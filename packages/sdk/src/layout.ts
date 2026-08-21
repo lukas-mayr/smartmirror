@@ -86,6 +86,59 @@ export function normalizeWidgetSize(value: unknown, fallback: WidgetSize = DEFAU
   return isWidgetSize(value) ? value : fallback;
 }
 
+/**
+ * Groessen, die ein Modul anbietet.
+ *
+ * Nicht jedes Modul gibt es in jeder Groesse: eine Wochenvorhersage in einem
+ * Feld von 1 x 1 ist keine Vorhersage mehr, sondern eine Zahl ohne Zusammenhang.
+ * Ein Modul, das dazu nichts sagt, kann alle vier – das ist die haeufigere
+ * Haelfte und erspart jedem einfachen Modul eine Pflichtangabe.
+ *
+ * Das Ergebnis steht immer in der kanonischen Reihenfolge (klein nach gross)
+ * und ohne Wiederholungen: die Auswahl am Handy soll nicht davon abhaengen, in
+ * welcher Reihenfolge jemand sein Manifest geschrieben hat.
+ */
+export function normalizeWidgetSizes(
+  value: unknown,
+  fallback: readonly WidgetSize[] = WIDGET_SIZES,
+): readonly WidgetSize[] {
+  if (!Array.isArray(value)) return fallback;
+  const kept = WIDGET_SIZES.filter((size) => value.includes(size));
+  return kept.length > 0 ? kept : fallback;
+}
+
+/**
+ * Naechstliegende Groesse, die ein Modul anbietet.
+ *
+ * Gebraucht, wenn eine Groesse aus der Konfiguration nicht (mehr) zum Modul
+ * passt – etwa weil ein Update eine Groesse fallen gelassen hat oder jemand die
+ * Datei von Hand bearbeitet hat. Bei gleichem Abstand gewinnt die kleinere:
+ * ein zu grosser Block schoebe seine Nachbarn beiseite, ein zu kleiner faellt
+ * nur selbst kleiner aus.
+ */
+export function nearestWidgetSize(size: WidgetSize, supported: readonly WidgetSize[]): WidgetSize {
+  if (supported.length === 0 || supported.includes(size)) return size;
+  const index = WIDGET_SIZES.indexOf(size);
+  let best = supported[0]!;
+  let bestScore = Number.POSITIVE_INFINITY;
+  for (const candidate of supported) {
+    const delta = WIDGET_SIZES.indexOf(candidate) - index;
+    const score = Math.abs(delta) * 2 + (delta > 0 ? 1 : 0);
+    if (score < bestScore) {
+      bestScore = score;
+      best = candidate;
+    }
+  }
+  return best;
+}
+
+/** Aufzaehlung fuer die Handy-App: "M, L und XL". */
+export function formatWidgetSizes(sizes: readonly WidgetSize[]): string {
+  const labels = sizes.map((size) => WIDGET_SIZE_SPECS[size].label);
+  if (labels.length <= 1) return labels[0] ?? '';
+  return `${labels.slice(0, -1).join(', ')} und ${labels.at(-1)}`;
+}
+
 /* ------------------------------ Platzierungen ------------------------------ */
 
 /** Ein Rechteck im Raster. `x`/`y` sind nullbasierte Zellenkoordinaten. */
