@@ -19,6 +19,7 @@ REPO="lukas-mayr/smartmirror"
 PUBKEY=""
 BUNDLE=""
 CHANNEL="stable"
+ROTATE=""
 SKIP_BOOT_CONFIG="no"
 
 log()  { printf '\033[1m==>\033[0m %s\n' "$*"; }
@@ -34,6 +35,12 @@ Optionen:
                            aus dem Repository geholt.
   --bundle <datei.tar.gz>  Lokales Release statt Download von GitHub
   --channel <stable|beta>  Update-Kanal (Standard: stable)
+  --rotate <0|90|180|270>  Anzeige drehen, fuer hochkant aufgehaengte Spiegel.
+                           Gedreht wird der Inhalt im Uhrzeigersinn: ein nach
+                           links gekippter Bildschirm braucht 90, ein nach
+                           rechts gekippter 270. Die Angabe wirkt sofort und
+                           damit auch fuer den Kopplungscode. Spaeter aendern:
+                           sudo /opt/smartmirror/current/deploy/rotate.sh <grad>
   --skip-boot-config       /boot/firmware/config.txt nicht anfassen
   -h, --help               Diese Hilfe
 USAGE
@@ -45,6 +52,7 @@ while [[ $# -gt 0 ]]; do
     --pubkey) PUBKEY="${2:-}"; shift 2 ;;
     --bundle) BUNDLE="${2:-}"; shift 2 ;;
     --channel) CHANNEL="${2:-}"; shift 2 ;;
+    --rotate) ROTATE="${2:-}"; shift 2 ;;
     --skip-boot-config) SKIP_BOOT_CONFIG="yes"; shift ;;
     -h|--help) usage; exit 0 ;;
     *) die "Unbekannte Option: $1" ;;
@@ -89,6 +97,11 @@ case "$MODEL" in
 esac
 
 [[ -n "$REPO" || -n "$BUNDLE" ]] || die "Entweder --repo oder --bundle angeben."
+
+case "$ROTATE" in
+  ''|0|90|180|270) ;;
+  *) die "--rotate erwartet 0, 90, 180 oder 270 – nicht \"$ROTATE\"." ;;
+esac
 
 # Der oeffentliche Schluessel ist kein Geheimnis und liegt im Repository. Ihn von
 # Hand herzutragen wuerde die Sicherheit nicht erhoehen: dieses Skript kommt aus
@@ -343,7 +356,7 @@ log "Release $BUNDLE_VERSION nach $TARGET installieren"
 rm -rf "$TARGET"
 mkdir -p "$TARGET"
 cp -a "$STAGING/." "$TARGET/"
-chmod +x "$TARGET/deploy/cage-session.sh" 2>/dev/null || true
+chmod +x "$TARGET/deploy/cage-session.sh" "$TARGET/deploy/rotate.sh" 2>/dev/null || true
 chmod +x "$TARGET/shell/smartmirror-shell" 2>/dev/null || true
 
 # Electrons Sandbox-Helfer braucht setuid-root, sonst startet die Anwendung mit
@@ -378,11 +391,17 @@ mv -T "$INSTALL_ROOT/current.new" "$INSTALL_ROOT/current"
 # --------------------------- Erstkonfiguration --------------------------------
 
 CONFIG="$INSTALL_ROOT/data/config.json"
+
+# Fehlende Felder ergaenzt der Core beim Laden aus seinen Voreinstellungen –
+# hier steht nur, was das Skript wirklich weiss.
 if [[ ! -f "$CONFIG" && -n "$REPO" ]]; then
-  log "Grundkonfiguration anlegen (Repository: $REPO, Kanal: $CHANNEL)"
+  log "Grundkonfiguration anlegen (Repository: $REPO, Kanal: $CHANNEL, Drehung: ${ROTATE:-0}°)"
   cat > "$CONFIG" <<JSON
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
+  "display": {
+    "rotation": ${ROTATE:-0}
+  },
   "update": {
     "repository": "$REPO",
     "channel": "$CHANNEL",
@@ -393,6 +412,11 @@ if [[ ! -f "$CONFIG" && -n "$REPO" ]]; then
 JSON
   chown "$SERVICE_USER:$SERVICE_USER" "$CONFIG"
   chmod 600 "$CONFIG"
+elif [[ -n "$ROTATE" && -f "$CONFIG" ]]; then
+  # Bestehende Einstellungen bleiben unberuehrt – geaendert wird nur die
+  # Drehung, mit demselben Skript, das auch spaeter dafuer zustaendig ist.
+  "$INSTALL_ROOT/current/deploy/rotate.sh" "$ROTATE" \
+    || die "Drehung liess sich nicht setzen."
 fi
 
 # ------------------------------ Bildschirm/Boot -------------------------------
@@ -448,6 +472,15 @@ else
   warn "Core antwortet noch nicht. Log ansehen mit: journalctl -u mirror-core -n 50"
 fi
 
+# Nicht "${ROTATE:-0}" ausgeben: bei einem Lauf ohne --rotate stuende dort 0,
+# obwohl der Spiegel laengst gedreht ist. Der wahre Wert steht in der Datei.
+ROTATION_NOW="$(node -e '
+  try {
+    const config = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
+    process.stdout.write(String(config.display?.rotation ?? 0));
+  } catch { process.stdout.write("0"); }
+' "$CONFIG" 2>/dev/null || echo 0)"
+
 cat <<DONE
 
 Fertig. Version $BUNDLE_VERSION ist installiert.
@@ -455,6 +488,8 @@ Fertig. Version $BUNDLE_VERSION ist installiert.
   Fernbedienung   http://smartmirror.local:8080
   Kopplung        Der Spiegel zeigt einen sechsstelligen Code, sobald sich ein
                   ungekoppeltes Geraet verbindet.
+  Drehung         ${ROTATION_NOW}°. Steht der Kopplungscode quer:
+                  sudo $INSTALL_ROOT/current/deploy/rotate.sh 90
   Logs            journalctl -u mirror-core -u mirror-shell -u mirror-updater -f
   Update von Hand systemctl start mirror-updater.service
 

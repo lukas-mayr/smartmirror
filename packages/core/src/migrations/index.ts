@@ -1,4 +1,4 @@
-import { CONFIG_SCHEMA_VERSION } from '@mirror/sdk';
+import { CONFIG_SCHEMA_VERSION, normalizeRotation } from '@mirror/sdk';
 
 /**
  * Eine Migration hebt die Config von `from` auf `from + 1`.
@@ -14,12 +14,18 @@ export interface Migration {
 }
 
 export const migrations: readonly Migration[] = [
-  // Beispiel fuer den naechsten Schemawechsel:
-  // {
-  //   from: 1,
-  //   describe: 'display.nightMode ergaenzt',
-  //   migrate: (config) => ({ ...config, display: { ...(config.display as object), nightMode: false } }),
-  // },
+  {
+    from: 1,
+    describe: 'display.rotation ergaenzt',
+    migrate: (config) => {
+      const display = (config.display ?? {}) as Record<string, unknown>;
+      // Einen vorhandenen Wert nicht ueberschreiben: nach einem
+      // zurueckgerollten Update steht die Versionsnummer wieder auf 1, die
+      // Drehung aber schon in der Datei – und der Spiegel haengt weiterhin
+      // hochkant an der Wand.
+      return { ...config, display: { ...display, rotation: normalizeRotation(display.rotation) } };
+    },
+  },
 ];
 
 export function migrateToLatest(

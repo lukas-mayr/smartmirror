@@ -35,7 +35,7 @@ packages/
 modules/
   clock/     Uhrzeit und Datum (rein im Frontend)
   weather/   Open-Meteo, mit Cache und Offline-Zustand
-deploy/      systemd-Units, Compositor-Start, Installer
+deploy/      systemd-Units, Compositor-Start, Installer, Drehung
 scripts/     Build-, Bundle- und Generator-Skripte
 ```
 
@@ -151,6 +151,10 @@ Die Regeln im Basis-Stylesheet sind keine Geschmacksfrage, sondern Physik:
   Voreinstellung ist Nunito. Nie ein CDN — der Spiegel muss ohne Internet in
   der richtigen Schrift starten.
 - Einbrennschutz verschiebt das Layout alle 15 Minuten um wenige Pixel.
+- Hochkant gedreht wird in der Anzeige selbst, nicht im Compositor und nicht im
+  Kernel. Bei Vielfachen von 90° ist das pixelgenau — es wird nichts skaliert
+  und nichts interpoliert, und hinter halbdurchlässigem Glas fällt jede weiche
+  Kante als Schleier auf.
 
 ---
 
@@ -181,6 +185,15 @@ und Kopplungen unberührt.
 Danach: **`http://smartmirror.local:8080`** auf dem Handy öffnen und zum
 Startbildschirm hinzufügen.
 
+Hängt der Spiegel hochkant, gehört die Drehung gleich in den ersten Aufruf:
+
+```bash
+sudo bash /tmp/install.sh --rotate 90
+```
+
+Gedreht wird der Bildschirminhalt im Uhrzeigersinn — ein nach links gekippt
+aufgehängter Bildschirm braucht `90`, ein nach rechts gekippter `270`.
+
 Ohne Internet geht es auch aus einem lokal gebauten Paket:
 
 ```bash
@@ -192,6 +205,23 @@ sudo bash install.sh --bundle smartmirror-0.1.0-arm64.tar.gz --pubkey ./minisign
 Beim ersten Verbinden zeigt der Spiegel einen sechsstelligen Code. Wer koppeln
 will, braucht also Sichtkontakt — für ein Gerät im eigenen WLAN die passende
 Hürde, und es erspart ein Passwort, das ohnehin niemand ändert.
+
+### Drehen
+
+Genau deshalb ist die Drehung keine reine App-Einstellung: Sie steht in der
+Konfiguration und gilt ab dem ersten Bild, also auch für den Kopplungscode.
+Stünde der quer auf einem hochkanten Bildschirm, wäre er kaum zu lesen — und
+ohne ihn käme man nicht in die App, in der die Drehung sonst liegt.
+
+Steht schon alles an der Wand und die Richtung stimmt nicht, geht es ohne
+Neuinstallation und ohne Kopplung:
+
+```bash
+sudo /opt/smartmirror/current/deploy/rotate.sh 270
+```
+
+Das ändert nur dieses eine Feld und startet den Core neu. Nach der Kopplung ist
+dieselbe Einstellung in der Handy-App unter **Anzeige → Ausrichtung** zu finden.
 
 ### Was der Installer mit dem Signierschlüssel macht
 

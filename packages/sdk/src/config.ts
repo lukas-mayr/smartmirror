@@ -1,8 +1,9 @@
 import { DEFAULT_FONT, type FontId } from './fonts.js';
+import { DEFAULT_ROTATION, type Rotation } from './rotation.js';
 import type { Zone } from './zones.js';
 
 /** Aktuelle Version des Config-Formats. Erhoehen = Migration schreiben. */
-export const CONFIG_SCHEMA_VERSION = 1;
+export const CONFIG_SCHEMA_VERSION = 2;
 
 export interface ModuleInstance {
   /** Stabil ueber die Lebensdauer der Instanz, z.B. "weather-1". */
@@ -39,6 +40,16 @@ export interface PowerSettings {
 export interface DisplaySettings {
   /** 0..100. Wird per ddcutil gesetzt, sonst per CSS-Overlay abgedunkelt. */
   brightness: number;
+  /**
+   * Drehung des Inhalts im Uhrzeigersinn – fuer hochkant aufgehaengte Spiegel.
+   *
+   * Sie steht bewusst in der Konfiguration und nicht nur in der Handy-App:
+   * gekoppelt wird ueber einen Code, der auf dem Spiegel erscheint. Steht der
+   * quer auf einem hochkanten Bildschirm, ist er kaum zu lesen – die Drehung
+   * muss also schon vor der ersten Kopplung stimmen. Der Installer setzt sie
+   * dafuer mit `--rotate`.
+   */
+  rotation: Rotation;
   /**
    * Mitgelieferte Schriftfamilie. Alle Kandidaten sind runde, freundliche
    * Schnitte unter der SIL Open Font License und werden lokal ausgeliefert –
@@ -98,6 +109,7 @@ export function createDefaultConfig(): MirrorConfig {
     ],
     display: {
       brightness: 100,
+      rotation: DEFAULT_ROTATION,
       fontFamily: DEFAULT_FONT,
       burnInProtection: true,
       paddingPercent: 4,

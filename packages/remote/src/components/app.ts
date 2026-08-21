@@ -1,6 +1,8 @@
 import { LitElement, html, nothing, type TemplateResult } from 'lit';
 import {
   FONT_OPTIONS,
+  normalizeRotation,
+  ROTATION_OPTIONS,
   ZONE_LABELS,
   ZONES,
   type FontId,
@@ -307,6 +309,25 @@ export class MirrorRemote extends LitElement {
 
     return html`
       <section class="panel">
+        <label class="field">
+          <span class="field__label">
+            Ausrichtung
+            <span class="field__hint">
+              ${ROTATION_OPTIONS.find((option) => option.id === display.rotation)?.note ?? ''}
+            </span>
+          </span>
+          <select
+            @change=${(event: Event) =>
+              patchDisplay({ rotation: normalizeRotation((event.target as HTMLSelectElement).value) })}
+          >
+            ${ROTATION_OPTIONS.map(
+              (option) => html`
+                <option value=${option.id} ?selected=${option.id === display.rotation}>${option.name}</option>
+              `,
+            )}
+          </select>
+        </label>
+
         <label class="field">
           <span class="field__label">
             Schriftart

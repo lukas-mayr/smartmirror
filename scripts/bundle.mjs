@@ -9,7 +9,7 @@
  *   remote/            gebaute Handy-App
  *   modules/<id>/      Manifest und die beiden Bundles je Modul
  *   shell/             entpackte Electron-Anwendung (nur wenn vorher gebaut)
- *   deploy/            Startskript des Compositors, von der systemd-Unit aufgerufen
+ *   deploy/            Startskript des Compositors und Hilfsskripte fuer den Pi
  *
  * Warum alles buendeln: ein Release ohne node_modules ist ein Bruchteil so
  * gross, entpackt schneller auf einer SD-Karte und hat keine halb
