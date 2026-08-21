@@ -157,14 +157,24 @@ export async function rollback(): Promise<string | null> {
  * Geschrieben wird nur, was sich tatsaechlich unterscheidet: daemon-reload bei
  * jedem Update auszuloesen, obwohl sich nichts geaendert hat, ist unnoetiges
  * Risiko.
+ *
+ * Eine Unit, die es auf dem Geraet noch nicht gab, wird zusaetzlich aktiviert.
+ * Kopieren allein genuegt dafuer nicht: ohne "enable" fehlt der Symlink in das
+ * Ziel aus [Install], und die Unit liegt zwar da, laeuft aber nie. Bei einer
+ * bestehenden Unit wird das bewusst nicht angefasst – wer einen Dienst von
+ * Hand abgeschaltet hat, soll ihn nicht durch ein Update zurueckbekommen.
  */
 export async function syncSystemdUnits(releasePath: string): Promise<string[]> {
   const source = join(releasePath, 'deploy', 'systemd');
   if (!existsSync(source) || !existsSync(SYSTEMD_DIR)) return [];
 
   const changed: string[] = [];
+  const added: string[] = [];
   const entries = (await readdir(source, { withFileTypes: true }))
-    .filter((entry) => entry.isFile() && /\.(service|timer)$/.test(entry.name));
+    // .path gehoert dazu, seit der Knopf "Jetzt pruefen" ueber eine
+    // Path-Unit ausgeloest wird. Fehlt die Endung hier, kommt die Unit nie
+    // auf das Geraet und der Knopf bleibt wirkungslos.
+    .filter((entry) => entry.isFile() && /\.(service|timer|path)$/.test(entry.name));
 
   for (const entry of entries) {
     const from = join(source, entry.name);
@@ -175,10 +185,16 @@ export async function syncSystemdUnits(releasePath: string): Promise<string[]> {
     await copyFile(from, to);
     await chmod(to, 0o644);
     changed.push(entry.name);
+    if (current === null && /^\[Install\]/m.test(next)) added.push(entry.name);
   }
 
   if (changed.length > 0) {
     await run('systemctl', ['daemon-reload'], { timeout: 30_000 });
+  }
+  for (const unit of added) {
+    // Scheitert das, ist es kein Grund, ein sonst intaktes Update abzubrechen:
+    // der Rest laeuft, und der Healthcheck haengt nicht an dieser Unit.
+    await run('systemctl', ['enable', '--now', unit], { timeout: 30_000 }).catch(() => {});
   }
   return changed;
 }

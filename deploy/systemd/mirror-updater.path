@@ -1,0 +1,23 @@
+[Unit]
+Description=Startet den Updater, sobald die Handy-App eine Pruefung anfordert
+After=mirror-core.service
+
+[Path]
+# Der Core schreibt diese Datei, wenn in der App "Jetzt pruefen" oder
+# "Aktualisieren" gedrueckt wird. systemd startet daraufhin den Updater.
+#
+# Der Umweg ueber eine Datei ist Absicht: der Core laeuft unprivilegiert und
+# darf einen Root-Dienst nicht starten – "Interactive authentication required"
+# quittiert polkit jeden Versuch. Ihm das Recht zu geben hiesse, dem einzigen
+# ans Netz gebundenen Dienst den Start des einzigen Dienstes mit Root-Rechten
+# zu erlauben. Eine Datei zu schreiben, die er ohnehin schreibt, reicht.
+#
+# PathExists und nicht PathChanged: die Datei entsteht durch Umbenennen einer
+# Temporaerdatei (atomares Schreiben), und der Updater loescht sie zu Beginn
+# seines Laufs wieder. Damit ist ihre blosse Existenz das Signal, und das
+# Loeschen schaerft den Ausloeser fuer das naechste Mal.
+PathExists=/opt/smartmirror/data/update-request.json
+Unit=mirror-updater.service
+
+[Install]
+WantedBy=paths.target
