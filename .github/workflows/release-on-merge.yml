@@ -1,0 +1,192 @@
+name: Release nach Merge
+
+# Ein Merge auf main ist eine Veroeffentlichung. Dieser Ablauf prueft den
+# Stand, vergibt die naechste Version, schreibt sie in alle package.json,
+# setzt den Tag und uebergibt an die Release-Pipeline.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Welcher Stellenwert steigt'
+        required: true
+        default: patch
+        type: choice
+        options: [patch, minor, major]
+
+permissions:
+  contents: write
+
+# Zwei Releases gleichzeitig wuerden sich beim Tag-Setzen in die Quere kommen.
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  version:
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.next.outputs.version }}
+      release: ${{ steps.next.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Die Tags sind die Quelle der Wahrheit fuer die letzte Version,
+          # deshalb die vollstaendige Historie.
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Stellenwert bestimmen
+        id: bump
+        env:
+          MANUAL_BUMP: ${{ inputs.bump }}
+        run: |
+          set -euo pipefail
+
+          LATEST=$(git tag -l 'v*' --sort=-v:refname | head -n 1)
+          echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
+
+          if [ -n "$MANUAL_BUMP" ]; then
+            echo "bump=$MANUAL_BUMP" >> "$GITHUB_OUTPUT"
+            echo "Von Hand angestossen: $MANUAL_BUMP"
+            exit 0
+          fi
+
+          if [ -z "$LATEST" ]; then
+            echo "bump=patch" >> "$GITHUB_OUTPUT"
+            echo "Noch kein Tag – das erste Release."
+            exit 0
+          fi
+
+          # Der Sprung kommt aus dem, was sich seit dem letzten Release
+          # geaendert hat. Niemand muss dafuer etwas beschriften oder eine
+          # Schreibweise fuer Commit-Nachrichten einhalten.
+          CHANGED=$(git diff --name-only "$LATEST" HEAD)
+          echo "Geaendert seit ${LATEST}:"
+          echo "$CHANGED" | sed 's/^/  /'
+
+          # Aendert sich nur Beiwerk, gibt es nichts zu veroeffentlichen: ein
+          # Release ist rund 113 MB, das ist einer README-Korrektur nicht wert.
+          RELEVANT=$(echo "$CHANGED" | grep -Ev '^(README\.md|LICENSES\.md|docs/|\.github/|\.gitignore$)' || true)
+          if [ -z "$RELEVANT" ]; then
+            echo "bump=skip" >> "$GITHUB_OUTPUT"
+            echo "Nur Beiwerk geaendert – kein Release."
+            exit 0
+          fi
+
+          BUMP=patch
+
+          # Die Vertraege im SDK haengen alle Module daran: aendern sie sich,
+          # ist das mehr als eine Fehlerkorrektur. fonts.ts ist ausgenommen,
+          # weil die Datei erzeugt wird und sich schon bei einer neuen Schrift
+          # aendert.
+          SDK=$(echo "$CHANGED" | grep -E '^packages/sdk/src/' \
+            | grep -v '^packages/sdk/src/fonts\.ts$' || true)
+          if [ -n "$SDK" ]; then
+            BUMP=minor
+            echo "Grund: ein Vertrag im SDK hat sich geaendert ($(echo "$SDK" | tr '\n' ' '))."
+          fi
+
+          # Was neu dazukommt, ist neue Funktion und kein Fehler weniger: ein
+          # weiteres Modul, ein Skript auf dem Spiegel, eine systemd-Unit.
+          # Tests zaehlen nicht mit, die kommen auch zu Fehlerkorrekturen dazu.
+          NEU=$(git diff --name-only --diff-filter=A "$LATEST" HEAD \
+            -- 'packages/*/src' 'modules' 'deploy' | grep -v '/test/' || true)
+          if [ -n "$NEU" ]; then
+            BUMP=minor
+            echo "Grund: neu dazugekommen ($(echo "$NEU" | tr '\n' ' '))."
+          fi
+
+          # Steigt die Schemaversion der Konfiguration, laeuft auf dem Spiegel
+          # eine Migration – das gehoert sichtbar in die Versionsnummer.
+          SCHEMA=$(git diff "$LATEST" HEAD -- packages/sdk/src/config.ts \
+            | grep '^[+-]export const CONFIG_SCHEMA_VERSION' || true)
+          if [ -n "$SCHEMA" ]; then
+            BUMP=minor
+            echo "Grund: die Schemaversion der Konfiguration ist gestiegen."
+          fi
+
+          echo "bump=$BUMP" >> "$GITHUB_OUTPUT"
+          echo "Stellenwert: $BUMP"
+
+      - name: Naechste Version berechnen
+        id: next
+        env:
+          BUMP: ${{ steps.bump.outputs.bump }}
+          LATEST: ${{ steps.bump.outputs.latest }}
+        run: |
+          set -euo pipefail
+
+          if [ "$BUMP" = "skip" ]; then
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Kein Release fuer diesen Merge."
+            exit 0
+          fi
+
+          if [ -z "$LATEST" ]; then
+            # Noch nie veroeffentlicht: die Nummer aus package.json ist das
+            # erste Release, ohne sie vorher hochzuzaehlen.
+            VERSION=$(node -p "require('./package.json').version")
+          else
+            CURRENT="${LATEST#v}"
+            IFS=. read -r MAJOR MINOR PATCH <<< "${CURRENT%%-*}"
+            case "$BUMP" in
+              major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+              minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+              patch) PATCH=$((PATCH + 1)) ;;
+            esac
+            VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          fi
+
+          if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
+            echo "::error::Tag v${VERSION} gibt es schon."
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "release=true" >> "$GITHUB_OUTPUT"
+          echo "${LATEST:-(noch kein Tag)} -> v${VERSION}"
+
+      - name: Version schreiben und Tag setzen
+        if: steps.next.outputs.release == 'true'
+        env:
+          VERSION: ${{ steps.next.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          node scripts/set-version.mjs "$VERSION"
+          # Die Sperrdatei fuehrt die Versionen der eigenen Pakete mit; ohne
+          # diesen Lauf schlaegt "npm ci" im Release-Bau fehl.
+          npm install --package-lock-only --ignore-scripts
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package.json package-lock.json packages/*/package.json modules/*/package.json
+          git commit -m "Version ${VERSION}"
+          git tag -a "v${VERSION}" -m "smartmirror ${VERSION}"
+
+          # Erst der Commit, dann der Tag: sonst zeigt der Tag auf einen Stand,
+          # den es auf main noch nicht gibt.
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+          git push origin "v${VERSION}"
+
+  release:
+    needs: version
+    if: needs.version.outputs.release == 'true'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+      ref: v${{ needs.version.outputs.version }}
+    secrets: inherit
