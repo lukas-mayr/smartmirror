@@ -135,7 +135,7 @@ apt-get update -qq
 log "Compositor und Grundpakete (das dauert ein paar Minuten) ..."
 apt-get install -y --no-install-recommends \
   ca-certificates curl tar \
-  cage wlr-randr \
+  cage wlr-randr seatd \
   avahi-daemon \
   || die "Grundpakete liessen sich nicht installieren. Bitte zuerst:
   sudo apt --fix-broken install && sudo apt update && sudo apt full-upgrade -y"
@@ -244,6 +244,15 @@ fi
 for group in video render input; do
   getent group "$group" >/dev/null && usermod -aG "$group" "$SERVICE_USER"
 done
+
+# seatd verwaltet den Zugriff auf Grafik- und Eingabegeraete fuer Compositor,
+# die ausserhalb einer Login-Sitzung laufen. Ohne ihn kommt cage nicht an die
+# Grafikausgabe: es fragt zuerst systemd-logind, findet keine Sitzung und gibt
+# nach zehn Sekunden auf.
+log "Seat-Verwaltung aktivieren"
+systemctl enable --now seatd >/dev/null 2>&1 \
+  || warn "seatd liess sich nicht starten – die Anzeige kommt dann nicht an die Grafikausgabe."
+getent group _seatd >/dev/null && usermod -aG _seatd "$SERVICE_USER"
 
 log "Verzeichnisse unter $INSTALL_ROOT anlegen"
 mkdir -p "$INSTALL_ROOT/releases" "$INSTALL_ROOT/data"

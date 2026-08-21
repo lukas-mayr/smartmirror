@@ -1,7 +1,7 @@
 [Unit]
 Description=Smartmirror Anzeige (Electron unter cage)
-After=mirror-core.service systemd-udev-settle.service
-Wants=mirror-core.service
+After=mirror-core.service seatd.service
+Wants=mirror-core.service seatd.service
 
 [Service]
 Type=simple
@@ -12,6 +12,15 @@ WorkingDirectory=/opt/smartmirror/current
 # cage ist ein Wayland-Compositor fuer genau ein Fenster: kein Desktop, keine
 # Leiste, kein Mauszeiger. Damit bootet der Pi in diese Anwendung statt in eine
 # Arbeitsumgebung, aus der heraus ein Browser gestartet wuerde.
+# Seat-Verwaltung ueber seatd statt ueber systemd-logind.
+#
+# wlroots braucht einen "Seat", um an Grafikausgabe und Eingabegeraete zu
+# kommen. Der Standardweg dorthin ist logind - das setzt aber eine Login-
+# Sitzung voraus, und ein Systemdienst hat keine. Ohne diese Zeile fragt
+# libseat zuerst logind, wartet zehn Sekunden auf eine Sitzung, die nie kommt,
+# und gibt dann auf.
+Environment=LIBSEAT_BACKEND=seatd
+
 # Eigenes Laufzeitverzeichnis statt /run/user/<uid>: das legt sonst nur logind
 # an, und der Spiegel soll ohne Benutzeranmeldung starten.
 RuntimeDirectory=mirror
@@ -24,8 +33,8 @@ ExecStart=/opt/smartmirror/current/deploy/cage-session.sh
 Restart=always
 RestartSec=5
 
-# Zugriff auf Grafik und Eingabe – mehr nicht.
-SupplementaryGroups=video render input
+# Zugriff auf Grafik, Eingabe und den seatd-Socket – mehr nicht.
+SupplementaryGroups=video render input _seatd
 PrivateTmp=yes
 NoNewPrivileges=yes
 
