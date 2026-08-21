@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { chmod, chown, mkdir, readdir, readlink, rename, rm, symlink, unlink, writeFile } from 'node:fs/promises';
+import { chmod, chown, copyFile, mkdir, readdir, readFile, readlink, rename, rm, symlink, unlink, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { promisify } from 'node:util';
@@ -11,6 +11,8 @@ const run = promisify(execFile);
 
 /** So viele alte Releases bleiben liegen – genug fuer Rueckfall und Diagnose. */
 const KEEP_RELEASES = 3;
+
+const SYSTEMD_DIR = '/etc/systemd/system';
 
 export function sha256Hex(buffer: Buffer): string {
   return createHash('sha256').update(buffer).digest('hex');
@@ -130,6 +132,7 @@ export async function activateRelease(version: string): Promise<{ previous: stri
   const previous = await linkTarget(currentLink);
   if (previous) await swapLink(previousLink, previous);
   await swapLink(currentLink, releaseDir(version));
+  await syncSystemdUnits(releaseDir(version));
   return { previous };
 }
 
@@ -137,7 +140,47 @@ export async function rollback(): Promise<string | null> {
   const target = await linkTarget(previousLink);
   if (!target) return null;
   await swapLink(currentLink, target);
+  // Auch die Unit-Dateien zuruecknehmen. Sonst laeuft nach einem Rueckfall der
+  // alte Code unter den Units der gescheiterten Version – die Kombination hat
+  // nie jemand getestet, und der Rueckfall soll genau das nicht sein.
+  await syncSystemdUnits(target);
   return target;
+}
+
+/**
+ * Uebernimmt die systemd-Units aus dem Release nach /etc/systemd/system.
+ *
+ * Ohne diesen Schritt kaemen Aenderungen an den Units nie ueber ein Update auf
+ * das Geraet – sie werden sonst nur bei der Erstinstallation kopiert. Ein
+ * Fehler in einer Unit waere dann nur mit physischem Zugriff zu beheben.
+ *
+ * Geschrieben wird nur, was sich tatsaechlich unterscheidet: daemon-reload bei
+ * jedem Update auszuloesen, obwohl sich nichts geaendert hat, ist unnoetiges
+ * Risiko.
+ */
+export async function syncSystemdUnits(releasePath: string): Promise<string[]> {
+  const source = join(releasePath, 'deploy', 'systemd');
+  if (!existsSync(source) || !existsSync(SYSTEMD_DIR)) return [];
+
+  const changed: string[] = [];
+  const entries = (await readdir(source, { withFileTypes: true }))
+    .filter((entry) => entry.isFile() && /\.(service|timer)$/.test(entry.name));
+
+  for (const entry of entries) {
+    const from = join(source, entry.name);
+    const to = join(SYSTEMD_DIR, entry.name);
+    const next = await readFile(from, 'utf8');
+    const current = existsSync(to) ? await readFile(to, 'utf8') : null;
+    if (current === next) continue;
+    await copyFile(from, to);
+    await chmod(to, 0o644);
+    changed.push(entry.name);
+  }
+
+  if (changed.length > 0) {
+    await run('systemctl', ['daemon-reload'], { timeout: 30_000 });
+  }
+  return changed;
 }
 
 export async function restartServices(): Promise<void> {

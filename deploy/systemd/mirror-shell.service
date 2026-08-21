@@ -34,4 +34,9 @@ StandardError=journal
 SyslogIdentifier=mirror-shell
 
 [Install]
-WantedBy=graphical.target
+# multi-user.target, nicht graphical.target: Raspberry Pi OS Lite erreicht
+# graphical.target nie, weil es keinen Display-Manager gibt. Genau das ist
+# beabsichtigt - cage zeichnet direkt auf DRM/KMS. Mit graphical.target waere
+# die Unit in ein Ziel eingehaengt, das nie kommt: der Dienst startet dann
+# nicht und hinterlaesst auch keine Logzeile, weil er nie versucht wurde.
+WantedBy=multi-user.target
