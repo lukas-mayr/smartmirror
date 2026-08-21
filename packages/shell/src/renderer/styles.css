@@ -24,7 +24,11 @@
   --mirror-inset-left: 4%;
   --mirror-shift-x: 0px;
   --mirror-shift-y: 0px;
-  --mirror-gap: 2.5rem;
+  /* Abstand zwischen zwei Bloecken. */
+  --mirror-gap: 2rem;
+  /* Raster der Bloecke. Wird aus der Konfiguration gesetzt. */
+  --mirror-columns: 6;
+  --mirror-rows: 4;
   /* Wird aus der Konfiguration gesetzt; der Wert hier ist nur der Ausgangspunkt. */
   --mirror-font: 'Nunito', 'Helvetica Neue', Arial, system-ui, sans-serif;
 }
@@ -109,62 +113,68 @@ body {
  * hochkanten Bildschirm auch oben drei Prozent – und nur so laesst sich ein
  * schief haengender Bildschirm ueberhaupt sauber ausmitteln.
  */
-.grid,
+.screens,
 .frame,
 .overlay {
   position: absolute;
   inset: var(--mirror-inset-top) var(--mirror-inset-right) var(--mirror-inset-bottom) var(--mirror-inset-left);
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  grid-template-rows: auto 1fr auto;
-  gap: var(--mirror-gap);
+.screens {
   /* Einbrennschutz: das Layout wandert langsam um wenige Pixel. */
   transform: translate(var(--mirror-shift-x), var(--mirror-shift-y));
-  transition: transform 4s linear, opacity 600ms ease;
+  transition: transform 4s linear;
 }
 
-.zone {
+/*
+ * Ein Screen ist eine vollstaendige Anordnung. Alle liegen uebereinander, und
+ * nur einer ist sichtbar: so bleiben die Module beim Weiterschalten am Leben
+ * und muessen ihre Daten nicht jedes Mal neu holen.
+ *
+ * Ueberblendet wird lang und weich. Hinter halbdurchlaessigem Glas wirkt jeder
+ * harte Schnitt wie ein Blitz – der Spiegel soll sich veraendern, ohne dass es
+ * im Augenwinkel auffaellt.
+ */
+.screen {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--mirror-columns, 6), 1fr);
+  grid-template-rows: repeat(var(--mirror-rows, 4), 1fr);
+  gap: var(--mirror-gap);
+  opacity: 0;
+  /* Ausgeblendete Screens duerfen keine Klicks oder Groessen beeinflussen. */
+  visibility: hidden;
+  transition: opacity 900ms ease, visibility 0s linear 900ms;
+}
+
+.screen--active {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 900ms ease, visibility 0s;
+}
+
+/*
+ * Ein Block.
+ *
+ * `container-type: size` ist der Grund, warum ein Modul in jeder Blockgroesse
+ * funktioniert: Schriftgroessen im Modul beziehen sich mit `cqh`/`cqmin` auf
+ * den Block und nicht auf den Bildschirm. Ein und dieselbe Uhr fuellt damit
+ * einen kleinen Block genauso wie einen grossen.
+ *
+ * `overflow: hidden` ist die Notbremse: laeuft ein Modul trotzdem ueber, endet
+ * es an der Blockkante statt quer ueber den Nachbarn.
+ */
+.module {
+  container-type: size;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-  min-width: 0;
-}
-
-.zone--top-left,
-.zone--middle-left,
-.zone--bottom-left {
-  align-items: flex-start;
-  text-align: left;
-}
-.zone--top-center,
-.zone--middle-center,
-.zone--bottom-center {
   align-items: center;
-  text-align: center;
-}
-.zone--top-right,
-.zone--middle-right,
-.zone--bottom-right {
-  align-items: flex-end;
-  text-align: right;
-}
-
-.zone--middle-left,
-.zone--middle-center,
-.zone--middle-right {
   justify-content: center;
-}
-.zone--bottom-left,
-.zone--bottom-center,
-.zone--bottom-right {
-  justify-content: flex-end;
-}
-
-.module {
-  max-width: 100%;
+  text-align: center;
+  min-width: 0;
+  min-height: 0;
 }
 
 .module--failed {
@@ -349,25 +359,55 @@ body {
 
 /* ------------------------- Grundstile fuer Module ------------------------- */
 
+/*
+ * Schriftgroessen in Container-Einheiten statt in `rem`.
+ *
+ * Ein Modul weiss nicht, in welchem Block es liegt – und soll es auch nicht
+ * wissen muessen. `cqh`/`cqw` beziehen sich auf den Block: dieselbe Uhr fuellt
+ * damit einen kleinen Block genauso wie einen grossen, ohne dass irgendwo eine
+ * Groessentabelle gepflegt werden muesste.
+ *
+ * Immer als `min(...)` aus Hoehe und Breite: ein breiter, flacher Block wuerde
+ * sonst Schrift zeigen, die unten abgeschnitten ist, ein schmaler hoher solche,
+ * die seitlich hinauslaeuft.
+ */
+
+.clock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+
 .clock__time {
-  font-size: var(--clock-size, 5.4rem);
+  font-size: min(30cqh, 18cqw);
   font-weight: 300;
   line-height: 1;
   font-variant-numeric: tabular-nums;
+  /* Eine umgebrochene Uhrzeit ist keine Uhrzeit mehr. */
+  white-space: nowrap;
 }
 
 .clock__date {
-  margin-top: 0.5rem;
-  font-size: 1.35rem;
+  margin-top: 0.4em;
+  font-size: min(9cqh, 5.5cqw);
   font-weight: 300;
   color: var(--mirror-fg-muted);
+}
+
+/* Im kleinsten Block bleibt neben der Uhrzeit nichts uebrig. */
+@container (max-height: 160px) {
+  .clock__date {
+    display: none;
+  }
 }
 
 .weather {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  align-items: inherit;
+  gap: 0.4em;
+  align-items: center;
+  min-width: 0;
 }
 
 .weather--stale {
@@ -377,27 +417,29 @@ body {
 .weather__now {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.4em;
 }
 
 .weather__icon {
-  font-size: 3rem;
+  font-size: min(20cqh, 12cqw);
   line-height: 0;
   display: inline-flex;
 }
 
 .weather__temp {
-  font-size: 3.2rem;
+  font-size: min(22cqh, 13cqw);
   font-weight: 300;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .weather__meta {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 0.4rem;
-  font-size: 1rem;
+  justify-content: center;
+  gap: 0.4em;
+  font-size: min(8cqh, 4.6cqw);
   color: var(--mirror-fg-muted);
 }
 
@@ -406,30 +448,30 @@ body {
 }
 
 .weather__place {
-  font-size: 0.95rem;
+  font-size: min(7cqh, 4cqw);
   color: var(--mirror-fg-dim);
 }
 
 .weather__forecast {
   display: flex;
-  /* Hochkant ist eine Zone nur noch ein Drittel der schmalen Kante breit –
-     dann bricht die Vorschau lieber um, als aus dem Bild zu laufen. */
+  /* Ein schmaler Block bricht die Vorschau lieber um, als aus dem Bild zu laufen. */
   flex-wrap: wrap;
-  gap: 1.4rem;
-  margin-top: 0.6rem;
+  justify-content: center;
+  gap: 1.2em;
+  margin-top: 0.2em;
+  font-size: min(7cqh, 4cqw);
 }
 
 .weather__day {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.25rem;
-  font-size: 0.95rem;
+  gap: 0.25em;
   color: var(--mirror-fg-muted);
 }
 
 .weather__day-icon {
-  font-size: 1.5rem;
+  font-size: 1.6em;
   line-height: 0;
   display: inline-flex;
   color: var(--mirror-fg);
@@ -446,13 +488,30 @@ body {
   color: var(--mirror-fg-muted);
 }
 
+/*
+ * Was in einen flachen Block nicht mehr hineinpasst, faellt weg statt sich zu
+ * quetschen. Ein Modul im S-Block zeigt die eine Zahl, auf die es ankommt.
+ */
+@container (max-height: 260px) {
+  .weather__forecast {
+    display: none;
+  }
+}
+
+@container (max-height: 180px) {
+  .weather__place,
+  .weather__meta {
+    display: none;
+  }
+}
+
 .weather__hint,
 .weather__error {
-  font-size: 0.85rem;
+  font-size: min(7cqh, 4cqw);
   color: var(--mirror-fg-dim);
 }
 
 .weather--empty {
-  font-size: 1rem;
+  font-size: min(9cqh, 5cqw);
   color: var(--mirror-fg-dim);
 }

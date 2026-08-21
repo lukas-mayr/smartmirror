@@ -3,11 +3,17 @@ import { EventEmitter } from 'node:events';
 import {
   CONFIG_SCHEMA_VERSION,
   createDefaultConfig,
+  findFreeSpot,
   FONT_STACKS,
-  isZone,
+  normalizeGrid,
   normalizeInsets,
   normalizeRotation,
+  normalizeScreens,
   normalizeSetup,
+  normalizeWidgetSize,
+  rectFor,
+  rectsOverlap,
+  type GridRect,
   type MirrorConfig,
   type ModuleInstance,
 } from '@mirror/sdk';
@@ -81,28 +87,12 @@ function normalize(input: Record<string, unknown>): MirrorConfig {
   const defaults = createDefaultConfig();
   const source = input as Partial<MirrorConfig>;
 
-  const seenIds = new Set<string>();
-  const instances: ModuleInstance[] = (Array.isArray(source.instances) ? source.instances : [])
-    .filter((entry): entry is ModuleInstance => typeof entry?.id === 'string' && typeof entry?.moduleId === 'string')
-    .filter((entry) => {
-      if (seenIds.has(entry.id)) {
-        log.warn(`Doppelte Instanz-ID "${entry.id}" verworfen.`);
-        return false;
-      }
-      seenIds.add(entry.id);
-      return true;
-    })
-    .map((entry, index) => ({
-      id: entry.id,
-      moduleId: entry.moduleId,
-      zone: isZone(entry.zone) ? entry.zone : 'top-center',
-      order: Number.isFinite(entry.order) ? Number(entry.order) : index,
-      enabled: entry.enabled !== false,
-      config: typeof entry.config === 'object' && entry.config !== null ? entry.config : {},
-    }));
+  const screens = normalizeScreens(source.screens);
+  const screenIds = new Set(screens.map((screen) => screen.id));
 
   const display = { ...defaults.display, ...(source.display ?? {}) };
   display.brightness = clamp(display.brightness, 10, 100);
+  display.grid = normalizeGrid(display.grid);
   // Zweites Argument: eine Config aus der Zeit vor den vier Raendern kennt nur
   // `paddingPercent`. Die Migration rechnet das um – hier steht es trotzdem
   // noch einmal, weil `normalize` auch auf von Hand editierte Dateien und auf
@@ -120,6 +110,51 @@ function normalize(input: Record<string, unknown>): MirrorConfig {
   // Systemschrift zurueckfallen – lieber hier auf den Standard zurechtruecken.
   if (!(display.fontFamily in FONT_STACKS)) display.fontFamily = defaults.display.fontFamily;
 
+  const seenIds = new Set<string>();
+  // Belegte Rechtecke je Screen, damit sich zwei Bloecke nicht ueberdecken.
+  const occupied = new Map<string, GridRect[]>();
+
+  const instances: ModuleInstance[] = (Array.isArray(source.instances) ? source.instances : [])
+    .filter((entry): entry is ModuleInstance => typeof entry?.id === 'string' && typeof entry?.moduleId === 'string')
+    .filter((entry) => {
+      if (seenIds.has(entry.id)) {
+        log.warn(`Doppelte Instanz-ID "${entry.id}" verworfen.`);
+        return false;
+      }
+      seenIds.add(entry.id);
+      return true;
+    })
+    .map((entry) => {
+      // Ein Block auf einem geloeschten Screen waere unsichtbar und in der
+      // Handy-App nicht mehr erreichbar – er kommt auf den ersten Screen.
+      const screenId = screenIds.has(entry.screenId) ? entry.screenId : screens[0]!.id;
+      const size = normalizeWidgetSize(entry.size);
+      const taken = occupied.get(screenId) ?? [];
+      let rect = rectFor({ x: entry.x, y: entry.y, size }, display.grid);
+
+      if (taken.some((other) => rectsOverlap(other, rect))) {
+        // Ueblicher Fall: jemand hat das Raster verkleinert, und zwei Bloecke
+        // sind aufeinander gerutscht. Der spaetere weicht aus.
+        const spot = findFreeSpot(taken, display.grid, size, { x: rect.x, y: rect.y });
+        // Kein freier Platz: lieber uebereinander als verschwunden. Am Handy
+        // ist der Block dann sichtbar im Weg und laesst sich verschieben.
+        if (spot) rect = { ...rect, ...spot };
+        else log.warn(`Fuer "${entry.id}" ist kein freier Platz im Raster – der Block liegt ueber einem anderen.`);
+      }
+      taken.push(rect);
+      occupied.set(screenId, taken);
+
+      return {
+        id: entry.id,
+        moduleId: entry.moduleId,
+        screenId,
+        x: rect.x,
+        y: rect.y,
+        size,
+        enabled: entry.enabled !== false,
+        config: typeof entry.config === 'object' && entry.config !== null ? entry.config : {},
+      };
+    });
   const power = { ...defaults.power, ...(source.power ?? {}) };
   power.rules = (Array.isArray(power.rules) ? power.rules : []).filter(
     (rule) => typeof rule?.on === 'string' && typeof rule?.off === 'string' && Array.isArray(rule?.days),
@@ -134,6 +169,7 @@ function normalize(input: Record<string, unknown>): MirrorConfig {
     deviceName: source.deviceName || defaults.deviceName,
     locale: source.locale || defaults.locale,
     timezone: source.timezone || defaults.timezone,
+    screens,
     instances,
     display,
     power,

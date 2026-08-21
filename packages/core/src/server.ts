@@ -4,12 +4,19 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import websocket from '@fastify/websocket';
 import fastifyStatic from '@fastify/static';
 import {
+  clampScreenDuration,
+  createScreen,
+  defaultScreenName,
+  findFreeSpot,
   isClientMessage,
-  isZone,
+  nextScreenId,
+  normalizeWidgetSize,
+  rectFor,
   withSetupStep,
   type ClientMessage,
   type ClientType,
   type ErrorCode,
+  type MirrorConfig,
   type ServerMessage,
   type Viewport,
 } from '@mirror/sdk';
@@ -24,6 +31,12 @@ import { createLogger } from './logger.js';
 import { appVersion, remoteDistDir } from './paths.js';
 
 const log = createLogger('server');
+
+/**
+ * Mehr Screens laufen niemandem mehr durch den Kopf, und die Runde dauerte bei
+ * zwanzig Sekunden je Screen schon ueber drei Minuten.
+ */
+const MAX_SCREENS = 10;
 
 interface Client {
   socket: WebSocket;
@@ -60,6 +73,23 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
    * beschreibt die Hardware von jetzt, nicht eine Einstellung.
    */
   let viewport: Viewport | null = null;
+  /**
+   * Screen, den die Anzeige gerade zeigen soll, weil am Handy daran gearbeitet
+   * wird. Solange er gesetzt ist, schaltet der Spiegel nicht weiter.
+   *
+   * Wie `viewport` bewusst nicht in der Konfiguration: die Vorschau beschreibt
+   * einen Moment und keine Einstellung. Bliebe sie in der Datei stehen, haenge
+   * der Spiegel nach einem Stromausfall fuer immer auf einem Screen fest –
+   * ohne dass jemand wuesste, warum.
+   */
+  let preview: { screenId: string; owner: Client } | null = null;
+  let previewTimer: NodeJS.Timeout | null = null;
+  /**
+   * Nach dieser Zeit ohne neuen Wunsch schaltet der Spiegel wieder selbst
+   * weiter. Ein Handy, das mit offener Modulseite in der Tasche verschwindet,
+   * darf die Screens nicht dauerhaft anhalten.
+   */
+  const PREVIEW_TIMEOUT_MS = 5 * 60_000;
 
   await app.register(websocket, { options: { maxPayload: 256 * 1024 } });
 
@@ -93,7 +123,32 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
     power: { on: deps.power.isOn },
     update: deps.updates.status,
     viewport,
+    previewScreenId: preview?.screenId ?? null,
   });
+
+  /**
+   * Setzt die Vorschau oder nimmt sie zurueck. Ein unbekannter Screen zaehlt
+   * wie "keine Vorschau" – sonst zeigte die Anzeige nach dem Loeschen eines
+   * Screens ins Leere.
+   */
+  const setPreview = (screenId: string | null, owner: Client | null): void => {
+    if (previewTimer) clearTimeout(previewTimer);
+    previewTimer = null;
+
+    const next =
+      screenId !== null && owner && deps.config.current.screens.some((screen) => screen.id === screenId)
+        ? { screenId, owner }
+        : null;
+    const changed = (preview?.screenId ?? null) !== (next?.screenId ?? null);
+    preview = next;
+
+    if (next) {
+      previewTimer = setTimeout(() => setPreview(null, null), PREVIEW_TIMEOUT_MS);
+      // Der Timer darf den Prozess nicht am Leben halten.
+      previewTimer.unref?.();
+    }
+    if (changed) broadcast({ t: 'display:previewScreen', screenId: next?.screenId ?? null });
+  };
 
   const pushConfig = (): void => {
     broadcast({ t: 'config:update', config: deps.config.current });
@@ -113,6 +168,10 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
   });
 
   deps.config.on('change', () => {
+    // Der vorgemerkte Screen kann gerade geloescht worden sein.
+    if (preview && !deps.config.current.screens.some((screen) => screen.id === preview?.screenId)) {
+      setPreview(null, null);
+    }
     pushConfig();
     void deps.modules.sync(deps.config.current);
     deps.power.onConfigChange(deps.config.current);
@@ -176,6 +235,9 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
 
     socket.on('close', () => {
       clients.delete(client);
+      // Wer die Vorschau angefordert hat, ist weg – der Spiegel schaltet
+      // wieder von selbst weiter.
+      if (preview?.owner === client) setPreview(null, null);
       if (client.type === 'shell') {
         log.info('Anzeige hat die Verbindung getrennt.');
         shellReady = [...clients].some((candidate) => candidate.type === 'shell' && candidate.authenticated);
@@ -306,8 +368,15 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
           for (const update of message.instances) {
             const instance = draft.instances.find((entry) => entry.id === update.id);
             if (!instance) continue;
-            if (isZone(update.zone)) instance.zone = update.zone;
-            if (Number.isFinite(update.order)) instance.order = update.order;
+            // Nur, was tatsaechlich mitgeschickt wurde: die Handy-App schiebt
+            // beim Ziehen Koordinaten und beim Antippen einen Schalter, und
+            // das eine darf das andere nicht zuruecksetzen.
+            if (typeof update.screenId === 'string' && draft.screens.some((s) => s.id === update.screenId)) {
+              instance.screenId = update.screenId;
+            }
+            if (Number.isFinite(update.x)) instance.x = Number(update.x);
+            if (Number.isFinite(update.y)) instance.y = Number(update.y);
+            if (update.size !== undefined) instance.size = normalizeWidgetSize(update.size, instance.size);
             if (typeof update.enabled === 'boolean') instance.enabled = update.enabled;
           }
         });
@@ -320,12 +389,27 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
           if (descriptor.singleton && draft.instances.some((entry) => entry.moduleId === descriptor.id)) {
             throw new Error(`Von "${descriptor.id}" ist nur eine Instanz erlaubt`);
           }
-          const zone = isZone(message.zone) ? message.zone : 'top-center';
+          const screen = draft.screens.find((entry) => entry.id === message.screenId) ?? draft.screens[0]!;
+          const size = normalizeWidgetSize(message.size, descriptor.preferredSize);
+          const occupied = draft.instances
+            .filter((entry) => entry.screenId === screen.id)
+            .map((entry) => rectFor(entry, draft.display.grid));
+          const preferred =
+            Number.isFinite(message.x) && Number.isFinite(message.y)
+              ? { x: Number(message.x), y: Number(message.y) }
+              : undefined;
+          const spot = findFreeSpot(occupied, draft.display.grid, size, preferred);
+          // Lieber eine klare Absage als ein Block, der unter einem anderen
+          // liegt: auf dem Spiegel waere davon nichts zu sehen.
+          if (!spot) throw new Error(`Auf "${screen.name}" ist kein Platz frei fuer diese Groesse`);
+
           draft.instances.push({
             id: nextInstanceId(draft.instances.map((entry) => entry.id), descriptor.id),
             moduleId: descriptor.id,
-            zone,
-            order: draft.instances.filter((entry) => entry.zone === zone).length,
+            screenId: screen.id,
+            x: spot.x,
+            y: spot.y,
+            size,
             enabled: true,
             config: {},
           });
@@ -337,6 +421,64 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
         await deps.config.update((draft) => {
           draft.instances = draft.instances.filter((entry) => entry.id !== message.instanceId);
         });
+        return;
+
+      case 'admin:addScreen':
+        await deps.config.update((draft) => {
+          if (draft.screens.length >= MAX_SCREENS) {
+            throw new Error(`Mehr als ${MAX_SCREENS} Screens sind nicht vorgesehen`);
+          }
+          const name = message.name?.trim() || defaultScreenName(draft.screens);
+          draft.screens.push(createScreen(nextScreenId(draft.screens.map((entry) => entry.id)), name));
+        });
+        return;
+
+      case 'admin:removeScreen':
+        await deps.config.update((draft) => {
+          // Ohne Screen gaebe es keine Flaeche mehr: der Spiegel waere schwarz,
+          // und die Handy-App haette nichts, worauf sie ein Modul legen kann.
+          if (draft.screens.length <= 1) throw new Error('Der letzte Screen kann nicht geloescht werden');
+          if (!draft.screens.some((entry) => entry.id === message.screenId)) {
+            throw new Error(`Screen "${message.screenId}" existiert nicht`);
+          }
+          draft.screens = draft.screens.filter((entry) => entry.id !== message.screenId);
+          // Die Bloecke gehen mit. Sie auf einen anderen Screen zu retten,
+          // wuerde dort fremde Anordnungen ueberschreiben – die Handy-App
+          // fragt vorher nach und nennt die Zahl.
+          draft.instances = draft.instances.filter((entry) => entry.screenId !== message.screenId);
+        });
+        return;
+
+      case 'admin:setScreen':
+        await deps.config.update((draft) => {
+          const screen = draft.screens.find((entry) => entry.id === message.screenId);
+          if (!screen) throw new Error(`Screen "${message.screenId}" existiert nicht`);
+          const name = message.patch.name?.trim();
+          if (name) screen.name = name.slice(0, 40);
+          if (message.patch.durationSeconds !== undefined) {
+            screen.durationSeconds = clampScreenDuration(message.patch.durationSeconds);
+          }
+        });
+        return;
+
+      case 'admin:reorderScreens':
+        await deps.config.update((draft) => {
+          const byId = new Map(draft.screens.map((entry) => [entry.id, entry]));
+          const ordered = message.ids
+            .map((id) => byId.get(id))
+            .filter((entry): entry is MirrorConfig['screens'][number] => entry !== undefined);
+          // Was in der Liste fehlt, haengt hinten an: eine unvollstaendige
+          // Reihenfolge darf keinen Screen verschlucken.
+          for (const screen of draft.screens) {
+            if (!ordered.includes(screen)) ordered.push(screen);
+          }
+          draft.screens = ordered;
+        });
+        return;
+
+      case 'admin:previewScreen':
+        if (client.type !== 'remote') return;
+        setPreview(message.screenId, client);
         return;
 
       case 'admin:setSettings':

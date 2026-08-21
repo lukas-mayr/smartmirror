@@ -115,7 +115,10 @@ export default defineFrontend<State, Config>({
 
 **Die Einstellungsoberfläche entsteht von selbst.** Das `configSchema` im
 Manifest wird an die Handy-App geschickt, die daraus das Formular baut. Ein
-neues Modul braucht keinerlei eigene UI im Client.
+neues Modul braucht keinerlei eigene UI im Client. Wie groß der Block sein soll,
+in dem das Modul erscheint, schlägt das Manifest mit `preferredSize` vor
+(`"s"`, `"m"`, `"l"` oder `"xl"` — siehe [Screens, Raster und
+Blöcke](#screens-raster-und-blöcke)).
 
 **Rechte werden im Manifest angefordert**, sonst existieren sie nicht:
 
@@ -130,6 +133,64 @@ neues Modul braucht keinerlei eigene UI im Client.
 
 Geheimnisse (API-Schlüssel) liegen verschlüsselt in `data/secrets.json` und
 erreichen das Frontend nie.
+
+---
+
+## Screens, Raster und Blöcke
+
+Die Anzeige ist ein **Raster** (voreingestellt 6 × 4 Felder, quer; hochkant
+4 × 6). Jedes Modul liegt darin als **Block** in einer von vier Größen — wie die
+Widgets auf einem Telefon:
+
+| Größe | Felder | gedacht für |
+|---|---|---|
+| **S** | 1 × 1 | eine Zahl, ein Symbol |
+| **M** | 2 × 1 | Uhrzeit, ein Wert mit Beschriftung |
+| **L** | 2 × 2 | Wetter mit Vorhersage, Terminliste |
+| **XL** | 4 × 2 | eine Zeile, die über die halbe Wand geht |
+
+Ein Block rastet ein: Abstände stimmen von selbst, und eine Anordnung lässt sich
+in einem Satz beschreiben. Freie Pixelpositionen gäbe es nur um den Preis, dass
+niemand sie mit dem Daumen auf einem Handybildschirm trifft.
+
+**Mehrere Screens.** Ein Screen ist eine vollständige Anordnung. Der Spiegel
+schaltet sie im Kreis weiter; die Standzeit steht am Screen und nicht global —
+ein Blick auf die Uhr braucht keine zwei Minuten, eine Einkaufsliste schon.
+Screens ohne Inhalt werden übersprungen, sonst stünde die Wand zwanzig Sekunden
+schwarz und sähe kaputt aus. Alle Screens bleiben dabei im Dokument und werden
+nur überblendet: die Module laufen weiter und holen ihre Daten nicht bei jedem
+Wechsel neu.
+
+**Angeordnet wird am Handy**, auf einem Brett, das den Spiegel im Kleinen zeigt
+— gleiches Seitenverhältnis, gleiche Ränder, gleiches Raster. Ein Block wird mit
+dem Finger gezogen und rastet ein; ein Umriss zeigt dabei, wo er landet, und
+färbt sich rot, wenn dort schon etwas liegt. Solange die Modulseite offen ist,
+kann der Spiegel den bearbeiteten Screen mitzeigen und hält dafür das
+Weiterschalten an — der Schalter dafür steht unter dem Brett. Er löst sich nach
+fünf Minuten von selbst, damit ein Handy in der Hosentasche den Spiegel nicht
+dauerhaft anhält.
+
+**Für Modul-Autoren:** Ein Modul erfährt seine Blockgröße nicht als Zahl,
+sondern über CSS. Der Block ist ein `container-type: size`, Schriftgrößen
+beziehen sich mit `cqh`/`cqw` darauf, und was in einen flachen Block nicht mehr
+passt, blendet eine Container-Query aus:
+
+```css
+.mein-modul__wert {
+  /* Immer min(...) aus Höhe und Breite – sonst läuft es in flachen Blöcken
+     unten heraus und in schmalen seitlich. */
+  font-size: min(30cqh, 18cqw);
+}
+
+@container (max-height: 260px) {
+  .mein-modul__details {
+    display: none;
+  }
+}
+```
+
+Das Manifest schlägt mit `"preferredSize": "l"` nur die Größe beim Hinzufügen
+vor. Wohin der Block gehört, weiß allein der Nutzer.
 
 ---
 

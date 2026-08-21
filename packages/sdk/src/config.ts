@@ -1,19 +1,23 @@
 import { DEFAULT_FONT, type FontId } from './fonts.js';
 import { createDefaultInsets, type ScreenInsets } from './insets.js';
+import { DEFAULT_GRID, type GridSize, type WidgetSize } from './layout.js';
 import { DEFAULT_ROTATION, type Rotation } from './rotation.js';
+import { createScreen, type MirrorScreen } from './screens.js';
 import { createDefaultSetup, type SetupState } from './setup.js';
-import type { Zone } from './zones.js';
 
 /** Aktuelle Version des Config-Formats. Erhoehen = Migration schreiben. */
-export const CONFIG_SCHEMA_VERSION = 3;
+export const CONFIG_SCHEMA_VERSION = 4;
 
 export interface ModuleInstance {
   /** Stabil ueber die Lebensdauer der Instanz, z.B. "weather-1". */
   id: string;
   moduleId: string;
-  zone: Zone;
-  /** Reihenfolge innerhalb der Zone, aufsteigend. */
-  order: number;
+  /** Auf welchem Screen der Block liegt. */
+  screenId: string;
+  /** Nullbasierte Rasterkoordinaten der linken oberen Ecke. */
+  x: number;
+  y: number;
+  size: WidgetSize;
   enabled: boolean;
   config: Record<string, unknown>;
 }
@@ -61,6 +65,15 @@ export interface DisplaySettings {
   /** Layout alle paar Minuten um wenige Pixel verschieben. */
   burnInProtection: boolean;
   /**
+   * Raster, in dem die Bloecke liegen – fuer alle Screens dasselbe.
+   *
+   * Global und nicht je Screen: das Raster beschreibt die Flaeche an der Wand,
+   * nicht deren Inhalt. Zwei Screens mit unterschiedlichem Raster wuerden beim
+   * Weiterschalten sichtbar springen, und ein Block liesse sich nicht mehr von
+   * einem Screen auf den anderen schieben, ohne die Groesse zu wechseln.
+   */
+  grid: GridSize;
+  /**
    * Rand der bespielbaren Flaeche je Seite, in Prozent.
    *
    * Vier Werte und nicht einer, weil der Bildschirm hinter dem Spiegel selten
@@ -86,6 +99,11 @@ export interface MirrorConfig {
   deviceName: string;
   locale: string;
   timezone: string;
+  /**
+   * Anordnungen, die der Spiegel der Reihe nach zeigt. Immer mindestens eine.
+   * Die Reihenfolge in der Liste ist die Reihenfolge beim Weiterschalten.
+   */
+  screens: MirrorScreen[];
   instances: ModuleInstance[];
   display: DisplaySettings;
   power: PowerSettings;
@@ -103,20 +121,25 @@ export function createDefaultConfig(): MirrorConfig {
     deviceName: 'Spiegel',
     locale: 'de-DE',
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Vienna',
+    screens: [createScreen('screen-1', 'Screen 1')],
     instances: [
       {
         id: 'clock-1',
         moduleId: 'clock',
-        zone: 'top-center',
-        order: 0,
+        screenId: 'screen-1',
+        x: 2,
+        y: 0,
+        size: 'l',
         enabled: true,
         config: {},
       },
       {
         id: 'weather-1',
         moduleId: 'weather',
-        zone: 'top-right',
-        order: 0,
+        screenId: 'screen-1',
+        x: 4,
+        y: 0,
+        size: 'l',
         enabled: true,
         config: {},
       },
@@ -126,6 +149,7 @@ export function createDefaultConfig(): MirrorConfig {
       rotation: DEFAULT_ROTATION,
       fontFamily: DEFAULT_FONT,
       burnInProtection: true,
+      grid: { ...DEFAULT_GRID },
       insets: createDefaultInsets(),
     },
     power: {

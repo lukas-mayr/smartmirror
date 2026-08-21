@@ -1,5 +1,6 @@
 import type { JsonSchema } from './schema.js';
 import type { Duration } from './duration.js';
+import type { WidgetSize } from './layout.js';
 
 /**
  * Rechte, die ein Modul im Manifest anfordern muss. Was nicht angefordert
@@ -44,8 +45,13 @@ export interface ModuleManifest {
 
   /** Wenn true, ist nur eine Instanz erlaubt. */
   singleton?: boolean;
-  /** Vorschlag fuer die Zone bei der ersten Platzierung. */
-  preferredZone?: string;
+  /**
+   * Blockgroesse, mit der das Modul hinzugefuegt wird.
+   *
+   * Ein Vorschlag und keine Vorgabe: welche Groesse passt, weiss das Modul
+   * besser als der Nutzer, aber wohin der Block gehoert, weiss nur der Nutzer.
+   */
+  preferredSize?: WidgetSize;
   /** Rein informativ fuer die Oberflaeche. */
   refreshInterval?: Duration;
 }
@@ -57,7 +63,7 @@ export interface ModuleDescriptor {
   version: string;
   description?: string;
   singleton: boolean;
-  preferredZone?: string;
+  preferredSize?: WidgetSize;
   configSchema?: JsonSchema;
   secrets: readonly ModuleSecretDeclaration[];
   /** Welche der deklarierten Geheimnisse bereits hinterlegt sind. */

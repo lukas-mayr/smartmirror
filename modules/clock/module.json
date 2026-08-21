@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "Uhrzeit, Wochentag und Datum. Laeuft vollstaendig in der Anzeige und braucht kein Netzwerk.",
   "author": "smartmirror",
-  "preferredZone": "top-center",
+  "preferredSize": "l",
   "configSchema": {
     "type": "object",
     "properties": {
@@ -30,13 +30,6 @@
         "enum": ["full", "long", "medium"],
         "enumLabels": ["Montag, 1. Januar 2026", "1. Januar 2026", "01.01.2026"],
         "default": "full"
-      },
-      "size": {
-        "type": "string",
-        "title": "Groesse",
-        "enum": ["s", "m", "l", "xl"],
-        "enumLabels": ["Klein", "Mittel", "Gross", "Sehr gross"],
-        "default": "l"
       }
     }
   }

@@ -1,4 +1,16 @@
-import { CONFIG_SCHEMA_VERSION, normalizeInsets, normalizeRotation } from '@mirror/sdk';
+import {
+  CONFIG_SCHEMA_VERSION,
+  createScreen,
+  DEFAULT_GRID,
+  findFreeSpot,
+  normalizeInsets,
+  normalizeRotation,
+  rectFor,
+  sizeCells,
+  type GridRect,
+  type GridSize,
+  type WidgetSize,
+} from '@mirror/sdk';
 
 /**
  * Eine Migration hebt die Config von `from` auf `from + 1`.
@@ -46,6 +58,55 @@ export const migrations: readonly Migration[] = [
       return { ...config, display: { ...rest, insets }, setup };
     },
   },
+  {
+    from: 3,
+    describe: 'Zonen werden zu Rasterplaetzen, erster Screen angelegt',
+    migrate: (config) => {
+      const display = (config.display ?? {}) as Record<string, unknown>;
+      // Hochkant aufgehaengt heisst hochkantes Raster: sechs Zeilen und vier
+      // Spalten statt umgekehrt. Sonst waeren die Zellen nach dem Update
+      // liegende Rechtecke auf einem stehenden Bildschirm.
+      const upright = normalizeRotation(display.rotation) % 180 !== 0;
+      const grid: GridSize = upright
+        ? { columns: DEFAULT_GRID.rows, rows: DEFAULT_GRID.columns }
+        : { ...DEFAULT_GRID };
+
+      const screens = Array.isArray(config.screens) && config.screens.length > 0
+        ? config.screens
+        : [createScreen('screen-1', 'Screen 1')];
+      const screenId = (screens[0] as { id?: string }).id ?? 'screen-1';
+
+      const legacy = (Array.isArray(config.instances) ? config.instances : []) as Record<string, unknown>[];
+      const taken: GridRect[] = [];
+      const instances = legacy
+        // In der Zone bestimmte bisher `order` die Reihenfolge. Sie
+        // entscheidet jetzt, wer sich den Wunschplatz zuerst nimmt.
+        .map((entry, index) => ({ entry, index }))
+        .sort((a, b) => Number(a.entry.order ?? a.index) - Number(b.entry.order ?? b.index))
+        .map(({ entry }) => {
+          // Eine Config, die schon Rasterplaetze hat, kommt aus einem
+          // zurueckgerollten Update – ihre Werte bleiben stehen.
+          const size = (typeof entry.size === 'string' ? entry.size : 'm') as WidgetSize;
+          const preferred =
+            typeof entry.x === 'number' && typeof entry.y === 'number'
+              ? { x: entry.x, y: entry.y }
+              : zoneAnchor(String(entry.zone ?? 'top-center'), size, grid);
+          const spot = findFreeSpot(taken, grid, size, preferred) ?? preferred;
+          taken.push(rectFor({ ...spot, size }, grid));
+
+          const { zone: _zone, order: _order, ...rest } = entry;
+          return {
+            ...rest,
+            screenId: typeof entry.screenId === 'string' ? entry.screenId : screenId,
+            x: spot.x,
+            y: spot.y,
+            size,
+          };
+        });
+
+      return { ...config, screens, instances, display: { ...display, grid } };
+    },
+  },
 ];
 
 export function migrateToLatest(
@@ -81,4 +142,22 @@ export function migrateToLatest(
   }
 
   return { config: current, changed };
+}
+
+/**
+ * Wunschplatz einer alten Zone im neuen Raster.
+ *
+ * Die neun Zonen waren ein Drei-mal-drei-Raster mit Ausrichtung: "oben rechts"
+ * hiess oben und rechtsbuendig. Genau das wird hier zur Ecke, an der der Block
+ * ab jetzt klebt – wer seinen Spiegel eingerichtet hatte, findet nach dem
+ * Update alles ungefaehr dort wieder, wo es vorher war.
+ */
+function zoneAnchor(zone: string, size: WidgetSize, grid: GridSize): { x: number; y: number } {
+  const cells = sizeCells(size, grid);
+  const [row = 'top', column = 'center'] = zone.split('-');
+  const x =
+    column === 'left' ? 0 : column === 'right' ? grid.columns - cells.columns : Math.floor((grid.columns - cells.columns) / 2);
+  const y =
+    row === 'top' ? 0 : row === 'bottom' ? grid.rows - cells.rows : Math.floor((grid.rows - cells.rows) / 2);
+  return { x: Math.max(0, x), y: Math.max(0, y) };
 }
