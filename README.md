@@ -341,6 +341,39 @@ Der Spiegel bleibt bei Verbindungsverlust bewusst ruhig: kleiner Hinweis unten
 rechts statt Fehlerseite. Während eines Updates ist der Core einige Sekunden
 weg — das ist kein Zustand, der Aufmerksamkeit verdient.
 
+### Stecker ziehen
+
+Ein Spiegel wird nicht heruntergefahren, er wird ausgeschaltet. Das ist die
+normale Bedienung und keine Störung, also muss der Start damit umgehen können.
+
+Drei Vorkehrungen, jede gegen einen beobachteten Ausfall:
+
+- **`mirror-guard.service`** prüft vor Core und Anzeige, ob das installierte
+  Release überhaupt startfähig ist, und legt `current` sonst auf das vorige
+  zurück. Der Auslöser war ein Stromausfall kurz nach einem Update: `tar` hatte
+  die Dateien angelegt, der Symlink zeigte darauf, der Inhalt stand aber noch im
+  Schreibpuffer. Zurück blieben Dateien mit 0 Bytes — `node` auf einer leeren
+  Datei endet wortlos, `cage-session.sh` scheitert mit „Exec format error", und
+  systemd startete beide 167-mal im Kreis. Das Skript liegt unter
+  `/opt/smartmirror/guard.sh` und damit außerhalb von `current/`: es muss genau
+  dann funktionieren, wenn das Release es nicht mehr tut.
+- **Der Updater synchronisiert** das entpackte Release auf die Karte, bevor er
+  `current` umlegt, und die Symlinks danach. Damit ist das Zeitfenster von oben
+  geschlossen statt nur abgefangen.
+- **Beschädigte Zustandsdateien** halten den Spiegel nicht mehr auf. Unlesbares
+  JSON wandert als `<datei>.defekt` beiseite, und der Core startet mit
+  Standardwerten weiter. Vorher endete der Prozess mit Code 1, systemd startete
+  ihn alle drei Sekunden neu, und eine einzige halb geschriebene Datei hielt den
+  Spiegel dauerhaft schwarz. Ein Spiegel mit Werkseinstellungen ist besser als
+  keiner — und das Original bleibt liegen, es ist die einzige Kopie der
+  Einstellungen.
+
+Was der Wächter beim letzten Start getan hat:
+
+```bash
+journalctl -u mirror-guard -b
+```
+
 ---
 
 ## Lizenzen

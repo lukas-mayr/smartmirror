@@ -1,7 +1,7 @@
 [Unit]
 Description=Smartmirror Anzeige (Electron unter cage)
-After=mirror-core.service seatd.service
-Wants=mirror-core.service seatd.service
+After=mirror-core.service seatd.service mirror-guard.service
+Wants=mirror-core.service seatd.service mirror-guard.service
 
 [Service]
 Type=simple
