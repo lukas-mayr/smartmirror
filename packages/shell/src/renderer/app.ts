@@ -169,6 +169,10 @@ export class MirrorApp {
 
   #applyConfig(config: MirrorConfig): void {
     this.#config = config;
+    // Die Drehung greift damit auch fuer den Kopplungscode: die Anzeige
+    // bekommt ihre Konfiguration direkt beim Verbinden, lange bevor ein Handy
+    // ueberhaupt gekoppelt ist.
+    document.documentElement.dataset.rotation = String(config.display.rotation);
     document.documentElement.style.setProperty('--mirror-padding', `${config.display.paddingPercent}%`);
     document.documentElement.style.setProperty(
       '--mirror-font',

@@ -51,6 +51,49 @@ body {
   background: #000000;
 }
 
+/*
+ * Drehung fuer hochkant aufgehaengte Spiegel.
+ *
+ * Gedreht wird hier und nicht weiter unten im Stapel, aus drei Gruenden:
+ *
+ *  - cage bekommt bewusst keine Optionen mit (siehe deploy/cage-session.sh),
+ *    und wlr-randr --transform setzt voraus, dass der Compositor die
+ *    Ausgabeverwaltung anbietet – darauf ist unter cage kein Verlass.
+ *  - Eine Drehung im Kernel (video=HDMI-A-1:...,rotate=90) haengt daran, ob der
+ *    vc4-Treiber die Ebene drehen kann. Faellt das aus, bleibt der Bildschirm
+ *    schwarz – auf einem Geraet ohne Tastatur der teuerste aller Fehler.
+ *  - Bei Vielfachen von 90 Grad ist die Drehung pixelgenau: es wird nichts
+ *    skaliert, nichts interpoliert, keine Kante wird weich. Genau das braucht
+ *    ein Spiegel, auf dem jede unscharfe Flaeche als Schleier sichtbar waere.
+ *
+ * Die Buehne bekommt dafuer die vertauschten Kantenlaengen und wird um ihre
+ * eigene Hoehe bzw. Breite zurueckgeschoben, damit sie nach der Drehung wieder
+ * im sichtbaren Bereich liegt.
+ */
+[data-rotation='90'] .stage,
+[data-rotation='270'] .stage {
+  width: 100vh;
+  height: 100vw;
+}
+
+[data-rotation='90'] .stage,
+[data-rotation='180'] .stage,
+[data-rotation='270'] .stage {
+  transform-origin: top left;
+}
+
+[data-rotation='90'] .stage {
+  transform: rotate(90deg) translateY(-100%);
+}
+
+[data-rotation='180'] .stage {
+  transform: rotate(180deg) translate(-100%, -100%);
+}
+
+[data-rotation='270'] .stage {
+  transform: rotate(-90deg) translateX(-100%);
+}
+
 .grid {
   position: absolute;
   inset: 0;
@@ -242,6 +285,9 @@ body {
 
 .weather__forecast {
   display: flex;
+  /* Hochkant ist eine Zone nur noch ein Drittel der schmalen Kante breit –
+     dann bricht die Vorschau lieber um, als aus dem Bild zu laufen. */
+  flex-wrap: wrap;
   gap: 1.4rem;
   margin-top: 0.6rem;
 }

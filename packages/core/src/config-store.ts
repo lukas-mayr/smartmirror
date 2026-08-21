@@ -5,6 +5,7 @@ import {
   createDefaultConfig,
   FONT_STACKS,
   isZone,
+  normalizeRotation,
   type MirrorConfig,
   type ModuleInstance,
 } from '@mirror/sdk';
@@ -101,6 +102,10 @@ function normalize(input: Record<string, unknown>): MirrorConfig {
   const display = { ...defaults.display, ...(source.display ?? {}) };
   display.brightness = clamp(display.brightness, 10, 100);
   display.paddingPercent = clamp(display.paddingPercent, 0, 15);
+  // Eine krumme Gradzahl wuerde die Anzeige stumm auf "quer" zurueckfallen
+  // lassen – und wer sie von Hand in die Datei geschrieben hat, saehe nur einen
+  // querstehenden Spiegel und keinen Grund dafuer.
+  display.rotation = normalizeRotation(display.rotation);
   // Eine Schrift, die es nicht gibt, wuerde in der Anzeige stumm auf die
   // Systemschrift zurueckfallen – lieber hier auf den Standard zurechtruecken.
   if (!(display.fontFamily in FONT_STACKS)) display.fontFamily = defaults.display.fontFamily;

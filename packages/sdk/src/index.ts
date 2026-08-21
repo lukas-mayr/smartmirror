@@ -5,5 +5,6 @@ export * from './fonts.js';
 export * from './frontend.js';
 export * from './manifest.js';
 export * from './protocol.js';
+export * from './rotation.js';
 export * from './schema.js';
 export * from './zones.js';
