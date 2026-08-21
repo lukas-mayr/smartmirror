@@ -376,8 +376,8 @@ Installation dann mit `--repo deinname/smartmirror`.
 └─ data/               Konfiguration und Zustand – von Updates NIE berührt
 ```
 
-Veröffentlichen heißt: mergen. Jeder Merge auf `main` durchläuft
-`Release nach Merge`:
+Veröffentlichen heißt: mergen. Sonst nichts. Jeder Merge auf `main`
+durchläuft `Release nach Merge`:
 
 1. **Prüfen** – derselbe Job, der schon am Pull Request lief (Bauen,
    Typen, Tests, erzeugte Dateien).
@@ -387,28 +387,34 @@ Veröffentlichen heißt: mergen. Jeder Merge auf `main` durchläuft
    `Version X.Y.Z` auf `main` abgelegt und als `vX.Y.Z` getaggt.
 3. **Veröffentlichen** – die Release-Pipeline baut, signiert und lädt hoch.
 
-Wie weit die Nummer springt, sagt die Beschriftung des Pull Requests:
+Wie weit die Nummer springt, liest der Ablauf aus dem, was sich seit dem
+letzten Tag geändert hat. Keine Labels, keine Vorschriften für
+Commit-Nachrichten:
 
-| Label | Wirkung | Beispiel |
-| --- | --- | --- |
-| *(keine)* | Patch | 0.6.0 → 0.6.1 |
-| `release:patch` | Patch | 0.6.0 → 0.6.1 |
-| `release:minor` | Minor | 0.6.0 → 0.7.0 |
-| `release:major` | Major | 0.6.0 → 1.0.0 |
-| `release:skip` | kein Release | — |
+| Was sich geändert hat | Sprung |
+| --- | --- |
+| nur `README.md`, `LICENSES.md`, `docs/`, `.github/` | kein Release |
+| ein Vertrag in `packages/sdk/src/` (außer der erzeugten `fonts.ts`) | Minor |
+| `CONFIG_SCHEMA_VERSION` gestiegen – auf dem Spiegel läuft eine Migration | Minor |
+| neue Datei unter `packages/*/src/`, `modules/` oder `deploy/` (ohne Tests) | Minor |
+| alles andere | Patch |
 
-Ohne Label entscheidet ersatzweise die Commit-Nachricht: `feat:` hebt die
-zweite Stelle, `feat!:`/`BREAKING CHANGE` die erste, `[skip release]`
-unterdrückt das Release. Alles andere ist eine Fehlerkorrektur.
+Gegen die bisherige Historie geprüft trifft das jede Entscheidung, die früher
+von Hand gefallen ist. Die Grenze ist ehrlich benannt: Der Ablauf sieht
+Dateien, keine Absichten. Eine neue Funktion, die nur bestehende Dateien in
+`core` oder `remote` anfasst, wird als Patch veröffentlicht – zu wenig, nie zu
+viel. **Major springt nie von allein**: dass eine Änderung bricht, steht in
+keinem Dateinamen. Dafür gibt es den Knopf.
 
-Die Tags sind dabei die Quelle der Wahrheit, nicht `package.json` – die
+Die Tags sind die Quelle der Wahrheit, nicht `package.json` – die
 Versionsfelder werden aus dem Tag nachgezogen, können also nicht auseinander
 laufen. Der Versions-Commit wird mit dem `GITHUB_TOKEN` gepusht und löst
 deshalb keinen weiteren Lauf aus; auf `main` darf der Push allerdings nicht
 durch einen Branch-Schutz verboten sein.
 
 Von Hand geht weiterhin beides: der Knopf *Release nach Merge → Run workflow*
-für einen Sprung ohne Merge, und ein selbst gesetzter Tag als Notausgang.
+mit der Wahl `patch`/`minor`/`major` – der einzige Weg zu einem Major – und
+ein selbst gesetzter Tag als Notausgang.
 
 ```bash
 git tag v0.2.0 && git push origin v0.2.0

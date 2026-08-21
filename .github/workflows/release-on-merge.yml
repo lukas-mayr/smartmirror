@@ -17,7 +17,6 @@ on:
 
 permissions:
   contents: write
-  pull-requests: read
 
 # Zwei Releases gleichzeitig wuerden sich beim Tag-Setzen in die Quere kommen.
 concurrency:
@@ -50,10 +49,12 @@ jobs:
       - name: Stellenwert bestimmen
         id: bump
         env:
-          GH_TOKEN: ${{ github.token }}
           MANUAL_BUMP: ${{ inputs.bump }}
         run: |
           set -euo pipefail
+
+          LATEST=$(git tag -l 'v*' --sort=-v:refname | head -n 1)
+          echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
 
           if [ -n "$MANUAL_BUMP" ]; then
             echo "bump=$MANUAL_BUMP" >> "$GITHUB_OUTPUT"
@@ -61,37 +62,59 @@ jobs:
             exit 0
           fi
 
-          # Die Beschriftung des zugehoerigen Pull Requests entscheidet. Das
-          # ist der einzige Ort, an dem sich vor dem Merge noch bequem sagen
-          # laesst, wie gross die Aenderung ist – und er zwingt niemandem eine
-          # Schreibweise fuer Commit-Nachrichten auf.
-          LABELS=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" \
-            --jq '.[0].labels[].name' 2>/dev/null || true)
-          echo "Beschriftungen: ${LABELS:-keine}"
+          if [ -z "$LATEST" ]; then
+            echo "bump=patch" >> "$GITHUB_OUTPUT"
+            echo "Noch kein Tag – das erste Release."
+            exit 0
+          fi
+
+          # Der Sprung kommt aus dem, was sich seit dem letzten Release
+          # geaendert hat. Niemand muss dafuer etwas beschriften oder eine
+          # Schreibweise fuer Commit-Nachrichten einhalten.
+          CHANGED=$(git diff --name-only "$LATEST" HEAD)
+          echo "Geaendert seit ${LATEST}:"
+          echo "$CHANGED" | sed 's/^/  /'
+
+          # Aendert sich nur Beiwerk, gibt es nichts zu veroeffentlichen: ein
+          # Release ist rund 113 MB, das ist einer README-Korrektur nicht wert.
+          RELEVANT=$(echo "$CHANGED" | grep -Ev '^(README\.md|LICENSES\.md|docs/|\.github/|\.gitignore$)' || true)
+          if [ -z "$RELEVANT" ]; then
+            echo "bump=skip" >> "$GITHUB_OUTPUT"
+            echo "Nur Beiwerk geaendert – kein Release."
+            exit 0
+          fi
 
           BUMP=patch
-          case "$LABELS" in
-            *release:skip*)  BUMP=skip ;;
-            *release:major*) BUMP=major ;;
-            *release:minor*) BUMP=minor ;;
-            *release:patch*) BUMP=patch ;;
-            *)
-              # Ohne Beschriftung entscheidet die Commit-Nachricht: Wer die
-              # Conventional-Commits-Schreibweise benutzt, bekommt den
-              # passenden Sprung, alle anderen eine Fehlerkorrektur.
-              SUBJECT=$(git log -1 --pretty=%B "$GITHUB_SHA")
-              case "$SUBJECT" in
-                *"[skip release]"*) BUMP=skip ;;
-                # Sicherheitsnetz gegen eine Schleife: der eigene
-                # Versions-Commit loest zwar keinen Lauf aus, weil er mit dem
-                # GITHUB_TOKEN gepusht wird, aber verlassen wollen wir uns
-                # nicht allein darauf.
-                Version\ [0-9]*) BUMP=skip ;;
-                *"BREAKING CHANGE"*|feat!:*|fix!:*) BUMP=major ;;
-                feat:*|feat\(*) BUMP=minor ;;
-              esac
-              ;;
-          esac
+
+          # Die Vertraege im SDK haengen alle Module daran: aendern sie sich,
+          # ist das mehr als eine Fehlerkorrektur. fonts.ts ist ausgenommen,
+          # weil die Datei erzeugt wird und sich schon bei einer neuen Schrift
+          # aendert.
+          SDK=$(echo "$CHANGED" | grep -E '^packages/sdk/src/' \
+            | grep -v '^packages/sdk/src/fonts\.ts$' || true)
+          if [ -n "$SDK" ]; then
+            BUMP=minor
+            echo "Grund: ein Vertrag im SDK hat sich geaendert ($(echo "$SDK" | tr '\n' ' '))."
+          fi
+
+          # Was neu dazukommt, ist neue Funktion und kein Fehler weniger: ein
+          # weiteres Modul, ein Skript auf dem Spiegel, eine systemd-Unit.
+          # Tests zaehlen nicht mit, die kommen auch zu Fehlerkorrekturen dazu.
+          NEU=$(git diff --name-only --diff-filter=A "$LATEST" HEAD \
+            -- 'packages/*/src' 'modules' 'deploy' | grep -v '/test/' || true)
+          if [ -n "$NEU" ]; then
+            BUMP=minor
+            echo "Grund: neu dazugekommen ($(echo "$NEU" | tr '\n' ' '))."
+          fi
+
+          # Steigt die Schemaversion der Konfiguration, laeuft auf dem Spiegel
+          # eine Migration – das gehoert sichtbar in die Versionsnummer.
+          SCHEMA=$(git diff "$LATEST" HEAD -- packages/sdk/src/config.ts \
+            | grep '^[+-]export const CONFIG_SCHEMA_VERSION' || true)
+          if [ -n "$SCHEMA" ]; then
+            BUMP=minor
+            echo "Grund: die Schemaversion der Konfiguration ist gestiegen."
+          fi
 
           echo "bump=$BUMP" >> "$GITHUB_OUTPUT"
           echo "Stellenwert: $BUMP"
@@ -100,6 +123,7 @@ jobs:
         id: next
         env:
           BUMP: ${{ steps.bump.outputs.bump }}
+          LATEST: ${{ steps.bump.outputs.latest }}
         run: |
           set -euo pipefail
 
@@ -109,7 +133,6 @@ jobs:
             exit 0
           fi
 
-          LATEST=$(git tag -l 'v*' --sort=-v:refname | head -n 1)
           if [ -z "$LATEST" ]; then
             # Noch nie veroeffentlicht: die Nummer aus package.json ist das
             # erste Release, ohne sie vorher hochzuzaehlen.
