@@ -376,7 +376,39 @@ Installation dann mit `--repo deinname/smartmirror`.
 └─ data/               Konfiguration und Zustand – von Updates NIE berührt
 ```
 
-Veröffentlichen heißt: Tag setzen.
+Veröffentlichen heißt: mergen. Jeder Merge auf `main` durchläuft
+`Release nach Merge`:
+
+1. **Prüfen** – derselbe Job, der schon am Pull Request lief (Bauen,
+   Typen, Tests, erzeugte Dateien).
+2. **Versionieren** – die nächste Nummer wird aus dem letzten `v*`-Tag
+   berechnet, mit `scripts/set-version.mjs` in die Wurzel, in jedes Paket und
+   in alle internen `@mirror/*`-Abhängigkeiten geschrieben, als Commit
+   `Version X.Y.Z` auf `main` abgelegt und als `vX.Y.Z` getaggt.
+3. **Veröffentlichen** – die Release-Pipeline baut, signiert und lädt hoch.
+
+Wie weit die Nummer springt, sagt die Beschriftung des Pull Requests:
+
+| Label | Wirkung | Beispiel |
+| --- | --- | --- |
+| *(keine)* | Patch | 0.6.0 → 0.6.1 |
+| `release:patch` | Patch | 0.6.0 → 0.6.1 |
+| `release:minor` | Minor | 0.6.0 → 0.7.0 |
+| `release:major` | Major | 0.6.0 → 1.0.0 |
+| `release:skip` | kein Release | — |
+
+Ohne Label entscheidet ersatzweise die Commit-Nachricht: `feat:` hebt die
+zweite Stelle, `feat!:`/`BREAKING CHANGE` die erste, `[skip release]`
+unterdrückt das Release. Alles andere ist eine Fehlerkorrektur.
+
+Die Tags sind dabei die Quelle der Wahrheit, nicht `package.json` – die
+Versionsfelder werden aus dem Tag nachgezogen, können also nicht auseinander
+laufen. Der Versions-Commit wird mit dem `GITHUB_TOKEN` gepusht und löst
+deshalb keinen weiteren Lauf aus; auf `main` darf der Push allerdings nicht
+durch einen Branch-Schutz verboten sein.
+
+Von Hand geht weiterhin beides: der Knopf *Release nach Merge → Run workflow*
+für einen Sprung ohne Merge, und ein selbst gesetzter Tag als Notausgang.
 
 ```bash
 git tag v0.2.0 && git push origin v0.2.0

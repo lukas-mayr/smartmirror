@@ -1,0 +1,169 @@
+name: Release nach Merge
+
+# Ein Merge auf main ist eine Veroeffentlichung. Dieser Ablauf prueft den
+# Stand, vergibt die naechste Version, schreibt sie in alle package.json,
+# setzt den Tag und uebergibt an die Release-Pipeline.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Welcher Stellenwert steigt'
+        required: true
+        default: patch
+        type: choice
+        options: [patch, minor, major]
+
+permissions:
+  contents: write
+  pull-requests: read
+
+# Zwei Releases gleichzeitig wuerden sich beim Tag-Setzen in die Quere kommen.
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  version:
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.next.outputs.version }}
+      release: ${{ steps.next.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Die Tags sind die Quelle der Wahrheit fuer die letzte Version,
+          # deshalb die vollstaendige Historie.
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Stellenwert bestimmen
+        id: bump
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MANUAL_BUMP: ${{ inputs.bump }}
+        run: |
+          set -euo pipefail
+
+          if [ -n "$MANUAL_BUMP" ]; then
+            echo "bump=$MANUAL_BUMP" >> "$GITHUB_OUTPUT"
+            echo "Von Hand angestossen: $MANUAL_BUMP"
+            exit 0
+          fi
+
+          # Die Beschriftung des zugehoerigen Pull Requests entscheidet. Das
+          # ist der einzige Ort, an dem sich vor dem Merge noch bequem sagen
+          # laesst, wie gross die Aenderung ist – und er zwingt niemandem eine
+          # Schreibweise fuer Commit-Nachrichten auf.
+          LABELS=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" \
+            --jq '.[0].labels[].name' 2>/dev/null || true)
+          echo "Beschriftungen: ${LABELS:-keine}"
+
+          BUMP=patch
+          case "$LABELS" in
+            *release:skip*)  BUMP=skip ;;
+            *release:major*) BUMP=major ;;
+            *release:minor*) BUMP=minor ;;
+            *release:patch*) BUMP=patch ;;
+            *)
+              # Ohne Beschriftung entscheidet die Commit-Nachricht: Wer die
+              # Conventional-Commits-Schreibweise benutzt, bekommt den
+              # passenden Sprung, alle anderen eine Fehlerkorrektur.
+              SUBJECT=$(git log -1 --pretty=%B "$GITHUB_SHA")
+              case "$SUBJECT" in
+                *"[skip release]"*) BUMP=skip ;;
+                # Sicherheitsnetz gegen eine Schleife: der eigene
+                # Versions-Commit loest zwar keinen Lauf aus, weil er mit dem
+                # GITHUB_TOKEN gepusht wird, aber verlassen wollen wir uns
+                # nicht allein darauf.
+                Version\ [0-9]*) BUMP=skip ;;
+                *"BREAKING CHANGE"*|feat!:*|fix!:*) BUMP=major ;;
+                feat:*|feat\(*) BUMP=minor ;;
+              esac
+              ;;
+          esac
+
+          echo "bump=$BUMP" >> "$GITHUB_OUTPUT"
+          echo "Stellenwert: $BUMP"
+
+      - name: Naechste Version berechnen
+        id: next
+        env:
+          BUMP: ${{ steps.bump.outputs.bump }}
+        run: |
+          set -euo pipefail
+
+          if [ "$BUMP" = "skip" ]; then
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Kein Release fuer diesen Merge."
+            exit 0
+          fi
+
+          LATEST=$(git tag -l 'v*' --sort=-v:refname | head -n 1)
+          if [ -z "$LATEST" ]; then
+            # Noch nie veroeffentlicht: die Nummer aus package.json ist das
+            # erste Release, ohne sie vorher hochzuzaehlen.
+            VERSION=$(node -p "require('./package.json').version")
+          else
+            CURRENT="${LATEST#v}"
+            IFS=. read -r MAJOR MINOR PATCH <<< "${CURRENT%%-*}"
+            case "$BUMP" in
+              major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+              minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+              patch) PATCH=$((PATCH + 1)) ;;
+            esac
+            VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          fi
+
+          if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
+            echo "::error::Tag v${VERSION} gibt es schon."
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "release=true" >> "$GITHUB_OUTPUT"
+          echo "${LATEST:-(noch kein Tag)} -> v${VERSION}"
+
+      - name: Version schreiben und Tag setzen
+        if: steps.next.outputs.release == 'true'
+        env:
+          VERSION: ${{ steps.next.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          node scripts/set-version.mjs "$VERSION"
+          # Die Sperrdatei fuehrt die Versionen der eigenen Pakete mit; ohne
+          # diesen Lauf schlaegt "npm ci" im Release-Bau fehl.
+          npm install --package-lock-only --ignore-scripts
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package.json package-lock.json packages/*/package.json modules/*/package.json
+          git commit -m "Version ${VERSION}"
+          git tag -a "v${VERSION}" -m "smartmirror ${VERSION}"
+
+          # Erst der Commit, dann der Tag: sonst zeigt der Tag auf einen Stand,
+          # den es auf main noch nicht gibt.
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+          git push origin "v${VERSION}"
+
+  release:
+    needs: version
+    if: needs.version.outputs.release == 'true'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+      ref: v${{ needs.version.outputs.version }}
+    secrets: inherit
