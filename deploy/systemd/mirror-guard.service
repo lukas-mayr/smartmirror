@@ -1,0 +1,29 @@
+[Unit]
+Description=Prueft vor dem Start, ob das installierte Release brauchbar ist
+# Vor beiden Diensten, damit sie gar nicht erst in ein kaputtes Release
+# starten. Kein Requires in der Gegenrichtung: schlaegt der Waechter selbst
+# fehl, sollen Core und Anzeige es trotzdem versuchen.
+Before=mirror-core.service mirror-shell.service
+After=local-fs.target
+RequiresMountsFor=/opt/smartmirror
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=root
+# Liegt bewusst ausserhalb von current/: dieses Skript muss genau dann laufen,
+# wenn das Release es nicht mehr tut.
+#
+# Fehlt es dort noch, wird es einmalig aus dem Release geholt. Das ist der Weg
+# auf ein Geraet, das diese Unit per Update bekommt und nicht per Installer:
+# der Updater, der sie einspielt, ist noch der alte und kennt das Skript nicht.
+# Ist auch die Vorlage im Release beschaedigt, endet der Start hier - schlimmer
+# als ohne Waechter ist das nicht, denn Core und Anzeige warten nicht auf ihn.
+ExecStart=/bin/bash -c 'test -s /opt/smartmirror/guard.sh || install -m 0755 /opt/smartmirror/current/deploy/mirror-guard.sh /opt/smartmirror/guard.sh; exec /bin/bash /opt/smartmirror/guard.sh'
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mirror-guard
+
+[Install]
+WantedBy=multi-user.target

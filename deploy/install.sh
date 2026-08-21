@@ -388,6 +388,16 @@ fi
 ln -sfn "$TARGET" "$INSTALL_ROOT/current.new"
 mv -T "$INSTALL_ROOT/current.new" "$INSTALL_ROOT/current"
 
+# Der Waechter liegt ausserhalb des Releases: er muss laufen koennen, wenn
+# genau dieses Release beschaedigt ist. Der Updater haelt ihn spaeter aktuell.
+install -m 0755 "$TARGET/deploy/mirror-guard.sh" "$INSTALL_ROOT/guard.sh"
+log "Boot-Waechter eingerichtet: $INSTALL_ROOT/guard.sh"
+
+# Alles auf die Karte zwingen, bevor Dienste starten. Der Spiegel wird per
+# Stecker ausgeschaltet - was jetzt noch im Schreibpuffer steht, kann beim
+# naechsten Start als Datei der Groesse 0 dastehen.
+sync
+
 # --------------------------- Erstkonfiguration --------------------------------
 
 CONFIG="$INSTALL_ROOT/data/config.json"
@@ -462,7 +472,7 @@ systemctl daemon-reload
 # Die .path-Unit ist der Knopf "Jetzt pruefen" in der Handy-App: der Core kann
 # den Updater nicht selbst starten (unprivilegiert), also loest die Datei aus,
 # die er schreibt. Der Timer bleibt die regelmaessige Pruefung.
-systemctl enable mirror-core.service mirror-shell.service mirror-updater.timer mirror-updater.path >/dev/null
+systemctl enable mirror-guard.service mirror-core.service mirror-shell.service mirror-updater.timer mirror-updater.path >/dev/null
 systemctl restart mirror-core.service
 systemctl restart mirror-shell.service
 systemctl start mirror-updater.timer
@@ -496,6 +506,8 @@ Fertig. Version $BUNDLE_VERSION ist installiert.
   Drehung         ${ROTATION_NOW}°. Steht der Kopplungscode quer:
                   sudo $INSTALL_ROOT/current/deploy/rotate.sh 90
   Logs            journalctl -u mirror-core -u mirror-shell -u mirror-updater -f
+  Stromausfall    Ein beschaedigtes Release faellt beim Booten von selbst auf
+                  das vorige zurueck: journalctl -u mirror-guard -b
   Update von Hand systemctl start mirror-updater.service
 
 DONE

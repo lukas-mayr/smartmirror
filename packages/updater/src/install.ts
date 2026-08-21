@@ -4,7 +4,7 @@ import { chmod, chown, copyFile, mkdir, readdir, readFile, readlink, rename, rm,
 import { existsSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { promisify } from 'node:util';
-import { currentLink, previousLink, releaseDir, releasesDir } from './paths.js';
+import { currentLink, installRoot, previousLink, releaseDir, releasesDir } from './paths.js';
 import { compare } from './semver.js';
 
 const run = promisify(execFile);
@@ -13,6 +13,31 @@ const run = promisify(execFile);
 const KEEP_RELEASES = 3;
 
 const SYSTEMD_DIR = '/etc/systemd/system';
+
+/**
+ * Zwingt alles Geschriebene auf die Karte.
+ *
+ * Ohne das ist ein Update bis zu einige Sekunden lang eine Sollbruchstelle:
+ * tar legt die Dateien an, der Symlink zeigt schon darauf, aber der Inhalt
+ * steht noch im Schreibpuffer des Kernels. Wird in diesem Fenster der Stecker
+ * gezogen - die uebliche Art, einen Spiegel auszuschalten -, bleiben Dateien
+ * der Groesse 0 zurueck. Beobachtet auf einem echten Geraet: core/index.mjs
+ * und deploy/cage-session.sh mit 0 Bytes, danach 167 Startversuche im Kreis.
+ *
+ * "sync" statt fsync je Datei: ein Release sind zehntausende Dateien, fast
+ * alles davon Electron. Einmal alles rausschreiben zu lassen ist schneller
+ * als der Weg ueber jeden einzelnen Dateideskriptor - und der Updater hat an
+ * dieser Stelle ohnehin Zeit.
+ */
+async function flushToDisk(): Promise<void> {
+  try {
+    await run('sync', [], { timeout: 120_000 });
+  } catch (error) {
+    // Kein Abbruch: ohne sync ist das Update nur nicht gegen einen Stromausfall
+    // in den naechsten Sekunden geschuetzt, sonst aber vollstaendig.
+    console.warn(`[updater] sync fehlgeschlagen: ${(error as Error).message}`);
+  }
+}
 
 export function sha256Hex(buffer: Buffer): string {
   return createHash('sha256').update(buffer).digest('hex');
@@ -70,6 +95,9 @@ export async function extractRelease(archive: Buffer, version: string): Promise<
   await rename(source, target);
   if (source !== staging) await rm(staging, { recursive: true, force: true });
   await prepareShell(target);
+  // Erst wenn das Release wirklich auf der Karte steht, darf jemand darauf
+  // zeigen. Danach ist der Symlink-Tausch die einzige noch offene Aenderung.
+  await flushToDisk();
   return target;
 }
 
@@ -133,7 +161,35 @@ export async function activateRelease(version: string): Promise<{ previous: stri
   if (previous) await swapLink(previousLink, previous);
   await swapLink(currentLink, releaseDir(version));
   await syncSystemdUnits(releaseDir(version));
+  await syncGuardScript(releaseDir(version));
+  // Auch die beiden Symlinks sind Aenderungen am Dateisystem. Ueberleben sie
+  // den naechsten Stromausfall nicht, zeigt current auf das alte Release -
+  // unschoen, aber harmlos. Ohne diesen Aufruf koennte current dagegen ins
+  // Leere zeigen, und dann startet gar nichts mehr.
+  await flushToDisk();
   return { previous };
+}
+
+/**
+ * Haelt den Boot-Waechter unter /opt/smartmirror aktuell.
+ *
+ * Er liegt bewusst ausserhalb des Releases - er muss laufen, wenn genau
+ * dieses Release beschaedigt ist. Damit er trotzdem mit dem Code altert,
+ * wird er wie die Units aus dem Release nachgezogen.
+ */
+export async function syncGuardScript(releasePath: string): Promise<boolean> {
+  const from = join(releasePath, 'deploy', 'mirror-guard.sh');
+  const to = join(installRoot, 'guard.sh');
+  if (!existsSync(from)) return false;
+  const next = await readFile(from, 'utf8');
+  // Eine leere Quelldatei waere genau der Schaden, gegen den der Waechter
+  // schuetzt - die vorhandene Fassung ist dann in jedem Fall die bessere.
+  if (next.trim().length === 0) return false;
+  const current = existsSync(to) ? await readFile(to, 'utf8') : null;
+  if (current === next) return false;
+  await writeFile(to, next, 'utf8');
+  await chmod(to, 0o755);
+  return true;
 }
 
 export async function rollback(): Promise<string | null> {

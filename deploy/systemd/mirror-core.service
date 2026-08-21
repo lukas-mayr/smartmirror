@@ -1,8 +1,8 @@
 [Unit]
 Description=Smartmirror Core (Modul-Host und Fernsteuerungs-API)
 Documentation=https://github.com/
-After=network-online.target
-Wants=network-online.target
+After=network-online.target mirror-guard.service
+Wants=network-online.target mirror-guard.service
 
 [Service]
 Type=simple
