@@ -1,7 +1,5 @@
 export interface SpotifyConfig {
   clientId: string;
-  showProgress: boolean;
-  showAlbum: boolean;
   hideWhenIdle: boolean;
   /** Hoeren mehrere gleichzeitig, so lange zeigt der Block jeden. */
   switchSeconds: number;
@@ -24,6 +22,16 @@ export interface AccountPlayback {
   /** Bei Podcasts der Name der Sendung. */
   artist: string | null;
   album: string | null;
+  /** Erscheinungsjahr des Albums, soweit Spotify eines nennt. */
+  albumYear: string | null;
+  /**
+   * Albumcover als data-URI, vom Backend geholt und verkleinert.
+   *
+   * Als data-URI, weil die Anzeige hinter einer strikten CSP laeuft und
+   * nichts aus dem Netz laden darf – das Backend ist die einzige Stelle mit
+   * Netzzugang, und `data:` ist in der CSP fuer Bilder ausdruecklich erlaubt.
+   */
+  cover: string | null;
   durationMs: number | null;
   progressMs: number | null;
   /**
@@ -109,6 +117,52 @@ export function nextShown(slots: readonly number[], current: number | null): num
   const index = current === null ? -1 : slots.indexOf(current);
   if (index === -1) return slots[0] as number;
   return slots[(index + 1) % slots.length] as number;
+}
+
+/**
+ * Akzentfarbe aus den Pixeln eines Covers – der Ton, der das Bild dominiert.
+ *
+ * Bewusst simpel: alle ausreichend gesaettigten Pixel stimmen ueber den
+ * Farbton ab (als Vektorsumme, damit Rot bei 359 und 1 Grad nicht zu Cyan
+ * mittelt), Saettigung und Helligkeit sind fest gewaehlt. Fest deshalb, weil
+ * die Farbe auf schwarzem Glas lesbar sein muss – ein dunkles Cover darf
+ * keine dunkle Schrift ergeben.
+ */
+export function accentFromPixels(rgba: ArrayLike<number>): string | null {
+  let x = 0;
+  let y = 0;
+  let votes = 0;
+  for (let i = 0; i + 2 < rgba.length; i += 4) {
+    const r = (rgba[i] as number) / 255;
+    const g = (rgba[i + 1] as number) / 255;
+    const b = (rgba[i + 2] as number) / 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const delta = max - min;
+    if (delta === 0) continue;
+    const lightness = (max + min) / 2;
+    const denominator = 1 - Math.abs(2 * lightness - 1);
+    if (denominator <= 0) continue;
+    const saturation = delta / denominator;
+    // Graustufen und Extreme sagen nichts ueber den Charakter des Covers.
+    if (saturation < 0.3 || lightness < 0.12 || lightness > 0.88) continue;
+
+    let hue: number;
+    if (max === r) hue = ((g - b) / delta) % 6;
+    else if (max === g) hue = (b - r) / delta + 2;
+    else hue = (r - g) / delta + 4;
+    hue *= 60;
+    if (hue < 0) hue += 360;
+
+    const radians = (hue * Math.PI) / 180;
+    x += Math.cos(radians) * saturation;
+    y += Math.sin(radians) * saturation;
+    votes += 1;
+  }
+  if (votes === 0) return null;
+  let hue = (Math.atan2(y, x) * 180) / Math.PI;
+  if (hue < 0) hue += 360;
+  return `hsl(${Math.round(hue)}, 70%, 65%)`;
 }
 
 /** "3:07" – Minuten und Sekunden, ohne fuehrende Stunde bei kurzen Titeln. */

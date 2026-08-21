@@ -21,7 +21,9 @@ export const FONT_FAMILIES = [
     id: 'nunito',
     name: 'Nunito',
     package: '@fontsource/nunito',
-    weights: [300, 400, 500],
+    // 700/800 fuer das Spotify-Modul: dessen Titelzeile lebt vom fetten
+    // Schnitt, und kuenstlich verdickte Schrift franst hinter der Folie aus.
+    weights: [300, 400, 500, 700, 800],
     note: 'Deutlich abgerundete Endungen, wirkt weicher und freundlicher.',
   },
   {

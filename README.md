@@ -146,12 +146,28 @@ niemand, der tippen könnte.
 
 ## Spotify anschließen
 
-Das Modul zeigt Titel, Interpret und den Fortschritt dessen, was gerade läuft —
-für **bis zu fünf Konten**. Hören mehrere gleichzeitig, teilen sie sich den
-Block abwechselnd: der Spiegel zeigt jeden für ein einstellbares Intervall
-(Voreinstellung zehn Sekunden) und blendet dazu den Namen aus dem
-Spotify-Profil ein. Es steuert nichts: vor einem Spiegel gibt es nichts zu
-drücken.
+Das Modul zeigt, was gerade läuft — mit Cover, für **bis zu fünf Konten**.
+Hören mehrere gleichzeitig, teilen sie sich den Block abwechselnd: der Spiegel
+zeigt jeden für ein einstellbares Intervall (Voreinstellung zehn Sekunden) und
+blendet dazu den Namen aus dem Spotify-Profil ein. Es steuert nichts: vor einem
+Spiegel gibt es nichts zu drücken.
+
+**Was zu sehen ist, entscheidet die Blockgröße** — nicht eine Einstellung:
+
+| Größe | Inhalt |
+|---|---|
+| S | nur das Cover |
+| M | Cover, Titel, Interpret |
+| L | dazu der Fortschrittsbalken mit Zeiten |
+| XL | alles in voller Breite, mit Album und Jahr |
+
+Interpret und Fortschrittsbalken tragen die **Akzentfarbe des Covers** — die
+Anzeige zieht sie beim Laden aus dem Bild. Das Cover selbst holt das Backend
+und liefert es als data-URI mit: die Anzeige darf hinter ihrer strikten CSP
+nichts aus dem Netz laden. Eine Ausnahme von der Regel „keine Farbflächen"
+aus [Gestaltung hinter dem Spiegel](#gestaltung-hinter-dem-spiegel), und eine
+bewusste: das Cover ist hier der Inhalt, nicht Dekoration — und es bleibt die
+einzige Fläche, die leuchtet.
 
 **Jeder legt seine eigene Spotify-App an.** Das ist keine Bequemlichkeit,
 sondern die einzige Bauform, die trägt: Spotify erlaubt einer App im

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { elapsedFraction, extractCode, formatTime, nextShown, REDIRECT_URI } from '../dist/shared.js';
+import { accentFromPixels, elapsedFraction, extractCode, formatTime, nextShown, REDIRECT_URI } from '../dist/shared.js';
 
 test('rechnet den Fortschritt zwischen zwei Antworten weiter', () => {
   const sampledAt = new Date('2026-01-01T12:00:00Z').toISOString();
@@ -81,4 +81,26 @@ test('beginnt vorne, wenn der Gezeigte weggefallen ist', () => {
 
 test('ohne aktive Konten wird niemand gezeigt', () => {
   assert.equal(nextShown([], 1), null);
+});
+
+test('zieht aus einem roten Cover einen roten Akzent', () => {
+  // 4 Pixel sattes Rot (RGBA).
+  const pixels = new Uint8ClampedArray([220, 30, 30, 255, 220, 30, 30, 255, 220, 30, 30, 255, 220, 30, 30, 255]);
+  assert.equal(accentFromPixels(pixels), 'hsl(0, 70%, 65%)');
+});
+
+test('mittelt Rottoene um den Nullpunkt herum nicht zu Cyan', () => {
+  // 350 und 10 Grad muessen bei 0 landen, nicht bei 180.
+  const pixels = new Uint8ClampedArray([
+    230, 25, 60, 255, // ~350 Grad
+    230, 60, 25, 255, // ~10 Grad
+  ]);
+  const accent = accentFromPixels(pixels);
+  const hue = Number(/hsl\((\d+)/.exec(accent)[1]);
+  assert.ok(hue <= 15 || hue >= 345, `Farbton ${hue} liegt nicht bei Rot`);
+});
+
+test('ein graues Cover gibt keinen Akzent her', () => {
+  const pixels = new Uint8ClampedArray([128, 128, 128, 255, 40, 40, 40, 255, 200, 200, 200, 255]);
+  assert.equal(accentFromPixels(pixels), null);
 });
