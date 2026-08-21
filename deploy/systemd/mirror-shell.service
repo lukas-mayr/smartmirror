@@ -33,6 +33,17 @@ ExecStart=/opt/smartmirror/current/deploy/cage-session.sh
 Restart=always
 RestartSec=5
 
+# Beenden hart begrenzen. Beobachtet: cage reagierte nach einem gescheiterten
+# Backend-Start 90 Sekunden lang nicht auf SIGTERM und musste per SIGKILL
+# beendet werden. Das ist nicht nur laestig - es bedroht die Update-Kette:
+# der Updater startet beide Dienste neu und gibt dem Healthcheck 90 Sekunden.
+# Braucht allein das Beenden so lange, laeuft der Healthcheck ab und der
+# Spiegel rollt ein voellig intaktes Update zurueck.
+TimeoutStopSec=10
+KillMode=mixed
+KillSignal=SIGTERM
+FinalKillSignal=SIGKILL
+
 # Zugriff auf Grafik und Eingabe. Die Gruppe des seatd-Sockets heisst je nach
 # Distribution anders und wird deshalb vom Installer ermittelt und per
 # Drop-in-Datei ergaenzt, statt hier geraten zu werden.
