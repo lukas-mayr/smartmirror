@@ -5,6 +5,7 @@ import type {
   ModuleStateEnvelope,
   ServerMessage,
   UpdateStatus,
+  Viewport,
 } from '@mirror/sdk';
 
 const TOKEN_KEY = 'mirror.token';
@@ -27,6 +28,11 @@ export interface StoreSnapshot {
   state: Record<string, ModuleStateEnvelope>;
   powerOn: boolean;
   update: UpdateStatus | null;
+  /**
+   * Kantenlaengen der Anzeige in Pixeln, sofern sie gerade haengt. Nur zur
+   * Erlaeuterung beim Ausrichten: neben "2,5 %" steht dann auch "27 px".
+   */
+  viewport: Viewport | null;
   lastError: string | null;
 }
 
@@ -50,6 +56,7 @@ export class Store extends EventTarget {
     state: {},
     powerOn: true,
     update: null,
+    viewport: null,
     lastError: null,
   };
 
@@ -204,6 +211,7 @@ export class Store extends EventTarget {
           state: message.state,
           powerOn: message.power.on,
           update: message.update,
+          viewport: message.viewport,
         });
         return;
       case 'config:update':
@@ -227,6 +235,9 @@ export class Store extends EventTarget {
       }
       case 'display:power':
         this.#patch({ powerOn: message.on });
+        return;
+      case 'display:viewport':
+        this.#patch({ viewport: message.viewport });
         return;
       case 'update:status':
         this.#patch({ update: message.status });

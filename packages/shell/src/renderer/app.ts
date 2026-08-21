@@ -1,6 +1,7 @@
 import {
   DEFAULT_FONT,
   FONT_STACKS,
+  INSET_SIDES,
   validate,
   ZONES,
   type MirrorConfig,
@@ -41,8 +42,10 @@ const BURN_IN_PATH: readonly [number, number][] = [
 ];
 
 export class MirrorApp {
+  #stage: HTMLElement;
   #grid: HTMLElement;
   #dim: HTMLElement;
+  #frame: HTMLElement;
   #overlay: HTMLElement;
   #status: HTMLElement;
   #connection: CoreConnection;
@@ -58,8 +61,10 @@ export class MirrorApp {
   #ready = false;
 
   constructor(stage: HTMLElement, connection: CoreConnection, coreUrl: string) {
+    this.#stage = stage;
     this.#grid = stage.querySelector('#grid') as HTMLElement;
     this.#dim = stage.querySelector('#dim') as HTMLElement;
+    this.#frame = stage.querySelector('#frame') as HTMLElement;
     this.#overlay = stage.querySelector('#overlay') as HTMLElement;
     this.#connection = connection;
     this.#coreUrl = coreUrl;
@@ -69,6 +74,8 @@ export class MirrorApp {
     stage.append(this.#status);
 
     this.#buildZones();
+    this.#buildFrame();
+    this.#watchViewport();
     this.#startBurnInProtection();
   }
 
@@ -97,6 +104,10 @@ export class MirrorApp {
           // tatsaechlich Inhalte, nicht nur ein schwarzes Fenster.
           this.#connection.send({ t: 'shell:ready', appVersion: this.#appVersion() });
         }
+        // Erst jetzt steht die Verbindung sicher genug, dass die Masse auch
+        // ankommen. Der Beobachter unten hat vorher womoeglich ins Leere
+        // gemeldet – der Core wirft doppelte Werte ohnehin weg.
+        this.#reportViewport();
         return;
 
       case 'config:update':
@@ -127,7 +138,7 @@ export class MirrorApp {
         return;
 
       case 'pair:code':
-        if (message.code) {
+        if (message.code && this.#config?.setup.step !== 'frame') {
           this.#showOverlay('Spiegel koppeln', message.code, 'Diesen Code in der Spiegel-App eingeben.');
         } else {
           this.#hideOverlay();
@@ -173,12 +184,15 @@ export class MirrorApp {
     // bekommt ihre Konfiguration direkt beim Verbinden, lange bevor ein Handy
     // ueberhaupt gekoppelt ist.
     document.documentElement.dataset.rotation = String(config.display.rotation);
-    document.documentElement.style.setProperty('--mirror-padding', `${config.display.paddingPercent}%`);
+    for (const side of INSET_SIDES) {
+      document.documentElement.style.setProperty(`--mirror-inset-${side}`, `${config.display.insets[side]}%`);
+    }
     document.documentElement.style.setProperty(
       '--mirror-font',
       FONT_STACKS[config.display.fontFamily] ?? FONT_STACKS[DEFAULT_FONT],
     );
     this.#applyPower();
+    this.#applySetup(config);
 
     const desired = config.instances
       .filter((instance) => instance.enabled)
@@ -285,6 +299,64 @@ export class MirrorApp {
   #effectiveConfig(instance: ModuleInstance, descriptor: ModuleDescriptor | undefined): Record<string, unknown> {
     if (!descriptor?.configSchema) return instance.config;
     return validate(descriptor.configSchema, instance.config).value as Record<string, unknown>;
+  }
+
+  /**
+   * Baut den Ausricht-Rahmen einmal auf. Er haengt danach immer im Dokument
+   * und wird nur ein- und ausgeblendet: waehrend des Ausrichtens kommt bei
+   * jedem Tastendruck am Handy eine neue Konfiguration herein, und ein
+   * Neuaufbau bei jeder davon waere ein Flackern genau an der Kante, auf die
+   * der Nutzer gerade schaut.
+   */
+  #buildFrame(): void {
+    for (const corner of ['tl', 'tr', 'br', 'bl']) {
+      const element = document.createElement('div');
+      element.className = `frame__corner frame__corner--${corner}`;
+      this.#frame.append(element);
+    }
+    for (const orientation of ['vertical', 'horizontal']) {
+      const element = document.createElement('div');
+      element.className = `frame__cross frame__cross--${orientation}`;
+      this.#frame.append(element);
+    }
+
+    const hint = document.createElement('div');
+    hint.className = 'frame__hint';
+    const title = document.createElement('b');
+    title.textContent = 'Bildschirm ausrichten';
+    hint.append(
+      title,
+      'Dieser Rahmen zeigt die bespielbare Flaeche. Verschiebe die Kanten in der Spiegel-App, bis rundum gleich viel Rand bleibt.',
+    );
+    this.#frame.append(hint);
+  }
+
+  /** Zweiter Schritt der Einrichtung: Rahmen zeigen statt Kopplungscode. */
+  #applySetup(config: MirrorConfig): void {
+    const aligning = config.setup.step === 'frame';
+    this.#frame.classList.toggle('frame--visible', aligning);
+    if (aligning) this.#hideOverlay();
+  }
+
+  /**
+   * Meldet die Kantenlaengen der Buehne an den Core.
+   *
+   * `offsetWidth`/`offsetHeight` und nicht `getBoundingClientRect()`: die
+   * Buehne wird fuer hochkante Spiegel per CSS gedreht, und das Rechteck waere
+   * dann wieder in Bildschirmkoordinaten. Gebraucht wird aber die Sicht des
+   * Nutzers – auf einem hochkanten Spiegel ist "oben" die kurze Kante.
+   */
+  #reportViewport(): void {
+    const width = this.#stage.offsetWidth;
+    const height = this.#stage.offsetHeight;
+    if (width <= 0 || height <= 0) return;
+    this.#connection.send({ t: 'shell:viewport', viewport: { width, height } });
+  }
+
+  #watchViewport(): void {
+    // Faengt beides ab: einen anderen Bildschirm am Kabel und einen Wechsel
+    // der Drehung, der die Kantenlaengen tauscht.
+    new ResizeObserver(() => this.#reportViewport()).observe(this.#stage);
   }
 
   #applyPower(): void {

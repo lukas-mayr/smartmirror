@@ -501,8 +501,12 @@ cat <<DONE
 Fertig. Version $BUNDLE_VERSION ist installiert.
 
   Fernbedienung   http://smartmirror.local:8080
-  Kopplung        Der Spiegel zeigt einen sechsstelligen Code, sobald sich ein
-                  ungekoppeltes Geraet verbindet.
+  Einrichtung     Zwei Schritte in der Handy-App:
+                  1. Kopplung – der Spiegel zeigt einen sechsstelligen Code,
+                     sobald sich ein ungekoppeltes Geraet verbindet.
+                  2. Ausrichten – der Spiegel zeigt einen Rahmen, die App
+                     verschiebt dessen vier Kanten. Fuer einen Bildschirm, der
+                     nicht mittig hinter dem Spiegelrahmen sitzt.
   Drehung         ${ROTATION_NOW}°. Steht der Kopplungscode quer:
                   sudo $INSTALL_ROOT/current/deploy/rotate.sh 90
   Logs            journalctl -u mirror-core -u mirror-shell -u mirror-updater -f

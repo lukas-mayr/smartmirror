@@ -200,11 +200,34 @@ Ohne Internet geht es auch aus einem lokal gebauten Paket:
 sudo bash install.sh --bundle smartmirror-0.1.0-arm64.tar.gz --pubkey ./minisign.pub
 ```
 
-### Koppeln
+### Einrichten
 
-Beim ersten Verbinden zeigt der Spiegel einen sechsstelligen Code. Wer koppeln
-will, braucht also Sichtkontakt — für ein Gerät im eigenen WLAN die passende
-Hürde, und es erspart ein Passwort, das ohnehin niemand ändert.
+Die Einrichtung läuft in zwei Schritten, geführt von der Handy-App. Beide
+Geräte zeigen dabei denselben Schritt an — der Stand steht deshalb in der
+Konfiguration und nicht in einer der beiden Oberflächen.
+
+**1. Koppeln.** Beim ersten Verbinden zeigt der Spiegel einen sechsstelligen
+Code. Wer koppeln will, braucht also Sichtkontakt — für ein Gerät im eigenen
+WLAN die passende Hürde, und es erspart ein Passwort, das ohnehin niemand
+ändert.
+
+**2. Ausrichten.** Danach zeigt der Spiegel einen Rahmen: genau die Fläche, die
+später bespielt wird. In der App lassen sich dessen vier Kanten einzeln mit `−`
+und `+` nach außen und innen schieben.
+
+Vier Werte und nicht einer, weil der Bildschirm hinter dem Zwei-Wege-Spiegel
+fast nie mittig im Rahmen sitzt: ein paar Millimeter Versatz beim Aufhängen
+genügen, und der Rahmen verdeckt links mehr Pixel als rechts. Ein einziger
+Randabstand kann das nicht ausgleichen — er macht den Inhalt nur kleiner, aber
+nicht mittig.
+
+Die Werte stehen in Prozent der jeweiligen Kantenlänge, damit dieselbe
+Einstellung nach einem Bildschirmtausch mit anderer Auflösung noch passt. Wo es
+hilft, zeigt die App daneben den ungefähren Pixelwert.
+
+Später ändern: **Anzeige → Bildschirmfläche**. Dort lässt sich der Rahmen
+jederzeit wieder einblenden — der Bildschirm rutscht beim Putzen, der Rahmen
+wird getauscht. Die Kopplung bleibt dabei bestehen.
 
 ### Drehen
 
@@ -222,6 +245,9 @@ sudo /opt/smartmirror/current/deploy/rotate.sh 270
 
 Das ändert nur dieses eine Feld und startet den Core neu. Nach der Kopplung ist
 dieselbe Einstellung in der Handy-App unter **Anzeige → Ausrichtung** zu finden.
+Die Drehung wirkt auch auf die Ränder aus Schritt 2: „oben“ ist immer oben aus
+Sicht des Betrachters, auf einem hochkant aufgehängten Bildschirm also die
+kurze Kante.
 
 ### Was der Installer mit dem Signierschlüssel macht
 

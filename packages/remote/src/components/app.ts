@@ -1,13 +1,28 @@
 import { LitElement, html, nothing, type TemplateResult } from 'lit';
 import {
+  adjustAllInsets,
+  adjustInset,
+  createDefaultInsets,
   FONT_OPTIONS,
+  INSET_MAX,
+  INSET_MIN,
+  INSET_SIDE_OPTIONS,
+  INSET_STEP,
+  insetsEqual,
+  insetToPixels,
   normalizeRotation,
   ROTATION_OPTIONS,
+  SETUP_FLOW_STEPS,
+  SETUP_STEP_TITLES,
+  setupStepNumber,
   ZONE_LABELS,
   ZONES,
   type FontId,
+  type InsetSide,
   type ModuleDescriptor,
   type ModuleInstance,
+  type ScreenInsets,
+  type SetupStep,
   type Zone,
 } from '@mirror/sdk';
 import { store, type StoreSnapshot } from '../store.js';
@@ -16,6 +31,11 @@ import './schema-form.js';
 type Tab = 'module' | 'anzeige' | 'system';
 
 const WEEKDAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+
+/** Seitenverhaeltnis der Vorschau, solange die Anzeige noch nichts gemeldet hat. */
+const FALLBACK_ASPECT = 16 / 9;
+
+const formatPercent = (value: number): string => value.toFixed(1).replace('.', ',').replace(',0', '');
 
 export class MirrorRemote extends LitElement {
   static override properties = {
@@ -57,14 +77,18 @@ export class MirrorRemote extends LitElement {
   };
 
   protected override render(): TemplateResult {
-    const { status } = this.snapshot;
-    if (status === 'pairing') return this.#renderPairing();
-    if (!this.snapshot.config) return this.#renderLoading();
+    const { status, config } = this.snapshot;
+    // Die Einrichtung ist kein Reiter neben den anderen: solange sie laeuft,
+    // ist sie die ganze App. Wer beim Ausrichten zwischen Modulen und Rahmen
+    // hin- und herspringen kann, richtet nicht aus.
+    if (status === 'pairing') return this.#renderSetup('pair');
+    if (!config) return this.#renderLoading();
+    if (config.setup.step !== 'done') return this.#renderSetup(config.setup.step);
 
     return html`
       <header class="topbar">
         <div>
-          <h1>${this.snapshot.config.deviceName}</h1>
+          <h1>${config.deviceName}</h1>
           <span class="topbar__status ${status === 'offline' ? 'is-offline' : ''}">
             ${status === 'offline' ? 'keine Verbindung' : this.snapshot.powerOn ? 'Anzeige an' : 'Anzeige aus'}
           </span>
@@ -100,11 +124,37 @@ export class MirrorRemote extends LitElement {
     `;
   }
 
-  /* --------------------------------- Kopplung -------------------------------- */
+  /* ------------------------------- Einrichtung ------------------------------- */
 
-  #renderPairing(): TemplateResult {
+  #renderSetup(step: SetupStep): TemplateResult {
     return html`
-      <div class="pairing">
+      <div class="setup">
+        <ol class="stepper">
+          ${SETUP_FLOW_STEPS.map(
+            (entry, index) => html`
+              <li
+                class=${setupStepNumber(step) > index + 1
+                  ? 'is-done'
+                  : setupStepNumber(step) === index + 1
+                    ? 'is-active'
+                    : ''}
+              >
+                <span class="stepper__dot">${index + 1}</span>
+                <span class="stepper__label">${SETUP_STEP_TITLES[entry]}</span>
+              </li>
+            `,
+          )}
+        </ol>
+
+        ${step === 'pair' ? this.#renderPairStep() : this.#renderFrameStep()}
+      </div>
+    `;
+  }
+
+  /** Schritt 1: der Code steht auf dem Spiegel, eingetippt wird er hier. */
+  #renderPairStep(): TemplateResult {
+    return html`
+      <section class="setup__step">
         <h1>Spiegel koppeln</h1>
         <p class="muted">Auf dem Spiegel steht ein sechsstelliger Code. Gib ihn hier ein.</p>
         <input
@@ -123,8 +173,145 @@ export class MirrorRemote extends LitElement {
         <p class="muted small">
           Der Code wird nur angezeigt, wenn ein ungekoppeltes Geraet verbunden ist, und laeuft nach fuenf Minuten ab.
         </p>
+      </section>
+    `;
+  }
+
+  /**
+   * Schritt 2: der Spiegel zeigt jetzt einen Rahmen, hier werden dessen vier
+   * Kanten verschoben. Beides muss gleichzeitig zu sehen sein – deshalb steht
+   * hier eine Vorschau desselben Rahmens und nicht nur eine Zahlenliste.
+   */
+  #renderFrameStep(): TemplateResult {
+    const config = this.snapshot.config;
+    if (!config) return this.#renderLoading();
+
+    return html`
+      <section class="setup__step">
+        <h1>Bildschirm ausrichten</h1>
+        <p class="muted">
+          Auf dem Spiegel ist jetzt ein Rahmen zu sehen: er zeigt die bespielbare Flaeche. Sitzt der Bildschirm nicht
+          mittig hinter dem Rahmen, schiebe die Kanten einzeln nach innen oder aussen, bis rundum gleich viel Rand
+          bleibt.
+        </p>
+
+        ${this.#renderInsetControls(config.display.insets)}
+
+        <div class="card__actions setup__actions">
+          <button
+            class="primary"
+            @click=${() => store.send({ t: 'admin:setSettings', patch: { setup: { step: 'done', completedAt: null } } })}
+          >
+            Fertig
+          </button>
+        </div>
+        <p class="muted small">
+          Spaeter aendern: <b>Anzeige → Bildschirmflaeche</b>. Der Rahmen laesst sich dort jederzeit wieder einblenden.
+        </p>
+      </section>
+    `;
+  }
+
+  /**
+   * Vorschau plus vier mal "−/+".
+   *
+   * Absichtlich Tasten und kein Schieberegler: auf einem Handy trifft man mit
+   * dem Daumen keine halben Prozent, und die Rueckmeldung kommt nicht auf dem
+   * Handy, sondern zwei Meter weiter an der Wand. Ein Druck ist ein Schritt,
+   * und jeder Schritt ist am Spiegel sofort zu sehen.
+   *
+   * Kein Halten-zum-Wiederholen: jeder Schritt schreibt die Konfiguration auf
+   * die Speicherkarte des Pi, und eine gedrueckt gehaltene Taste waere ein
+   * Dauerfeuer von Schreibvorgaengen.
+   */
+  #renderInsetControls(insets: ScreenInsets): TemplateResult {
+    const viewport = this.snapshot.viewport;
+    const aspect = viewport ? viewport.width / viewport.height : FALLBACK_ASPECT;
+
+    return html`
+      <div class="align">
+        <div class="align__screen" style=${`aspect-ratio: ${aspect}`}>
+          <div
+            class="align__area"
+            style=${`top:${insets.top}%;right:${insets.right}%;bottom:${insets.bottom}%;left:${insets.left}%`}
+          >
+            <span class="align__hint">bespielbar</span>
+          </div>
+        </div>
+
+        ${INSET_SIDE_OPTIONS.map((side) => this.#renderInsetRow(insets, side.id, side.name))}
+
+        <div class="align__row align__row--all">
+          <span class="align__side">Alle Seiten</span>
+          <div class="align__controls">
+            <button
+              aria-label="Alle Seiten nach aussen"
+              ?disabled=${INSET_SIDE_OPTIONS.every((side) => insets[side.id] <= INSET_MIN)}
+              @click=${() => this.#patchInsets(adjustAllInsets(insets, -INSET_STEP))}
+            >
+              −
+            </button>
+            <span class="align__value muted small">gleichzeitig</span>
+            <button
+              aria-label="Alle Seiten nach innen"
+              ?disabled=${INSET_SIDE_OPTIONS.every((side) => insets[side.id] >= INSET_MAX)}
+              @click=${() => this.#patchInsets(adjustAllInsets(insets, INSET_STEP))}
+            >
+              +
+            </button>
+          </div>
+        </div>
+
+        <div class="card__actions">
+          <button
+            ?disabled=${insetsEqual(insets, createDefaultInsets())}
+            @click=${() => this.#patchInsets(createDefaultInsets())}
+          >
+            Zuruecksetzen
+          </button>
+        </div>
       </div>
     `;
+  }
+
+  #renderInsetRow(insets: ScreenInsets, side: InsetSide, label: string): TemplateResult {
+    const value = insets[side];
+    const viewport = this.snapshot.viewport;
+    // Oben und unten rechnen gegen die Hoehe, links und rechts gegen die
+    // Breite – genauso, wie die Anzeige die Prozentwerte aufloest.
+    const length = viewport ? (side === 'top' || side === 'bottom' ? viewport.height : viewport.width) : null;
+
+    return html`
+      <div class="align__row">
+        <span class="align__side">${label}</span>
+        <div class="align__controls">
+          <button
+            aria-label=${`${label} nach aussen`}
+            ?disabled=${value <= INSET_MIN}
+            @click=${() => this.#patchInsets(adjustInset(insets, side, -INSET_STEP))}
+          >
+            −
+          </button>
+          <span class="align__value">
+            <b>${formatPercent(value)} %</b>
+            ${length ? html`<span class="muted small">${insetToPixels(value, length)} px</span>` : nothing}
+          </span>
+          <button
+            aria-label=${`${label} nach innen`}
+            ?disabled=${value >= INSET_MAX}
+            @click=${() => this.#patchInsets(adjustInset(insets, side, INSET_STEP))}
+          >
+            +
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  #patchInsets(insets: ScreenInsets): void {
+    const display = this.snapshot.config?.display;
+    if (!display) return;
+    store.send({ t: 'admin:setSettings', patch: { display: { ...display, insets } } });
   }
 
   #renderLoading(): TemplateResult {
@@ -358,21 +545,6 @@ export class MirrorRemote extends LitElement {
           />
         </label>
 
-        <label class="field">
-          <span class="field__label">
-            Randabstand <b>${display.paddingPercent}%</b>
-            <span class="field__hint">Der Spiegelrahmen verdeckt die aeussersten Pixel.</span>
-          </span>
-          <input
-            type="range"
-            min="0"
-            max="15"
-            .value=${String(display.paddingPercent)}
-            @change=${(event: Event) =>
-              patchDisplay({ paddingPercent: Number((event.target as HTMLInputElement).value) })}
-          />
-        </label>
-
         <label class="field field--switch">
           <span class="field__label">
             Einbrennschutz
@@ -385,6 +557,23 @@ export class MirrorRemote extends LitElement {
               patchDisplay({ burnInProtection: (event.target as HTMLInputElement).checked })}
           />
         </label>
+      </section>
+
+      <h2>Bildschirmflaeche</h2>
+      <section class="panel">
+        <p class="muted small">
+          Vier Raender statt einem: der Bildschirm sitzt hinter dem Spiegel selten mittig im Rahmen, und ein
+          gleichmaessiger Abstand macht den Inhalt dann nur kleiner statt mittig.
+        </p>
+        ${this.#renderInsetControls(display.insets)}
+        <div class="card__actions">
+          <button
+            @click=${() =>
+              store.send({ t: 'admin:setSettings', patch: { setup: { step: 'frame', completedAt: null } } })}
+          >
+            Rahmen am Spiegel einblenden
+          </button>
+        </div>
       </section>
 
       <h2>Zeitplan</h2>
