@@ -23,6 +23,8 @@ const WANTED = [
   'sun', 'moon', 'cloud', 'cloudy', 'cloud-sun', 'cloud-moon', 'cloud-rain',
   'cloud-drizzle', 'cloud-snow', 'cloud-lightning', 'cloud-fog', 'cloud-hail',
   'wind', 'snowflake', 'droplets', 'thermometer', 'sunrise', 'sunset',
+  // Musik
+  'music', 'pause',
   // Allgemein
   'clock', 'calendar-days', 'bell', 'triangle-alert', 'wifi-off', 'refresh-cw',
 ];

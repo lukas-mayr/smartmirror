@@ -515,3 +515,134 @@ body {
   font-size: min(9cqh, 5cqw);
   color: var(--mirror-fg-dim);
 }
+
+/*
+ * Was gerade laeuft.
+ *
+ * Kein Cover: eine helle, bunte Flaeche zeichnet hinter halbdurchlaessigem
+ * Glas den Displayrahmen nach und blendet nachts. Ein Titel in Schrift sagt
+ * ohnehin mehr als ein Bildchen von der Groesse einer Briefmarke.
+ */
+.spotify {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25em;
+  /*
+   * Volle Blockbreite statt Inhaltsbreite: sonst haengt die Breite des
+   * Fortschrittsbalkens an der Laenge des Titels, und der Balken springt bei
+   * jedem Liedwechsel auf ein neues Mass.
+   */
+  width: 100%;
+  min-width: 0;
+  padding: 0 0.6em;
+  box-sizing: border-box;
+}
+
+.spotify--paused {
+  color: var(--mirror-fg-muted);
+}
+
+/*
+ * Wessen Musik gerade zu sehen ist. Erscheint erst ab zwei Konten – ein Name,
+ * der nichts unterscheidet, ist nur Laerm.
+ */
+.spotify__who {
+  font-size: min(6cqh, 3.2cqw);
+  font-weight: 300;
+  letter-spacing: 0.08em;
+  color: var(--mirror-fg-dim);
+}
+
+.spotify__head {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.spotify__icon {
+  flex: none;
+  font-size: min(8cqh, 4.2cqw);
+  color: var(--mirror-fg-muted);
+}
+
+/*
+ * Lange Titel werden abgeschnitten und nicht umbrochen oder gescrollt: ein
+ * Laufband ist die einzige Bewegung, die auf einem Spiegel wirklich stoert.
+ */
+.spotify__title,
+.spotify__artist,
+.spotify__album {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spotify__title {
+  font-size: min(11cqh, 5.5cqw);
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+.spotify__artist {
+  font-size: min(8cqh, 4.2cqw);
+  font-weight: 300;
+  color: var(--mirror-fg-muted);
+}
+
+.spotify__album {
+  font-size: min(7cqh, 3.6cqw);
+  font-weight: 300;
+  color: var(--mirror-fg-dim);
+}
+
+.spotify__progress {
+  width: 100%;
+  margin-top: 0.5em;
+}
+
+.spotify__bar {
+  height: 2px;
+  background: var(--mirror-fg-dim);
+  overflow: hidden;
+}
+
+.spotify__bar i {
+  display: block;
+  height: 100%;
+  background: var(--mirror-fg-muted);
+  /*
+   * Eine Sekunde lineare Bewegung – genau die Spanne bis zum naechsten
+   * Zeichnen. Damit waechst der Balken gleichmaessig, statt einmal je Sekunde
+   * zu springen.
+   */
+  transition: width 1s linear;
+}
+
+.spotify__times {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.35em;
+  font-size: min(6cqh, 3.2cqw);
+  font-variant-numeric: tabular-nums;
+  color: var(--mirror-fg-dim);
+}
+
+/* In einem flachen Block zaehlt der Titel, nicht die Sekundenzahl. */
+@container (max-height: 200px) {
+  .spotify__times,
+  .spotify__album {
+    display: none;
+  }
+}
+
+.spotify__hint,
+.spotify--hint {
+  font-size: min(7cqh, 4cqw);
+  font-weight: 300;
+  color: var(--mirror-fg-dim);
+  text-align: center;
+}

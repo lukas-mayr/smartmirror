@@ -159,6 +159,9 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
   /* --------------------------- Ereignisse der Dienste -------------------------- */
 
   deps.modules.on('state', (envelope) => broadcast({ t: 'state:patch', envelope }));
+  // Ein Modul hat ein Geheimnis selbst hinterlegt – die Handy-App zeigt an,
+  // welche schon da sind, und wuerde sonst weiter nach einem fragen.
+  deps.modules.on('modules', () => broadcast({ t: 'modules:update', modules: deps.modules.descriptors() }));
   deps.power.on('change', (on: boolean) => broadcast({ t: 'display:power', on }));
   deps.updates.on('status', (status) => broadcast({ t: 'update:status', status }));
 
@@ -546,8 +549,10 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
       case 'admin:setSecret':
         await deps.secrets.set(message.moduleId, message.key, message.value);
         broadcast({ t: 'modules:update', modules: deps.modules.descriptors() });
-        // Module lesen ihre Geheimnisse beim Start – also neu starten.
-        await deps.modules.sync(deps.config.current);
+        // Module lesen ihre Geheimnisse beim Start – also neu starten. `sync`
+        // taete das nicht: es vergleicht die Konfiguration, und die ist
+        // unveraendert.
+        await deps.modules.restartModule(message.moduleId);
         return;
 
       case 'admin:power':

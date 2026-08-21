@@ -19,6 +19,12 @@ export interface ModuleSecretDeclaration {
   label: string;
   description?: string;
   required?: boolean;
+  /**
+   * Das Modul schreibt dieses Geheimnis selbst und der Nutzer soll es nie
+   * eintippen – etwa ein Token, den eine Anmeldung eingebracht hat. Die
+   * Handy-App zeigt dafuer kein Feld an.
+   */
+  managed?: boolean;
 }
 
 export interface ModuleManifest {

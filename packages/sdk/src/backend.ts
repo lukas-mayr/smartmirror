@@ -1,4 +1,5 @@
 import type { Duration } from './duration.js';
+import type { ModuleAction } from './protocol.js';
 
 export interface Logger {
   debug(message: string, ...args: unknown[]): void;
@@ -26,6 +27,13 @@ export interface BackendContext<TConfig = Record<string, unknown>, TState = Reco
   getState(): Readonly<Partial<TState>>;
   /** Fehlerzustand setzen (z.B. Netzausfall). `null` loescht ihn wieder. */
   setError(error: string | null): void;
+  /**
+   * Bittet den Nutzer um einen Schritt, den nur er tun kann – etwa eine
+   * Anmeldung bei einem fremden Dienst. Die Handy-App zeigt die Bitte im
+   * Einstellungsblatt des Blocks, die Anzeige zeigt sie nie: vor dem Spiegel
+   * steht niemand, der darauf tippen koennte. `null` nimmt sie zurueck.
+   */
+  setAction(action: ModuleAction | null): void;
 
   /**
    * Wiederkehrende Aufgabe. Laeuft sofort einmal und danach im Intervall.
@@ -39,6 +47,18 @@ export interface BackendContext<TConfig = Record<string, unknown>, TState = Reco
   fetch(input: string, init?: RequestInit): Promise<Response>;
   /** Nur mit Permission "secrets". Erreicht das Frontend nie. */
   secret(key: string): string | undefined;
+  /**
+   * Geheimnis schreiben, `null` loescht es. Nur mit Permission "secrets".
+   *
+   * Gibt es, weil ein Modul nicht jedes Geheimnis vom Nutzer bekommt: wer sich
+   * per OAuth anmeldet, tauscht einen einmaligen Code gegen einen Token, den
+   * nur das Modul kennt und der einen Neustart ueberleben muss. Ihn in die
+   * Konfiguration zu schreiben, waere falsch – die geht an alle Clients.
+   *
+   * Schreibt ein Modul sein eigenes Geheimnis, wird es dadurch nicht neu
+   * gestartet. Nur was vom Handy kommt, startet die Instanz neu.
+   */
+  setSecret(key: string, value: string | null): Promise<void>;
   /** Nur mit Permission "commands". */
   onCommand(name: string, handler: (payload: unknown) => void | Promise<void>): Disposer;
 }

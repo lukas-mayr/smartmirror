@@ -30,6 +30,15 @@ const targets = [
     platform: 'browser',
     target: 'es2022',
   },
+  // Optional: was sich Backend und Frontend teilen. Nur damit reine
+  // Hilfsfunktionen eines Moduls geprueft werden koennen – in den beiden
+  // Bundles oben stecken sie mit drin und waeren von aussen nicht erreichbar.
+  {
+    entry: resolve(moduleDir, 'src/shared.ts'),
+    outfile: resolve(moduleDir, 'dist/shared.js'),
+    platform: 'neutral',
+    target: 'es2022',
+  },
 ];
 
 let built = 0;

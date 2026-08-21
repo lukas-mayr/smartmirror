@@ -55,12 +55,28 @@ export interface UpdateStatus {
   blocked: readonly string[];
 }
 
+/**
+ * Bitte eines Moduls an den Nutzer: ein Schritt, den nur er tun kann.
+ *
+ * Entstanden an der Anmeldung bei fremden Diensten. Ein Modul kann keinen
+ * Browser oeffnen und keine Zustimmung erteilen – es kann nur sagen, was zu
+ * tun ist, und wo. Die Handy-App zeigt das im Einstellungsblatt des Blocks.
+ */
+export interface ModuleAction {
+  /** Was zu tun ist, in einem Satz. */
+  label: string;
+  /** Adresse, die die Handy-App zum Antippen anbietet. */
+  url?: string;
+}
+
 export interface ModuleStateEnvelope {
   instanceId: string;
   /** Freier Modul-State. Wird flach ueber den bestehenden State gemerged. */
   patch: Record<string, unknown>;
   /** Modul meldet einen Fehlerzustand – die Shell zeigt ihn dezent an. */
   error?: string | null;
+  /** Offener Schritt fuer den Nutzer. Nur die Handy-App zeigt ihn. */
+  action?: ModuleAction | null;
   /** ISO-Zeitstempel der letzten erfolgreichen Aktualisierung. */
   updatedAt?: string;
 }

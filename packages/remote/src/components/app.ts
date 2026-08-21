@@ -711,6 +711,28 @@ export class MirrorRemote extends LitElement {
         <div class="card__body">
           ${envelope?.error ? html`<p class="banner banner--error">${envelope.error}</p>` : nothing}
 
+          <!--
+            Der offene Schritt steht ganz oben: er ist der Grund, warum das
+            Modul noch nichts anzeigt, und alles darunter hilft nichts, solange
+            er nicht getan ist.
+          -->
+          ${envelope?.action
+            ? html`
+                <div class="action">
+                  <span class="action__label">${envelope.action.label}</span>
+                  ${envelope.action.url
+                    ? html`<a
+                        class="action__link"
+                        href=${envelope.action.url}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        >Oeffnen</a
+                      >`
+                    : nothing}
+                </div>
+              `
+            : nothing}
+
           <div class="field">
             <span class="field__label">
               Groesse
@@ -762,34 +784,41 @@ export class MirrorRemote extends LitElement {
               })}
           ></schema-form>
 
-          ${(descriptor?.secrets ?? []).map(
-            (secret) => html`
-              <label class="field">
-                <span class="field__label">
-                  ${secret.label}
-                  ${descriptor?.secretsPresent.includes(secret.key)
-                    ? html`<span class="muted small">· hinterlegt</span>`
+          ${(descriptor?.secrets ?? [])
+            // Was ein Modul sich selbst holt, geht den Nutzer nichts an – ein
+            // leeres Feld "Zugriffstoken" waere nur eine Einladung zum Raten.
+            .filter((secret) => !secret.managed)
+            .map(
+              (secret) => html`
+                <label class="field">
+                  <span class="field__label">
+                    ${secret.label}
+                    ${descriptor?.secretsPresent.includes(secret.key)
+                      ? html`<span class="muted small">· hinterlegt</span>`
+                      : nothing}
+                  </span>
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    autocomplete="off"
+                    @change=${(event: Event) => {
+                      const input = event.target as HTMLInputElement;
+                      if (!input.value) return;
+                      store.send({
+                        t: 'admin:setSecret',
+                        moduleId: instance.moduleId,
+                        key: secret.key,
+                        value: input.value,
+                      });
+                      input.value = '';
+                    }}
+                  />
+                  ${secret.description
+                    ? html`<span class="field__hint">${secret.description}</span>`
                     : nothing}
-                </span>
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  autocomplete="off"
-                  @change=${(event: Event) => {
-                    const input = event.target as HTMLInputElement;
-                    if (!input.value) return;
-                    store.send({
-                      t: 'admin:setSecret',
-                      moduleId: instance.moduleId,
-                      key: secret.key,
-                      value: input.value,
-                    });
-                    input.value = '';
-                  }}
-                />
-              </label>
-            `,
-          )}
+                </label>
+              `,
+            )}
 
           <div class="card__actions">
             <button @click=${() => (this.selected = null)}>Fertig</button>

@@ -1,0 +1,15 @@
+{
+  "name": "@mirror/module-spotify",
+  "version": "0.6.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node ../../scripts/build-module.mjs",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@mirror/sdk": "0.6.1",
+    "lit": "^3.2.1",
+    "@mirror/icons": "0.6.1"
+  }
+}
