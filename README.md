@@ -35,6 +35,7 @@ packages/
 modules/
   clock/     Uhrzeit und Datum (rein im Frontend)
   weather/   Open-Meteo, mit Cache und Offline-Zustand
+  spotify/   Was gerade läuft, mit eigener Spotify-App
 deploy/      systemd-Units, Compositor-Start, Installer, Drehung
 scripts/     Build-, Bundle- und Generator-Skripte
 ```
@@ -131,7 +132,49 @@ Modul gibt, sagt das Manifest mit `sizes` und `preferredSize` (`"s"`, `"m"`,
 ```
 
 Geheimnisse (API-Schlüssel) liegen verschlüsselt in `data/secrets.json` und
-erreichen das Frontend nie.
+erreichen das Frontend nie. Das Backend darf sie mit `ctx.setSecret(key, wert)`
+auch selbst schreiben — für Zugänge, die kein Mensch abtippt, sondern die eine
+Anmeldung einbringt. Ein Geheimnis mit `"managed": true` im Manifest gehört dem
+Modul: die Handy-App zeigt dafür kein Eingabefeld.
+
+**Fehlt ein Schritt, den nur der Nutzer tun kann**, sagt das Modul das mit
+`ctx.setAction({ label, url })`. Die Bitte erscheint oben im Einstellungsblatt
+des Blocks — und nur dort. Auf dem Spiegel wäre sie sinnlos: davor steht
+niemand, der tippen könnte.
+
+---
+
+## Spotify anschließen
+
+Das Modul zeigt Titel, Interpret und den Fortschritt dessen, was gerade läuft.
+Es steuert nichts: vor einem Spiegel gibt es nichts zu drücken.
+
+**Jeder legt seine eigene Spotify-App an.** Das ist keine Bequemlichkeit,
+sondern die einzige Bauform, die trägt: Spotify erlaubt einer App im
+Development Mode seit Februar 2026 nur noch fünf Nutzer, die der App-Besitzer
+einzeln freischaltet, und die unbegrenzte Stufe verlangt ein eingetragenes
+Unternehmen mit 250.000 monatlich aktiven Nutzern. Eine mitgelieferte App wäre
+nach fünf Spiegeln voll. Home Assistant löst es aus demselben Grund genauso.
+
+1. Auf [developer.spotify.com](https://developer.spotify.com/dashboard) eine App
+   anlegen. Name und Beschreibung sind frei, als API **Web API** wählen.
+2. Als **Redirect URI** genau `http://127.0.0.1:8888/mirror` eintragen.
+3. Die **Client ID** kopieren und in der Handy-App beim Spotify-Block einfügen.
+4. Der Block bietet daraufhin **„Bei Spotify anmelden"** an. Antippen, zustimmen.
+5. Der Browser landet auf einer Fehlerseite. **Das ist richtig so.** Die Adresse
+   aus der Adresszeile kopieren und unter **Anmelde-Antwort** einfügen.
+
+Der Umweg über die Fehlerseite ist Spotifys Regelwerk geschuldet: seit April
+2025 sind nur noch HTTPS-Adressen und die Loopback-Adresse als Ziel erlaubt.
+Ein Spiegel im WLAN ist beides nicht — er hat kein Zertifikat, und 127.0.0.1
+zeigt auf dem Handy auf das Handy. Also schicken wir die Antwort bewusst
+irgendwohin, wo nichts lauscht, und lassen sie den Nutzer zurückreichen. Der
+Zugang wird danach verschlüsselt abgelegt und läuft von selbst weiter; die
+Client ID bleibt sichtbar, weil sie kein Geheimnis ist.
+
+Der App-Besitzer braucht ein **Spotify-Premium-Konto** — ohne das lässt Spotify
+seit Februar 2026 keine App mehr laufen. Angefordert wird nur
+`user-read-currently-playing`, also Lesen und sonst nichts.
 
 ---
 

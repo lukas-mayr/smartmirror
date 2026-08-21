@@ -14,6 +14,7 @@ import {
   type BackendContext,
   type Disposer,
   type MirrorConfig,
+  type ModuleAction,
   type ModuleBackend,
   type ModuleDescriptor,
   type ModuleInstance,
@@ -45,6 +46,7 @@ interface RunningInstance {
   commands: Map<string, (payload: unknown) => void | Promise<void>>;
   state: Record<string, unknown>;
   error: string | null;
+  action: ModuleAction | null;
   updatedAt?: string;
 }
 
@@ -140,6 +142,7 @@ export class ModuleHost extends EventEmitter {
         instanceId: id,
         patch: running.state,
         error: running.error,
+        action: running.action,
         updatedAt: running.updatedAt,
       };
     }
@@ -177,6 +180,23 @@ export class ModuleHost extends EventEmitter {
 
   async stopAll(): Promise<void> {
     for (const id of [...this.#instances.keys()]) await this.#stop(id);
+  }
+
+  /**
+   * Startet alle Instanzen eines Moduls neu.
+   *
+   * Noetig, wenn sich ein Geheimnis geaendert hat: Module lesen ihre
+   * Geheimnisse beim Start. `sync` leistet das nicht – es vergleicht die
+   * Konfiguration, und die steht bei einem neuen Schluessel unveraendert da.
+   */
+  async restartModule(moduleId: string): Promise<void> {
+    const affected = [...this.#instances.values()]
+      .filter((running) => running.module.manifest.id === moduleId)
+      .map((running) => running.instance);
+    for (const instance of affected) {
+      await this.#stop(instance.id);
+      await this.#start(instance);
+    }
   }
 
   async dispatchCommand(instanceId: string, name: string, payload: unknown): Promise<void> {
@@ -260,6 +280,7 @@ export class ModuleHost extends EventEmitter {
       commands: new Map(),
       state: {},
       error: null,
+      action: null,
     };
   }
 
@@ -321,6 +342,10 @@ export class ModuleHost extends EventEmitter {
         running.error = error;
         this.#emitState(instance.id, {}, error);
       },
+      setAction: (action) => {
+        running.action = action;
+        this.#emitState(instance.id, {}, running.error);
+      },
 
       every: (interval, task) => {
         const ms = toMillis(interval);
@@ -356,6 +381,18 @@ export class ModuleHost extends EventEmitter {
         return this.#secrets.get(manifest.id, key);
       },
 
+      setSecret: async (key, value) => {
+        if (!permissions.has('secrets')) {
+          throw new Error(`Modul "${manifest.id}" hat keine Permission "secrets"`);
+        }
+        if (value === null) await this.#secrets.remove(manifest.id, key);
+        else await this.#secrets.set(manifest.id, key, value);
+        // Die Handy-App zeigt an, welche Geheimnisse hinterlegt sind. Schreibt
+        // ein Modul selbst eines, muss sie das erfahren – aber die Instanz
+        // laeuft weiter: sie hat den Wert ja gerade selbst erzeugt.
+        this.emit('modules');
+      },
+
       onCommand: (name, handler) => {
         if (!permissions.has('commands')) {
           throw new Error(`Modul "${manifest.id}" hat keine Permission "commands"`);
@@ -369,7 +406,8 @@ export class ModuleHost extends EventEmitter {
   }
 
   #emitState(instanceId: string, patch: Record<string, unknown>, error: string | null, updatedAt?: string): void {
-    const envelope: ModuleStateEnvelope = { instanceId, patch, error, updatedAt };
+    const action = this.#instances.get(instanceId)?.action ?? null;
+    const envelope: ModuleStateEnvelope = { instanceId, patch, error, action, updatedAt };
     this.emit('state', envelope);
   }
 }

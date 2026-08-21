@@ -1,0 +1,62 @@
+{
+  "id": "spotify",
+  "name": "Spotify",
+  "version": "0.1.0",
+  "description": "Zeigt, was gerade laeuft. Braucht eine eigene Spotify-App und eine einmalige Anmeldung – Spotify gibt Wiedergabedaten nur an benannte Anwendungen heraus.",
+  "author": "smartmirror",
+  "singleton": true,
+  "sizes": ["m", "l"],
+  "preferredSize": "m",
+  "permissions": ["network", "secrets"],
+  "network": {
+    "allow": ["api.spotify.com", "accounts.spotify.com"]
+  },
+  "refreshInterval": "10s",
+  "secrets": [
+    {
+      "key": "authResponse",
+      "label": "Anmelde-Antwort",
+      "description": "Nach dem Anmelden zeigt der Browser eine Fehlerseite – das ist richtig so. Die Adresse aus der Adresszeile hier einfuegen.",
+      "required": false
+    },
+    {
+      "key": "refreshToken",
+      "label": "Zugriff",
+      "managed": true
+    },
+    {
+      "key": "verifier",
+      "label": "Anmelde-Nachweis",
+      "managed": true
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "clientId": {
+        "type": "string",
+        "title": "Client ID",
+        "description": "Aus der eigenen App im Spotify-Dashboard. Als Redirect URI dort genau http://127.0.0.1:8888/mirror eintragen.",
+        "default": "",
+        "maxLength": 64
+      },
+      "showProgress": {
+        "type": "boolean",
+        "title": "Fortschritt anzeigen",
+        "description": "Ein Balken, der mitlaeuft. Auf einem Spiegel ist das die einzige Bewegung im Bild.",
+        "default": true
+      },
+      "showAlbum": {
+        "type": "boolean",
+        "title": "Album anzeigen",
+        "default": false
+      },
+      "hideWhenIdle": {
+        "type": "boolean",
+        "title": "Bei Stille ausblenden",
+        "description": "Laeuft nichts, bleibt der Block leer und die Flaeche wieder Spiegel.",
+        "default": true
+      }
+    }
+  }
+}

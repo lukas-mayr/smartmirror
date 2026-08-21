@@ -21,7 +21,7 @@
     "dev:remote": "npm run dev --workspace @mirror/remote",
     "bundle": "node scripts/bundle.mjs",
     "set-version": "node scripts/set-version.mjs",
-    "test": "node --test packages/*/test/*.test.mjs",
+    "test": "node --test packages/*/test/*.test.mjs modules/*/test/*.test.mjs",
     "generate": "node scripts/collect-fonts.mjs && node scripts/generate-icons.mjs"
   },
   "devDependencies": {
