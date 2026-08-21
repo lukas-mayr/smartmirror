@@ -30,6 +30,12 @@ interface TokenResponse {
   refresh_token?: string;
 }
 
+interface CoverImage {
+  url: string;
+  width?: number;
+  height?: number;
+}
+
 interface CurrentlyPlaying {
   is_playing: boolean;
   progress_ms: number | null;
@@ -37,11 +43,22 @@ interface CurrentlyPlaying {
     name: string;
     duration_ms: number;
     artists?: { name: string }[];
-    album?: { name: string };
+    album?: { name: string; images?: CoverImage[]; release_date?: string };
     /** Bei Podcasts steht hier die Sendung statt eines Interpreten. */
     show?: { name: string };
+    /** Podcast-Folgen tragen ihr Bild direkt am Item. */
+    images?: CoverImage[];
   } | null;
 }
+
+/**
+ * Wunschkante des Covers in Pixeln. Spotify liefert meist 640/300/64 – die
+ * mittlere Stufe reicht fuer jeden Block und haelt den State klein: als
+ * base64 sind das rund 40 kB, die bei jedem Titelwechsel einmal wandern.
+ */
+const COVER_TARGET_PX = 300;
+/** Groessere Bilder werden verworfen statt den WebSocket-Bus zu fluten. */
+const COVER_MAX_BYTES = 200_000;
 
 /** Ein angemeldetes Konto zur Laufzeit. Der dauerhafte Teil liegt im SecretStore. */
 interface Slot {
@@ -51,6 +68,9 @@ interface Slot {
   name: string;
   /** Der Profilname wird einmal geholt; bis dahin heisst das Konto "Konto N". */
   named: boolean;
+  /** Adresse des zuletzt geholten Covers – geladen wird nur bei Wechsel. */
+  coverUrl: string | null;
+  cover: string | null;
   entry: AccountPlayback;
 }
 
@@ -96,6 +116,8 @@ export default defineBackend<SpotifyConfig, SpotifyState>({
       title: null,
       artist: null,
       album: null,
+      albumYear: null,
+      cover: null,
       durationMs: null,
       progressMs: null,
       sampledAt: null,
@@ -226,6 +248,8 @@ export default defineBackend<SpotifyConfig, SpotifyState>({
         expiresAt: 0,
         name: `Konto ${n}`,
         named: false,
+        coverUrl: null,
+        cover: null,
         entry: emptyEntry(n, `Konto ${n}`),
       };
       slots.set(n, slot);
@@ -264,6 +288,33 @@ export default defineBackend<SpotifyConfig, SpotifyState>({
       ctx.log.info(`Konto "${slot.name}" auf Platz ${free} angemeldet.`);
     };
 
+    /**
+     * Haelt das Cover eines Kontos aktuell. Geladen wird nur, wenn sich die
+     * Adresse aendert – ein Titel laeuft Minuten, gefragt wird alle zehn
+     * Sekunden. Ein fehlendes Cover ist kein Fehler: die Anzeige hat dafuer
+     * einen Platzhalter, und Musik ohne Bild ist besser als gar nichts.
+     */
+    const updateCover = async (slot: Slot, images: CoverImage[]): Promise<void> => {
+      const best = [...images].sort(
+        (a, b) => Math.abs((a.width ?? COVER_TARGET_PX) - COVER_TARGET_PX) - Math.abs((b.width ?? COVER_TARGET_PX) - COVER_TARGET_PX),
+      )[0];
+      const url = best?.url ?? null;
+      if (url === slot.coverUrl) return;
+      slot.coverUrl = url;
+      slot.cover = null;
+      if (!url) return;
+      try {
+        const response = await ctx.fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const bytes = Buffer.from(await response.arrayBuffer());
+        if (bytes.byteLength > COVER_MAX_BYTES) throw new Error(`${bytes.byteLength} Bytes sind zu gross`);
+        const type = response.headers.get('content-type') ?? 'image/jpeg';
+        slot.cover = `data:${type};base64,${bytes.toString('base64')}`;
+      } catch (error) {
+        ctx.log.warn(`Cover fuer "${slot.name}" nicht ladbar`, error);
+      }
+    };
+
     /** Einmal nachsehen, was auf diesem Konto laeuft. */
     const pollAccount = async (slot: Slot): Promise<boolean> => {
       const response = await ctx.fetch('https://api.spotify.com/v1/me/player/currently-playing', {
@@ -299,6 +350,8 @@ export default defineBackend<SpotifyConfig, SpotifyState>({
         return body.is_playing;
       }
 
+      await updateCover(slot, item.album?.images ?? item.images ?? []);
+
       const artists = (item.artists ?? []).map((artist) => artist.name).filter(Boolean);
       slot.entry = {
         slot: slot.slot,
@@ -307,6 +360,8 @@ export default defineBackend<SpotifyConfig, SpotifyState>({
         title: item.name,
         artist: artists.length > 0 ? artists.join(', ') : (item.show?.name ?? null),
         album: item.album?.name ?? null,
+        albumYear: item.album?.release_date?.slice(0, 4) ?? null,
+        cover: slot.cover,
         durationMs: item.duration_ms,
         progressMs: body.progress_ms ?? 0,
         sampledAt: new Date().toISOString(),

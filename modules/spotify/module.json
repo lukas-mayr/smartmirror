@@ -1,13 +1,15 @@
 {
   "id": "spotify",
   "name": "Spotify",
-  "version": "0.1.0",
-  "description": "Zeigt, was gerade laeuft – fuer bis zu fuenf Konten, die sich den Block abwechselnd teilen. Braucht eine eigene Spotify-App und je Konto eine einmalige Anmeldung.",
+  "version": "0.2.0",
+  "description": "Zeigt, was gerade laeuft – mit Cover, fuer bis zu fuenf Konten abwechselnd. Braucht eine eigene Spotify-App und je Konto eine einmalige Anmeldung. S zeigt nur das Cover, M Titel und Interpret, L den Fortschritt, XL alles in voller Breite.",
   "author": "smartmirror",
   "singleton": true,
   "sizes": [
+    "s",
     "m",
-    "l"
+    "l",
+    "xl"
   ],
   "preferredSize": "m",
   "permissions": [
@@ -17,7 +19,8 @@
   "network": {
     "allow": [
       "api.spotify.com",
-      "accounts.spotify.com"
+      "accounts.spotify.com",
+      "*.scdn.co"
     ]
   },
   "refreshInterval": "10s",
@@ -68,17 +71,6 @@
         "description": "Aus der eigenen App im Spotify-Dashboard. Als Redirect URI dort genau http://127.0.0.1:8888/mirror eintragen.",
         "default": "",
         "maxLength": 64
-      },
-      "showProgress": {
-        "type": "boolean",
-        "title": "Fortschritt anzeigen",
-        "description": "Ein Balken, der mitlaeuft. Auf einem Spiegel ist das die einzige Bewegung im Bild.",
-        "default": true
-      },
-      "showAlbum": {
-        "type": "boolean",
-        "title": "Album anzeigen",
-        "default": false
       },
       "hideWhenIdle": {
         "type": "boolean",
