@@ -27,6 +27,18 @@ async function main(): Promise<void> {
   const auth = new AuthStore();
   await auth.load();
 
+  // Ein Spiegel ohne gekoppeltes Handy ist nicht eingerichtet, egal was in der
+  // Datei steht. Der Fall entsteht beim Update einer Installation aus der Zeit
+  // vor der gefuehrten Einrichtung: die Migration setzt den Stand auf "fertig",
+  // damit laufende Spiegel nicht ploetzlich wieder Fragen stellen – aber ohne
+  // Zeitstempel, weil der Durchlauf nie stattgefunden hat.
+  if (!auth.hasPairedClients && !config.current.setup.completedAt && config.current.setup.step !== 'pair') {
+    log.info('Noch kein Handy gekoppelt – Einrichtung beginnt beim Kopplungscode.');
+    await config.update((draft) => {
+      draft.setup = { step: 'pair', completedAt: null };
+    });
+  }
+
   const modules = new ModuleHost(config.current, secrets);
   await modules.discover();
 

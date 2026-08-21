@@ -377,6 +377,189 @@ progress {
   padding: 3rem 1rem;
 }
 
+/* ------------------------------- Einrichtung ------------------------------- */
+
+.setup {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem 0 2rem;
+}
+
+.setup__step {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: center;
+  text-align: center;
+}
+
+.setup__step h1 {
+  font-size: 1.5rem;
+}
+
+.setup__step p {
+  margin: 0;
+  max-width: 42ch;
+}
+
+.setup__actions {
+  width: 100%;
+}
+
+.setup__actions .primary {
+  flex: 1;
+}
+
+button.primary {
+  background: var(--accent);
+  color: #0b0b0c;
+  border-color: transparent;
+  font-weight: 600;
+}
+
+/* Fortschritt: zwei Schritte, also zwei Punkte – mehr Anzeige waere Zierrat. */
+.stepper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.stepper li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.stepper li + li::before {
+  content: '';
+  width: 1.5rem;
+  height: 1px;
+  background: var(--border);
+}
+
+.stepper__dot {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  font-size: 0.8rem;
+  font-weight: 600;
+  flex: none;
+}
+
+.stepper li.is-active {
+  color: var(--fg);
+}
+
+.stepper li.is-active .stepper__dot {
+  background: var(--accent);
+  border-color: transparent;
+  color: #0b0b0c;
+}
+
+.stepper li.is-done .stepper__dot {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ------------------------------- Ausrichten -------------------------------- */
+
+.align {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+/*
+ * Vorschau desselben Rahmens, den der Spiegel zeigt. Sie ist kein Ersatz fuer
+ * den Blick an die Wand, sondern die Bestaetigung, dass der Druck angekommen
+ * ist – auf einem hochkanten Spiegel ist "oben" sonst schnell verwechselt.
+ */
+.align__screen {
+  position: relative;
+  width: 100%;
+  background: #000;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.align__area {
+  position: absolute;
+  border: 1px dashed var(--accent);
+  border-radius: 2px;
+  display: grid;
+  place-items: center;
+  transition: top 120ms ease, right 120ms ease, bottom 120ms ease, left 120ms ease;
+}
+
+.align__hint {
+  font-size: 0.7rem;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+}
+
+.align__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.4rem 0.75rem;
+  background: var(--surface-2);
+  border-radius: 10px;
+}
+
+.align__row--all {
+  background: transparent;
+  border: 1px dashed var(--border);
+}
+
+.align__side {
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.align__controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Quadratisch und gross genug fuer den Daumen – hier wird oft getippt. */
+.align__controls button {
+  width: var(--tap);
+  min-height: var(--tap);
+  padding: 0;
+  font-size: 1.4rem;
+  line-height: 1;
+  background: var(--surface);
+}
+
+.align__value {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.2;
+  min-width: 5.5rem;
+}
+
+.align__value b {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
 .pairing__input {
   width: 100%;
   max-width: 260px;

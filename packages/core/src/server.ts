@@ -6,10 +6,12 @@ import fastifyStatic from '@fastify/static';
 import {
   isClientMessage,
   isZone,
+  withSetupStep,
   type ClientMessage,
   type ClientType,
   type ErrorCode,
   type ServerMessage,
+  type Viewport,
 } from '@mirror/sdk';
 import type { WebSocket } from 'ws';
 import type { AuthStore } from './auth.js';
@@ -51,6 +53,13 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
    * gescheitert und wird zurueckgerollt.
    */
   let shellReady = false;
+  /**
+   * Kantenlaengen der Buehne, wie die Anzeige sie zuletzt gemeldet hat. Nur
+   * fuer die Handy-App: beim Ausrichten steht neben dem Prozentwert der
+   * ungefaehre Pixelwert. Bewusst nicht in der Konfiguration – der Wert
+   * beschreibt die Hardware von jetzt, nicht eine Einstellung.
+   */
+  let viewport: Viewport | null = null;
 
   await app.register(websocket, { options: { maxPayload: 256 * 1024 } });
 
@@ -83,6 +92,7 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
     state: deps.modules.snapshot(),
     power: { on: deps.power.isOn },
     update: deps.updates.status,
+    viewport,
   });
 
   const pushConfig = (): void => {
@@ -169,6 +179,13 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
       if (client.type === 'shell') {
         log.info('Anzeige hat die Verbindung getrennt.');
         shellReady = [...clients].some((candidate) => candidate.type === 'shell' && candidate.authenticated);
+        // Die gemeldeten Kantenlaengen gelten nur, solange die Anzeige haengt.
+        // Bleibt der alte Wert stehen, rechnet die Handy-App beim Ausrichten
+        // mit einem Bildschirm, der gar nicht mehr da ist.
+        if (!shellReady) {
+          viewport = null;
+          broadcast({ t: 'display:viewport', viewport: null }, (candidate) => candidate.type === 'remote');
+        }
       }
     });
     socket.on('error', (error: Error) => log.warn('WebSocket-Fehler', error.message));
@@ -213,6 +230,16 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
         return;
       }
 
+      // Ein Handy mit gueltigem Token hat Schritt 1 nachweislich hinter sich.
+      // Ohne diese Zeile koennte eine von Hand zurueckgesetzte Konfiguration
+      // die Einrichtung festfahren: die App fragte nach einem Code, den der
+      // Spiegel gar nicht mehr erzeugt, weil ja schon jemand gekoppelt ist.
+      if (client.type === 'remote' && deps.config.current.setup.step === 'pair') {
+        await deps.config.update((draft) => {
+          draft.setup = withSetupStep(draft.setup, 'frame');
+        });
+      }
+
       send(client, { t: 'welcome', serverVersion: appVersion(), authenticated: true, needsPairing: false });
       send(client, snapshotFor(client));
       if (client.type === 'shell') log.info(`Anzeige verbunden (v${message.appVersion}).`);
@@ -223,6 +250,16 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
       const token = await deps.auth.redeem(message.code, message.clientName);
       if (!token) return fail(client, 'pairing-failed', 'Code ist falsch oder abgelaufen');
       client.authenticated = true;
+
+      // Schritt 1 ist damit erledigt. Der Wechsel passiert hier und nicht in
+      // der Handy-App: der Spiegel muss ab jetzt den Ausricht-Rahmen zeigen,
+      // und er erfaehrt davon nur ueber die Konfiguration.
+      if (deps.config.current.setup.step === 'pair') {
+        await deps.config.update((draft) => {
+          draft.setup = withSetupStep(draft.setup, 'frame');
+        });
+      }
+
       send(client, { t: 'pair:result', ok: true, token });
       send(client, snapshotFor(client));
       // Code vom Spiegel nehmen – er ist verbraucht.
@@ -239,6 +276,18 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
         shellReady = true;
         log.info(`Anzeige meldet Bereitschaft (v${message.appVersion}).`);
         return;
+
+      case 'shell:viewport': {
+        const width = Math.round(Number(message.viewport?.width));
+        const height = Math.round(Number(message.viewport?.height));
+        if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+          return fail(client, 'bad-request', 'Unbrauchbare Bildschirmmasse');
+        }
+        if (viewport?.width === width && viewport.height === height) return;
+        viewport = { width, height };
+        broadcast({ t: 'display:viewport', viewport }, (candidate) => candidate.type === 'remote');
+        return;
+      }
 
       case 'command':
         await deps.modules.dispatchCommand(message.instanceId, message.name, message.payload);
@@ -292,7 +341,12 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
 
       case 'admin:setSettings':
         await deps.config.update((draft) => {
-          Object.assign(draft, message.patch);
+          const { setup, ...rest } = message.patch;
+          Object.assign(draft, rest);
+          // Der Einrichtungsstand geht nicht roh durch: `completedAt` gehoert
+          // dem Server, nicht dem Handy – sonst koennte eine App den ersten
+          // Durchlauf als nie geschehen ausgeben.
+          if (setup?.step) draft.setup = withSetupStep(draft.setup, setup.step);
         });
         return;
 

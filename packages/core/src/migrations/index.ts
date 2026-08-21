@@ -1,4 +1,4 @@
-import { CONFIG_SCHEMA_VERSION, normalizeRotation } from '@mirror/sdk';
+import { CONFIG_SCHEMA_VERSION, normalizeInsets, normalizeRotation } from '@mirror/sdk';
 
 /**
  * Eine Migration hebt die Config von `from` auf `from + 1`.
@@ -24,6 +24,26 @@ export const migrations: readonly Migration[] = [
       // Drehung aber schon in der Datei – und der Spiegel haengt weiterhin
       // hochkant an der Wand.
       return { ...config, display: { ...display, rotation: normalizeRotation(display.rotation) } };
+    },
+  },
+  {
+    from: 2,
+    describe: 'display.paddingPercent wird zu display.insets, Einrichtungsstand ergaenzt',
+    migrate: (config) => {
+      const display = (config.display ?? {}) as Record<string, unknown>;
+      // Der alte Wert galt fuer alle vier Seiten. Ihn als Startpunkt zu
+      // uebernehmen heisst: nach dem Update sieht der Spiegel genauso aus wie
+      // vorher, und die neuen Seitenwerte sind trotzdem sofort da.
+      const insets = normalizeInsets(display.insets ?? display.paddingPercent);
+      const { paddingPercent: _legacy, ...rest } = display;
+
+      // Wer schon einen laufenden Spiegel hat, soll nach dem Update nicht
+      // ploetzlich vor einer Einrichtung stehen. Ohne Zeitstempel: der
+      // Durchlauf hat nie stattgefunden, und der Start setzt ihn wieder auf
+      // Anfang, falls noch gar kein Handy gekoppelt ist.
+      const setup = config.setup ?? { step: 'done', completedAt: null };
+
+      return { ...config, display: { ...rest, insets }, setup };
     },
   },
 ];

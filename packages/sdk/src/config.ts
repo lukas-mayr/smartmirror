@@ -1,9 +1,11 @@
 import { DEFAULT_FONT, type FontId } from './fonts.js';
+import { createDefaultInsets, type ScreenInsets } from './insets.js';
 import { DEFAULT_ROTATION, type Rotation } from './rotation.js';
+import { createDefaultSetup, type SetupState } from './setup.js';
 import type { Zone } from './zones.js';
 
 /** Aktuelle Version des Config-Formats. Erhoehen = Migration schreiben. */
-export const CONFIG_SCHEMA_VERSION = 2;
+export const CONFIG_SCHEMA_VERSION = 3;
 
 export interface ModuleInstance {
   /** Stabil ueber die Lebensdauer der Instanz, z.B. "weather-1". */
@@ -58,8 +60,15 @@ export interface DisplaySettings {
   fontFamily: FontId;
   /** Layout alle paar Minuten um wenige Pixel verschieben. */
   burnInProtection: boolean;
-  /** Innenabstand in Prozent – der Spiegelrahmen verdeckt die Raender. */
-  paddingPercent: number;
+  /**
+   * Rand der bespielbaren Flaeche je Seite, in Prozent.
+   *
+   * Vier Werte und nicht einer, weil der Bildschirm hinter dem Spiegel selten
+   * mittig im Rahmen sitzt – Begruendung in insets.ts. Eingestellt wird das im
+   * zweiten Schritt der Einrichtung, an einem Rahmen, den der Spiegel dabei
+   * anzeigt.
+   */
+  insets: ScreenInsets;
 }
 
 export type UpdateChannel = 'stable' | 'beta';
@@ -81,6 +90,11 @@ export interface MirrorConfig {
   display: DisplaySettings;
   power: PowerSettings;
   update: UpdateSettings;
+  /**
+   * Wie weit die Einrichtung ist. Steht hier und nicht in einer der beiden
+   * Oberflaechen, weil Spiegel und Handy denselben Schritt zeigen muessen.
+   */
+  setup: SetupState;
 }
 
 export function createDefaultConfig(): MirrorConfig {
@@ -112,7 +126,7 @@ export function createDefaultConfig(): MirrorConfig {
       rotation: DEFAULT_ROTATION,
       fontFamily: DEFAULT_FONT,
       burnInProtection: true,
-      paddingPercent: 4,
+      insets: createDefaultInsets(),
     },
     power: {
       scheduleEnabled: false,
@@ -128,5 +142,6 @@ export function createDefaultConfig(): MirrorConfig {
       autoUpdate: true,
       checkIntervalMinutes: 15,
     },
+    setup: createDefaultSetup(),
   };
 }

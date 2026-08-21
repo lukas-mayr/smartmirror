@@ -5,7 +5,9 @@ import {
   createDefaultConfig,
   FONT_STACKS,
   isZone,
+  normalizeInsets,
   normalizeRotation,
+  normalizeSetup,
   type MirrorConfig,
   type ModuleInstance,
 } from '@mirror/sdk';
@@ -101,7 +103,15 @@ function normalize(input: Record<string, unknown>): MirrorConfig {
 
   const display = { ...defaults.display, ...(source.display ?? {}) };
   display.brightness = clamp(display.brightness, 10, 100);
-  display.paddingPercent = clamp(display.paddingPercent, 0, 15);
+  // Zweites Argument: eine Config aus der Zeit vor den vier Raendern kennt nur
+  // `paddingPercent`. Die Migration rechnet das um – hier steht es trotzdem
+  // noch einmal, weil `normalize` auch auf von Hand editierte Dateien und auf
+  // Teil-Patches aus der Handy-App laeuft.
+  display.insets = normalizeInsets(
+    display.insets,
+    Number((display as unknown as { paddingPercent?: unknown }).paddingPercent ?? defaults.display.insets.top),
+  );
+  delete (display as unknown as { paddingPercent?: unknown }).paddingPercent;
   // Eine krumme Gradzahl wuerde die Anzeige stumm auf "quer" zurueckfallen
   // lassen – und wer sie von Hand in die Datei geschrieben hat, saehe nur einen
   // querstehenden Spiegel und keinen Grund dafuer.
@@ -128,6 +138,7 @@ function normalize(input: Record<string, unknown>): MirrorConfig {
     display,
     power,
     update,
+    setup: normalizeSetup(source.setup),
   };
 }
 

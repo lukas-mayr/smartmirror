@@ -16,7 +16,12 @@
   /* Nicht dunkler: hinter halbdurchlaessigem Glas verliert man darunter
      liegende Grauwerte fast vollstaendig. */
   --mirror-fg-dim: #707070;
-  --mirror-padding: 4%;
+  /* Rand der bespielbaren Flaeche je Seite. Wird aus der Konfiguration
+     gesetzt; die Werte hier sind nur der Ausgangspunkt. */
+  --mirror-inset-top: 4%;
+  --mirror-inset-right: 4%;
+  --mirror-inset-bottom: 4%;
+  --mirror-inset-left: 4%;
   --mirror-shift-x: 0px;
   --mirror-shift-y: 0px;
   --mirror-gap: 2.5rem;
@@ -94,14 +99,28 @@ body {
   transform: rotate(-90deg) translateX(-100%);
 }
 
-.grid {
+/*
+ * Bespielbare Flaeche.
+ *
+ * Die vier Raender stecken in `inset` und nicht in `padding`, weil Prozent
+ * dort unterschiedlich rechnen: bei `padding` beziehen sich auch oben und
+ * unten auf die *Breite* des Elements, bei `inset` dagegen oben/unten auf die
+ * Hoehe und links/rechts auf die Breite. Nur so heisst "oben 3 %" auf einem
+ * hochkanten Bildschirm auch oben drei Prozent – und nur so laesst sich ein
+ * schief haengender Bildschirm ueberhaupt sauber ausmitteln.
+ */
+.grid,
+.frame,
+.overlay {
   position: absolute;
-  inset: 0;
+  inset: var(--mirror-inset-top) var(--mirror-inset-right) var(--mirror-inset-bottom) var(--mirror-inset-left);
+}
+
+.grid {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   grid-template-rows: auto 1fr auto;
   gap: var(--mirror-gap);
-  padding: var(--mirror-padding);
   /* Einbrennschutz: das Layout wandert langsam um wenige Pixel. */
   transform: translate(var(--mirror-shift-x), var(--mirror-shift-y));
   transition: transform 4s linear, opacity 600ms ease;
@@ -164,8 +183,6 @@ body {
 }
 
 .overlay {
-  position: absolute;
-  inset: 0;
   display: none;
   flex-direction: column;
   align-items: center;
@@ -199,6 +216,116 @@ body {
   color: var(--mirror-fg-dim);
   max-width: 32ch;
   line-height: 1.6;
+}
+
+/*
+ * Ausricht-Rahmen (zweiter Schritt der Einrichtung).
+ *
+ * Er zeigt genau die Flaeche, die spaeter bespielt wird. Deshalb liegt er auf
+ * denselben Raendern wie das Raster und nicht auf einem eigenen Kasten: was
+ * hier zu sehen ist, ist buchstaeblich die Kante, an der der Inhalt endet.
+ *
+ * Eine Linie und nicht eine Flaeche: eine helle Flaeche waere hinter
+ * halbdurchlaessigem Glas ein Leuchtkasten und wuerde genau das verraten, was
+ * der Spiegel verbergen soll. Aus demselben Grund duenn und ungefaerbt.
+ */
+.frame {
+  display: none;
+  border: 1px solid var(--mirror-fg-dim);
+  pointer-events: none;
+}
+
+.frame--visible {
+  display: block;
+}
+
+/*
+ * Ecken kraeftiger als die Linien dazwischen: durch die Folie verschwindet
+ * eine durchgehende Ein-Pixel-Linie fast, die Ecken bleiben ablesbar. Und
+ * beim Ausmitteln schaut man ohnehin auf die Ecken.
+ */
+.frame__corner {
+  position: absolute;
+  /* Feste Groesse und nicht Prozent: prozentuale Ecken waeren auf einem
+     breiten Bildschirm rechteckig, und schiefe Ecken sind ausgerechnet beim
+     Ausrichten das falsche Signal. */
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--mirror-fg);
+}
+
+.frame__corner--tl {
+  top: -1px;
+  left: -1px;
+  border-right: none;
+  border-bottom: none;
+}
+.frame__corner--tr {
+  top: -1px;
+  right: -1px;
+  border-left: none;
+  border-bottom: none;
+}
+.frame__corner--br {
+  bottom: -1px;
+  right: -1px;
+  border-left: none;
+  border-top: none;
+}
+.frame__corner--bl {
+  bottom: -1px;
+  left: -1px;
+  border-right: none;
+  border-top: none;
+}
+
+/* Fadenkreuz: verraet auf einen Blick, ob die Flaeche mittig sitzt. */
+.frame__cross {
+  position: absolute;
+  background: var(--mirror-fg-dim);
+}
+
+.frame__cross--vertical {
+  left: 50%;
+  top: 44%;
+  height: 12%;
+  width: 1px;
+}
+
+.frame__cross--horizontal {
+  top: 50%;
+  left: 44%;
+  width: 12%;
+  height: 1px;
+}
+
+/*
+ * Unterhalb der Mitte: dort deckt der Text weder das Fadenkreuz noch die
+ * ueblicherweise oben stehenden Module ab.
+ */
+.frame__hint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 68%;
+  transform: translateY(-50%);
+  text-align: center;
+  font-size: 1rem;
+  line-height: 1.7;
+  color: var(--mirror-fg-muted);
+  /* Deckt Module ab, die zufaellig in der Mitte stehen. Schwarz und nicht
+     halbtransparent: alles andere waere hinter dem Glas ein grauer Fleck. */
+  background: #000000;
+  padding: 1.5rem 12%;
+}
+
+.frame__hint b {
+  display: block;
+  font-size: 1.4rem;
+  font-weight: 300;
+  color: var(--mirror-fg);
+  letter-spacing: 0.04em;
+  margin-bottom: 0.6rem;
 }
 
 /*
