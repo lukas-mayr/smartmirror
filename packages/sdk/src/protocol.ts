@@ -1,5 +1,7 @@
-import type { MirrorConfig, ModuleInstance } from './config.js';
+import type { MirrorConfig } from './config.js';
+import type { WidgetSize } from './layout.js';
 import type { ModuleDescriptor } from './manifest.js';
+import type { MirrorScreen } from './screens.js';
 
 /**
  * Kantenlaengen der bespielbaren Buehne in Pixeln, wie die Anzeige sie sieht.
@@ -12,6 +14,20 @@ import type { ModuleDescriptor } from './manifest.js';
 export interface Viewport {
   width: number;
   height: number;
+}
+
+/**
+ * Aenderung an einem Block. Alles ausser der Id ist optional: die Handy-App
+ * schiebt beim Ziehen nur Koordinaten, beim Antippen nur den Schalter – und
+ * beides darf sich nicht gegenseitig ueberschreiben.
+ */
+export interface LayoutPatch {
+  id: string;
+  screenId?: string;
+  x?: number;
+  y?: number;
+  size?: WidgetSize;
+  enabled?: boolean;
 }
 
 /** Die PWA ("remote") darf konfigurieren, die Anzeige ("shell") nur lesen. */
@@ -58,9 +74,19 @@ export type ClientMessage =
   | { t: 'shell:viewport'; viewport: Viewport }
   | { t: 'command'; instanceId: string; name: string; payload?: unknown }
   | { t: 'admin:setInstanceConfig'; instanceId: string; config: Record<string, unknown> }
-  | { t: 'admin:setLayout'; instances: Pick<ModuleInstance, 'id' | 'zone' | 'order' | 'enabled'>[] }
-  | { t: 'admin:addInstance'; moduleId: string; zone: string }
+  | { t: 'admin:setLayout'; instances: LayoutPatch[] }
+  | { t: 'admin:addInstance'; moduleId: string; screenId?: string; size?: WidgetSize; x?: number; y?: number }
   | { t: 'admin:removeInstance'; instanceId: string }
+  | { t: 'admin:addScreen'; name?: string }
+  | { t: 'admin:removeScreen'; screenId: string }
+  | { t: 'admin:setScreen'; screenId: string; patch: Partial<Pick<MirrorScreen, 'name' | 'durationSeconds'>> }
+  | { t: 'admin:reorderScreens'; ids: string[] }
+  /**
+   * Der Spiegel soll diesen Screen zeigen und nicht weiterschalten, solange am
+   * Handy daran gearbeitet wird. Kein Teil der Konfiguration: die Vorschau ist
+   * ein Zustand von jetzt und darf einen Neustart nicht ueberleben.
+   */
+  | { t: 'admin:previewScreen'; screenId: string | null }
   | { t: 'admin:setSettings'; patch: Partial<Pick<MirrorConfig, 'deviceName' | 'locale' | 'timezone' | 'display' | 'power' | 'update' | 'setup'>> }
   | { t: 'admin:setSecret'; moduleId: string; key: string; value: string }
   | { t: 'admin:power'; on: boolean }
@@ -72,12 +98,13 @@ export type ClientMessage =
 
 export type ServerMessage
   = { t: 'welcome'; serverVersion: string; authenticated: boolean; needsPairing: boolean }
-  | { t: 'snapshot'; config: MirrorConfig; modules: ModuleDescriptor[]; state: Record<string, ModuleStateEnvelope>; power: { on: boolean }; update: UpdateStatus; viewport: Viewport | null }
+  | { t: 'snapshot'; config: MirrorConfig; modules: ModuleDescriptor[]; state: Record<string, ModuleStateEnvelope>; power: { on: boolean }; update: UpdateStatus; viewport: Viewport | null; previewScreenId: string | null }
   | { t: 'state:patch'; envelope: ModuleStateEnvelope }
   | { t: 'config:update'; config: MirrorConfig }
   | { t: 'modules:update'; modules: ModuleDescriptor[] }
   | { t: 'display:power'; on: boolean }
   | { t: 'display:viewport'; viewport: Viewport | null }
+  | { t: 'display:previewScreen'; screenId: string | null }
   | { t: 'update:status'; status: UpdateStatus }
   | { t: 'pair:result'; ok: true; token: string }
   | { t: 'pair:code'; code: string; expiresAt: string }

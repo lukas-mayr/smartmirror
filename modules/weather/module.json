@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "Aktuelles Wetter und Vorhersage von Open-Meteo. Ohne API-Schluessel nutzbar.",
   "author": "smartmirror",
-  "preferredZone": "top-right",
+  "preferredSize": "l",
   "permissions": ["network", "commands"],
   "network": {
     "allow": ["api.open-meteo.com", "geocoding-api.open-meteo.com"]

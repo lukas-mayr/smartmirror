@@ -274,6 +274,232 @@ button.danger {
   border-color: transparent;
 }
 
+/* --------------------------------- Screens --------------------------------- */
+
+/*
+ * Reiterleiste der Screens. Sie steht ueber dem Brett und nicht darunter, weil
+ * sie beantwortet, was das Brett ueberhaupt zeigt.
+ */
+.screens {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
+  /* Waagrecht wischen soll die Leiste rollen und nicht die Seite. */
+  scrollbar-width: none;
+}
+
+.screens::-webkit-scrollbar {
+  display: none;
+}
+
+.screens__tab {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.1rem;
+  min-height: 44px;
+  padding: 0.3rem 0.9rem;
+  background: var(--surface);
+  color: var(--muted);
+  white-space: nowrap;
+  flex: none;
+}
+
+.screens__tab.is-active {
+  background: var(--surface-2);
+  color: var(--fg);
+  border-color: var(--accent);
+}
+
+.screens__time {
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.screens__add {
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
+  font-size: 1.3rem;
+  flex: none;
+}
+
+/* ---------------------------------- Brett ---------------------------------- */
+
+/*
+ * Das Brett ist der Spiegel in klein: gleiches Seitenverhaeltnis, gleiche
+ * Raender, gleiches Raster. Nur so beantwortet es die Frage, um die es hier
+ * geht – wie sieht das zusammen aus?
+ */
+.board {
+  position: relative;
+  width: 100%;
+  background: #000;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.board__area {
+  position: absolute;
+  display: grid;
+  gap: 4px;
+  /* Wischen auf dem Brett verschiebt Bloecke und rollt nicht die Seite.
+     Gerollt wird ueberall sonst – das Brett ist nur ein Ausschnitt. */
+  touch-action: none;
+}
+
+.board__cell {
+  border: 1px dashed rgba(255, 255, 255, 0.09);
+  border-radius: 4px;
+}
+
+/* Umriss der Zelle, in die der gezogene Block einrastet. */
+.board__ghost {
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: rgba(110, 168, 254, 0.12);
+}
+
+.board__ghost.is-invalid {
+  border-color: var(--danger);
+  background: rgba(255, 107, 107, 0.12);
+}
+
+.board__widget {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  padding: 0.2rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--fg);
+  font-size: 0.8rem;
+  line-height: 1.2;
+  text-align: center;
+  overflow: hidden;
+  /* Der gezogene Block soll dem Finger sofort folgen, das Einrasten der
+     anderen darf ruhig weich sein. */
+  transition: box-shadow 150ms ease;
+  user-select: none;
+}
+
+.board__widget.is-selected {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.board__widget.is-off {
+  opacity: 0.45;
+}
+
+.board__widget.is-overlap {
+  border-color: var(--danger);
+}
+
+.board__widget.is-dragging {
+  z-index: 2;
+  /* Halb durchsichtig, damit der Umriss darunter sichtbar bleibt: er zeigt,
+     wo der Block einrasten wird. */
+  opacity: 0.85;
+  border-color: var(--accent);
+  /* Hier ist ein Schatten erlaubt: die Fernbedienung haengt nicht hinter Glas. */
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+  transition: none;
+}
+
+.board__name,
+.board__size {
+  /* Der Block als Ganzes nimmt die Beruehrung entgegen – ein Kind dazwischen
+     wuerde den Zielpunkt eines Ziehens verschieben. */
+  pointer-events: none;
+}
+
+.board__name {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.board__size {
+  font-size: 0.7rem;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+}
+
+.board__empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  pointer-events: none;
+}
+
+.board__hint {
+  margin: 0.75rem 0 0;
+}
+
+/* Groessenauswahl S / M / L / XL. */
+.sizes {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.25rem;
+}
+
+.sizes button {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.sizes button.is-active {
+  background: var(--accent);
+  color: #0b0b0c;
+  border-color: transparent;
+}
+
+/*
+ * Ein Wert zwischen zwei Tasten. Wie beim Ausrichten: ein Druck ist ein
+ * Schritt, und jeder Schritt schreibt die Konfiguration auf den Pi.
+ */
+.stepper-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 0.25rem;
+}
+
+.stepper-row button {
+  width: var(--tap);
+  min-height: var(--tap);
+  padding: 0;
+  font-size: 1.3rem;
+  line-height: 1;
+  background: var(--surface);
+}
+
+.stepper-row b {
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+
+.card--sheet {
+  margin-top: 0.75rem;
+  border: 1px solid var(--border);
+}
+
 /* -------------------------------- Zeitplan -------------------------------- */
 
 .rule {
@@ -332,6 +558,12 @@ button.danger {
 .banner--error {
   background: rgba(255, 107, 107, 0.12);
   color: var(--danger);
+}
+
+/* Kein Fehler vom Spiegel, sondern ein Hinweis der App – etwa "kein Platz". */
+.banner--hint {
+  background: rgba(110, 168, 254, 0.12);
+  color: var(--accent);
 }
 
 .dot {

@@ -2,8 +2,13 @@ import { LitElement, html, nothing, type TemplateResult } from 'lit';
 import {
   adjustAllInsets,
   adjustInset,
+  clampScreenDuration,
   createDefaultInsets,
+  findFreeSpot,
   FONT_OPTIONS,
+  formatScreenDuration,
+  GRID_MAX,
+  GRID_MIN,
   INSET_MAX,
   INSET_MIN,
   INSET_SIDE_OPTIONS,
@@ -11,19 +16,28 @@ import {
   insetsEqual,
   insetToPixels,
   normalizeRotation,
+  rectFor,
+  rectsOverlap,
   ROTATION_OPTIONS,
+  SCREEN_DURATION_MAX,
+  SCREEN_DURATION_MIN,
+  SCREEN_DURATION_STEP,
   SETUP_FLOW_STEPS,
   SETUP_STEP_TITLES,
   setupStepNumber,
-  ZONE_LABELS,
-  ZONES,
+  sizeCells,
+  WIDGET_SIZE_OPTIONS,
+  WIDGET_SIZE_SPECS,
   type FontId,
+  type GridSize,
   type InsetSide,
+  type MirrorConfig,
+  type MirrorScreen,
   type ModuleDescriptor,
   type ModuleInstance,
   type ScreenInsets,
   type SetupStep,
-  type Zone,
+  type WidgetSize,
 } from '@mirror/sdk';
 import { store, type StoreSnapshot } from '../store.js';
 import './schema-form.js';
@@ -35,26 +49,70 @@ const WEEKDAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 /** Seitenverhaeltnis der Vorschau, solange die Anzeige noch nichts gemeldet hat. */
 const FALLBACK_ASPECT = 16 / 9;
 
+/**
+ * Ab so vielen Pixeln gilt eine Beruehrung als Ziehen und nicht mehr als
+ * Antippen. Darunter waere jeder Fingerwackler ein verschobener Block.
+ */
+const DRAG_THRESHOLD = 6;
+
+interface DragState {
+  id: string;
+  pointerId: number;
+  size: WidgetSize;
+  /** Startpunkt des Fingers in Bildschirmkoordinaten. */
+  startX: number;
+  startY: number;
+  dx: number;
+  dy: number;
+  /** Rasterplatz beim Aufsetzen des Fingers. */
+  origin: { x: number; y: number };
+  /** Masse der Rasterflaeche, einmal beim Aufsetzen gemessen. */
+  area: DOMRect;
+  target: { x: number; y: number } | null;
+  valid: boolean;
+  moved: boolean;
+}
+
+function clampCell(value: number, max: number): number {
+  return Math.min(Math.max(0, max), Math.max(0, value));
+}
+
 const formatPercent = (value: number): string => value.toFixed(1).replace('.', ',').replace(',0', '');
 
 export class MirrorRemote extends LitElement {
   static override properties = {
     snapshot: { state: true },
     tab: { state: true },
-    expanded: { state: true },
+    screen: { state: true },
+    selected: { state: true },
+    drag: { state: true },
+    pendingDelete: { state: true },
+    notice: { state: true },
     code: { state: true },
   };
 
   declare snapshot: StoreSnapshot;
   declare tab: Tab;
-  declare expanded: string | null;
+  /** Screen, der gerade bearbeitet wird. `null` = der erste. */
+  declare screen: string | null;
+  /** Block, dessen Einstellungen offen sind. */
+  declare selected: string | null;
+  declare drag: DragState | null;
+  /** Screen, dessen Loeschen bestaetigt werden muss. */
+  declare pendingDelete: string | null;
+  /** Hinweis, der nicht vom Spiegel kommt, sondern hier entsteht. */
+  declare notice: string | null;
   declare code: string;
 
   constructor() {
     super();
     this.snapshot = store.value;
     this.tab = 'module';
-    this.expanded = null;
+    this.screen = null;
+    this.selected = null;
+    this.drag = null;
+    this.pendingDelete = null;
+    this.notice = null;
     this.code = '';
   }
 
@@ -105,7 +163,7 @@ export class MirrorRemote extends LitElement {
       <nav class="tabs">
         ${(['module', 'anzeige', 'system'] as Tab[]).map(
           (tab) => html`
-            <button class=${this.tab === tab ? 'is-active' : ''} @click=${() => (this.tab = tab)}>
+            <button class=${this.tab === tab ? 'is-active' : ''} @click=${() => this.#selectTab(tab)}>
               ${tab === 'module' ? 'Module' : tab === 'anzeige' ? 'Anzeige' : 'System'}
             </button>
           `,
@@ -113,6 +171,7 @@ export class MirrorRemote extends LitElement {
       </nav>
 
       ${this.snapshot.lastError ? html`<p class="banner banner--error">${this.snapshot.lastError}</p>` : nothing}
+      ${this.notice ? html`<p class="banner banner--hint">${this.notice}</p>` : nothing}
 
       <main>
         ${this.tab === 'module'
@@ -122,6 +181,23 @@ export class MirrorRemote extends LitElement {
             : this.#renderSystem()}
       </main>
     `;
+  }
+
+  /**
+   * Reiterwechsel.
+   *
+   * Wer die Modulseite verlaesst, arbeitet nicht mehr an einem Screen: der
+   * Spiegel darf wieder selbst weiterschalten. Sonst bliebe er stehen, weil
+   * jemand die App weggelegt hat.
+   */
+  #selectTab(tab: Tab): void {
+    if (this.tab === tab) return;
+    if (this.tab === 'module' && this.snapshot.previewScreenId !== null) {
+      store.send({ t: 'admin:previewScreen', screenId: null });
+    }
+    this.tab = tab;
+    this.notice = null;
+    this.pendingDelete = null;
   }
 
   /* ------------------------------- Einrichtung ------------------------------- */
@@ -320,18 +396,65 @@ export class MirrorRemote extends LitElement {
 
   /* ---------------------------------- Module --------------------------------- */
 
+  /**
+   * Modulseite: oben die Screens, darunter das Brett.
+   *
+   * Das Brett ist die eigentliche Bedienung. Eine Liste mit Positionsauswahl
+   * je Modul hat frueher genau eine Frage nicht beantwortet – wie sieht das
+   * zusammen aus? Hier steht die Antwort massstabsgetreu auf dem Bildschirm,
+   * mit denselben Raendern und demselben Raster wie an der Wand.
+   */
   #renderModules(): TemplateResult {
     const config = this.snapshot.config;
     if (!config) return html``;
+    const screen = this.#currentScreen();
+    if (!screen) return html``;
     const byId = new Map(this.snapshot.modules.map((entry) => [entry.id, entry]));
-    const instances = [...config.instances].sort(
-      (a, b) => ZONES.indexOf(a.zone) - ZONES.indexOf(b.zone) || a.order - b.order,
-    );
+    const instance = config.instances.find((entry) => entry.id === this.selected) ?? null;
 
     return html`
-      <section class="cards">
-        ${instances.map((instance) => this.#renderInstance(instance, byId.get(instance.moduleId)))}
-      </section>
+      <nav class="screens">
+        ${config.screens.map(
+          (entry) => html`
+            <button
+              class="screens__tab ${entry.id === screen.id ? 'is-active' : ''}"
+              @click=${() => this.#selectScreen(entry.id)}
+            >
+              ${entry.name}
+              <span class="screens__time">${formatScreenDuration(entry.durationSeconds)}</span>
+            </button>
+          `,
+        )}
+        <button class="screens__add" aria-label="Screen hinzufuegen" @click=${() => store.send({ t: 'admin:addScreen' })}>
+          +
+        </button>
+      </nav>
+
+      ${this.#renderBoard(config, screen)}
+
+      <label class="field field--switch">
+        <span class="field__label">
+          Am Spiegel mitzeigen
+          <span class="field__hint">
+            Der Spiegel bleibt auf diesem Screen stehen, solange hier daran gearbeitet wird.
+          </span>
+        </span>
+        <input
+          type="checkbox"
+          .checked=${this.snapshot.previewScreenId !== null}
+          @change=${(event: Event) =>
+            store.send({
+              t: 'admin:previewScreen',
+              screenId: (event.target as HTMLInputElement).checked ? screen.id : null,
+            })}
+        />
+      </label>
+
+      ${instance
+        ? this.#renderInstance(instance, byId.get(instance.moduleId), config)
+        : html`<p class="muted small board__hint">
+            Block antippen, um ihn einzustellen. Ziehen verschiebt ihn im Raster.
+          </p>`}
 
       <h2>Modul hinzufuegen</h2>
       <section class="cards">
@@ -347,13 +470,8 @@ export class MirrorRemote extends LitElement {
               </div>
               <button
                 ?disabled=${Boolean(descriptor.loadError) ||
-                (descriptor.singleton && instances.some((i) => i.moduleId === descriptor.id))}
-                @click=${() =>
-                  store.send({
-                    t: 'admin:addInstance',
-                    moduleId: descriptor.id,
-                    zone: descriptor.preferredZone ?? 'top-center',
-                  })}
+                (descriptor.singleton && config.instances.some((i) => i.moduleId === descriptor.id))}
+                @click=${() => store.send({ t: 'admin:addInstance', moduleId: descriptor.id, screenId: screen.id })}
               >
                 Hinzufuegen
               </button>
@@ -361,20 +479,212 @@ export class MirrorRemote extends LitElement {
           `,
         )}
       </section>
+
+      ${this.#renderScreenSettings(config, screen)}
     `;
   }
 
-  #renderInstance(instance: ModuleInstance, descriptor: ModuleDescriptor | undefined): TemplateResult {
-    const open = this.expanded === instance.id;
+  /**
+   * Das Brett.
+   *
+   * Es zeigt die Flaeche des Spiegels im richtigen Seitenverhaeltnis, mit den
+   * eingestellten Raendern und dem Raster darin. Was hier passt, passt an der
+   * Wand – und was hier ueber die Kante ragt, ragt auch dort darueber.
+   */
+  #renderBoard(config: MirrorConfig, screen: MirrorScreen): TemplateResult {
+    const viewport = this.snapshot.viewport;
+    const aspect = viewport ? viewport.width / viewport.height : FALLBACK_ASPECT;
+    const grid = config.display.grid;
+    const insets = config.display.insets;
+    const instances = config.instances.filter((entry) => entry.screenId === screen.id);
+    const overlapping = this.#overlapping(instances, grid);
+    const drag = this.drag;
+
+    const cells = Array.from({ length: grid.columns * grid.rows }, (_unused, index) => {
+      const x = index % grid.columns;
+      const y = Math.floor(index / grid.columns);
+      return html`<div class="board__cell" style=${`grid-column:${x + 1};grid-row:${y + 1}`}></div>`;
+    });
+
+    return html`
+      <div class="board" style=${`aspect-ratio: ${aspect}`}>
+        <div
+          class="board__area"
+          style=${`top:${insets.top}%;right:${insets.right}%;bottom:${insets.bottom}%;left:${insets.left}%;` +
+          `grid-template-columns:repeat(${grid.columns},1fr);grid-template-rows:repeat(${grid.rows},1fr)`}
+        >
+          ${cells}
+          ${drag?.target
+            ? html`<div
+                class="board__ghost ${drag.valid ? '' : 'is-invalid'}"
+                style=${this.#areaStyle(drag.target.x, drag.target.y, drag.size, grid)}
+              ></div>`
+            : nothing}
+          ${instances.map((entry) => this.#renderWidget(entry, grid, overlapping.has(entry.id)))}
+          ${instances.length === 0
+            ? html`<p class="board__empty muted small">Noch kein Modul auf diesem Screen.</p>`
+            : nothing}
+        </div>
+      </div>
+      ${overlapping.size > 0
+        ? html`<p class="banner banner--hint small">
+            Zwei Bloecke liegen uebereinander. Das passiert, wenn das Raster kleiner wird als die Anordnung –
+            verschiebe oder verkleinere einen der beiden.
+          </p>`
+        : nothing}
+    `;
+  }
+
+  /**
+   * Bloecke, die sich gegenseitig verdecken.
+   *
+   * Entsteht nur, wenn das Raster nachtraeglich kleiner wird und alle Bloecke
+   * zusammenruecken muessen. Auf dem Spiegel saehe man davon nichts – hier
+   * schon, und deshalb steht der Hinweis genau hier.
+   */
+  #overlapping(instances: readonly ModuleInstance[], grid: GridSize): Set<string> {
+    const found = new Set<string>();
+    for (let i = 0; i < instances.length; i += 1) {
+      for (let j = i + 1; j < instances.length; j += 1) {
+        const a = instances[i]!;
+        const b = instances[j]!;
+        if (!rectsOverlap(rectFor(a, grid), rectFor(b, grid))) continue;
+        found.add(a.id);
+        found.add(b.id);
+      }
+    }
+    return found;
+  }
+
+  #renderWidget(instance: ModuleInstance, grid: GridSize, overlaps: boolean): TemplateResult {
+    const descriptor = this.snapshot.modules.find((entry) => entry.id === instance.moduleId);
+    const envelope = this.snapshot.state[instance.id];
+    const drag = this.drag?.id === instance.id ? this.drag : null;
+    const rect = rectFor(instance, grid);
+
+    return html`
+      <div
+        class="board__widget ${instance.enabled ? '' : 'is-off'} ${overlaps ? 'is-overlap' : ''} ${this.selected ===
+        instance.id
+          ? 'is-selected'
+          : ''} ${drag ? 'is-dragging' : ''}"
+        style=${this.#areaStyle(rect.x, rect.y, instance.size, grid) +
+        (drag ? `;transform:translate(${drag.dx}px,${drag.dy}px)` : '')}
+        @pointerdown=${(event: PointerEvent) => this.#dragStart(event, instance, grid)}
+        @pointermove=${(event: PointerEvent) => this.#dragMove(event, grid)}
+        @pointerup=${(event: PointerEvent) => this.#dragEnd(event, instance)}
+        @pointercancel=${() => (this.drag = null)}
+      >
+        <span class="board__name">${descriptor?.name ?? instance.moduleId}</span>
+        <span class="board__size">${WIDGET_SIZE_SPECS[instance.size].label}</span>
+        ${envelope?.error ? html`<span class="dot dot--error" title=${envelope.error}></span>` : nothing}
+      </div>
+    `;
+  }
+
+  /** Rasterplatz als Inline-Style. Dieselbe Rechnung wie in der Anzeige. */
+  #areaStyle(x: number, y: number, size: WidgetSize, grid: GridSize): string {
+    const cells = sizeCells(size, grid);
+    return `grid-column:${x + 1} / span ${cells.columns};grid-row:${y + 1} / span ${cells.rows}`;
+  }
+
+  /* --------------------------------- Ziehen ---------------------------------- */
+
+  /**
+   * Ziehen mit dem Finger.
+   *
+   * Der Block folgt dem Finger frei, waehrend darunter ein Umriss die Zelle
+   * zeigt, in die er einrasten wird. Frei folgen allein waere ungenau, nur
+   * einrasten allein waere ruckelig – zusammen sieht man beides: wohin man
+   * zieht und wo es landet.
+   *
+   * Ein Druck ohne Bewegung ist kein Ziehen, sondern eine Auswahl. Deshalb die
+   * Schwelle: auf einem Handy wackelt jeder Finger um ein paar Pixel.
+   */
+  #dragStart(event: PointerEvent, instance: ModuleInstance, grid: GridSize): void {
+    const widget = event.currentTarget as HTMLElement;
+    const area = widget.parentElement;
+    if (!area) return;
+    widget.setPointerCapture(event.pointerId);
+    this.drag = {
+      id: instance.id,
+      pointerId: event.pointerId,
+      size: instance.size,
+      startX: event.clientX,
+      startY: event.clientY,
+      dx: 0,
+      dy: 0,
+      origin: { x: rectFor(instance, grid).x, y: rectFor(instance, grid).y },
+      area: area.getBoundingClientRect(),
+      target: null,
+      valid: true,
+      moved: false,
+    };
+  }
+
+  #dragMove(event: PointerEvent, grid: GridSize): void {
+    const drag = this.drag;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const dx = event.clientX - drag.startX;
+    const dy = event.clientY - drag.startY;
+    const moved = drag.moved || Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD;
+    if (!moved) return;
+
+    const cellWidth = drag.area.width / grid.columns;
+    const cellHeight = drag.area.height / grid.rows;
+    const cells = sizeCells(drag.size, grid);
+    const x = clampCell(Math.round(drag.origin.x + dx / cellWidth), grid.columns - cells.columns);
+    const y = clampCell(Math.round(drag.origin.y + dy / cellHeight), grid.rows - cells.rows);
+
+    this.drag = { ...drag, dx, dy, moved, target: { x, y }, valid: this.#spotFree(drag.id, x, y, drag.size, grid) };
+  }
+
+  #dragEnd(event: PointerEvent, instance: ModuleInstance): void {
+    const drag = this.drag;
+    this.drag = null;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    // Kein Weg zurueckgelegt: das war ein Antippen und heisst "einstellen".
+    if (!drag.moved) {
+      this.selected = this.selected === instance.id ? null : instance.id;
+      return;
+    }
+    if (!drag.target || !drag.valid) return;
+    if (drag.target.x === drag.origin.x && drag.target.y === drag.origin.y) return;
+
+    store.send({
+      t: 'admin:setLayout',
+      instances: [{ id: instance.id, x: drag.target.x, y: drag.target.y }],
+    });
+  }
+
+  /** Liegt an dieser Stelle schon ein anderer Block? */
+  #spotFree(id: string, x: number, y: number, size: WidgetSize, grid: GridSize): boolean {
+    const config = this.snapshot.config;
+    const instance = config?.instances.find((entry) => entry.id === id);
+    if (!config || !instance) return false;
+    const cells = sizeCells(size, grid);
+    const candidate = { x, y, columns: cells.columns, rows: cells.rows };
+    return !config.instances
+      .filter((entry) => entry.screenId === instance.screenId && entry.id !== id)
+      .some((entry) => rectsOverlap(rectFor(entry, grid), candidate));
+  }
+
+  /* ------------------------------ Ausgewaehlter Block ------------------------------ */
+
+  #renderInstance(
+    instance: ModuleInstance,
+    descriptor: ModuleDescriptor | undefined,
+    config: MirrorConfig,
+  ): TemplateResult {
     const envelope = this.snapshot.state[instance.id];
 
     return html`
-      <div class="card ${instance.enabled ? '' : 'card--off'}">
-        <div class="card__head" @click=${() => (this.expanded = open ? null : instance.id)}>
+      <section class="card card--sheet ${instance.enabled ? '' : 'card--off'}">
+        <div class="card__head">
           <div>
             <strong>${descriptor?.name ?? instance.moduleId}</strong>
-            <span class="muted small">${ZONE_LABELS[instance.zone]}</span>
-            ${envelope?.error ? html`<span class="dot dot--error" title=${envelope.error}></span>` : nothing}
+            <span class="muted small">${WIDGET_SIZE_SPECS[instance.size].name}</span>
           </div>
           <label class="switch" @click=${(event: Event) => event.stopPropagation()}>
             <input
@@ -383,102 +693,315 @@ export class MirrorRemote extends LitElement {
               @change=${(event: Event) =>
                 store.send({
                   t: 'admin:setLayout',
-                  instances: [
-                    {
-                      id: instance.id,
-                      zone: instance.zone,
-                      order: instance.order,
-                      enabled: (event.target as HTMLInputElement).checked,
-                    },
-                  ],
+                  instances: [{ id: instance.id, enabled: (event.target as HTMLInputElement).checked }],
                 })}
             />
             <span></span>
           </label>
         </div>
 
-        ${open
-          ? html`
-              <div class="card__body">
-                ${envelope?.error ? html`<p class="banner banner--error">${envelope.error}</p>` : nothing}
+        <div class="card__body">
+          ${envelope?.error ? html`<p class="banner banner--error">${envelope.error}</p>` : nothing}
 
-                <label class="field">
-                  <span class="field__label">Position</span>
-                  <select
-                    @change=${(event: Event) =>
-                      store.send({
-                        t: 'admin:setLayout',
-                        instances: [
-                          {
-                            id: instance.id,
-                            zone: (event.target as HTMLSelectElement).value as Zone,
-                            order: instance.order,
-                            enabled: instance.enabled,
-                          },
-                        ],
-                      })}
+          <div class="field">
+            <span class="field__label">
+              Groesse
+              <span class="field__hint">Wie viele Rasterfelder der Block belegt.</span>
+            </span>
+            <div class="sizes">
+              ${WIDGET_SIZE_OPTIONS.map(
+                (option) => html`
+                  <button
+                    class=${option.id === instance.size ? 'is-active' : ''}
+                    title=${`${option.name} · ${option.columns}×${option.rows}`}
+                    @click=${() => this.#resize(instance, option.id)}
                   >
-                    ${ZONES.map(
-                      (zone) => html`
-                        <option value=${zone} ?selected=${zone === instance.zone}>${ZONE_LABELS[zone]}</option>
+                    ${option.label}
+                  </button>
+                `,
+              )}
+            </div>
+          </div>
+
+          ${config.screens.length > 1
+            ? html`
+                <label class="field">
+                  <span class="field__label">Screen</span>
+                  <select @change=${(event: Event) => this.#moveToScreen(instance, (event.target as HTMLSelectElement).value)}>
+                    ${config.screens.map(
+                      (entry) => html`
+                        <option value=${entry.id} ?selected=${entry.id === instance.screenId}>${entry.name}</option>
                       `,
                     )}
                   </select>
                 </label>
+              `
+            : nothing}
 
-                <schema-form
-                  .schema=${descriptor?.configSchema}
-                  .value=${instance.config}
-                  @form-change=${(event: CustomEvent<Record<string, unknown>>) =>
+          <schema-form
+            .schema=${descriptor?.configSchema}
+            .value=${instance.config}
+            @form-change=${(event: CustomEvent<Record<string, unknown>>) =>
+              store.send({
+                t: 'admin:setInstanceConfig',
+                instanceId: instance.id,
+                config: event.detail,
+              })}
+          ></schema-form>
+
+          ${(descriptor?.secrets ?? []).map(
+            (secret) => html`
+              <label class="field">
+                <span class="field__label">
+                  ${secret.label}
+                  ${descriptor?.secretsPresent.includes(secret.key)
+                    ? html`<span class="muted small">· hinterlegt</span>`
+                    : nothing}
+                </span>
+                <input
+                  type="password"
+                  placeholder="••••••••"
+                  autocomplete="off"
+                  @change=${(event: Event) => {
+                    const input = event.target as HTMLInputElement;
+                    if (!input.value) return;
                     store.send({
-                      t: 'admin:setInstanceConfig',
-                      instanceId: instance.id,
-                      config: event.detail,
-                    })}
-                ></schema-form>
+                      t: 'admin:setSecret',
+                      moduleId: instance.moduleId,
+                      key: secret.key,
+                      value: input.value,
+                    });
+                    input.value = '';
+                  }}
+                />
+              </label>
+            `,
+          )}
 
-                ${(descriptor?.secrets ?? []).map(
-                  (secret) => html`
-                    <label class="field">
-                      <span class="field__label">
-                        ${secret.label}
-                        ${descriptor?.secretsPresent.includes(secret.key)
-                          ? html`<span class="muted small">· hinterlegt</span>`
-                          : nothing}
-                      </span>
-                      <input
-                        type="password"
-                        placeholder="••••••••"
-                        autocomplete="off"
-                        @change=${(event: Event) => {
-                          const input = event.target as HTMLInputElement;
-                          if (!input.value) return;
-                          store.send({
-                            t: 'admin:setSecret',
-                            moduleId: instance.moduleId,
-                            key: secret.key,
-                            value: input.value,
-                          });
-                          input.value = '';
-                        }}
-                      />
-                    </label>
-                  `,
-                )}
-
-                <div class="card__actions">
-                  <button
-                    class="danger"
-                    @click=${() => store.send({ t: 'admin:removeInstance', instanceId: instance.id })}
-                  >
-                    Entfernen
-                  </button>
-                </div>
-              </div>
-            `
-          : nothing}
-      </div>
+          <div class="card__actions">
+            <button @click=${() => (this.selected = null)}>Fertig</button>
+            <button
+              class="danger"
+              @click=${() => {
+                store.send({ t: 'admin:removeInstance', instanceId: instance.id });
+                this.selected = null;
+              }}
+            >
+              Entfernen
+            </button>
+          </div>
+        </div>
+      </section>
     `;
+  }
+
+  /**
+   * Groesse wechseln.
+   *
+   * Ein groesserer Block passt an seiner Stelle oft nicht mehr. Statt die
+   * Aenderung abzulehnen, sucht die App einen freien Platz – meistens rutscht
+   * der Block nur eine Zelle nach links und niemandem faellt es auf.
+   */
+  #resize(instance: ModuleInstance, size: WidgetSize): void {
+    const config = this.snapshot.config;
+    if (!config || size === instance.size) return;
+    const grid = config.display.grid;
+    const occupied = config.instances
+      .filter((entry) => entry.screenId === instance.screenId && entry.id !== instance.id)
+      .map((entry) => rectFor(entry, grid));
+    const spot = findFreeSpot(occupied, grid, size, { x: instance.x, y: instance.y });
+    if (!spot) {
+      this.notice = 'Kein Platz fuer diese Groesse. Verschiebe zuerst einen anderen Block.';
+      return;
+    }
+    this.notice = null;
+    store.send({ t: 'admin:setLayout', instances: [{ id: instance.id, size, x: spot.x, y: spot.y }] });
+  }
+
+  #moveToScreen(instance: ModuleInstance, screenId: string): void {
+    const config = this.snapshot.config;
+    if (!config || screenId === instance.screenId) return;
+    const grid = config.display.grid;
+    const occupied = config.instances
+      .filter((entry) => entry.screenId === screenId)
+      .map((entry) => rectFor(entry, grid));
+    const spot = findFreeSpot(occupied, grid, instance.size, { x: instance.x, y: instance.y });
+    if (!spot) {
+      this.notice = 'Auf diesem Screen ist kein Platz frei.';
+      return;
+    }
+    this.notice = null;
+    store.send({ t: 'admin:setLayout', instances: [{ id: instance.id, screenId, x: spot.x, y: spot.y }] });
+    this.screen = screenId;
+  }
+
+  /* ------------------------------ Screen-Einstellungen ------------------------------ */
+
+  #renderScreenSettings(config: MirrorConfig, screen: MirrorScreen): TemplateResult {
+    const index = config.screens.findIndex((entry) => entry.id === screen.id);
+    const onScreen = config.instances.filter((entry) => entry.screenId === screen.id).length;
+    const grid = config.display.grid;
+    const patchGrid = (patch: Partial<GridSize>): void =>
+      store.send({
+        t: 'admin:setSettings',
+        patch: { display: { ...config.display, grid: { ...grid, ...patch } } },
+      });
+
+    return html`
+      <h2>Screen</h2>
+      <section class="panel">
+        <label class="field">
+          <span class="field__label">Name</span>
+          <input
+            type="text"
+            .value=${screen.name}
+            @change=${(event: Event) =>
+              store.send({
+                t: 'admin:setScreen',
+                screenId: screen.id,
+                patch: { name: (event.target as HTMLInputElement).value },
+              })}
+          />
+        </label>
+
+        <div class="field">
+          <span class="field__label">
+            Standzeit
+            <span class="field__hint">
+              ${config.screens.length > 1
+                ? 'Danach schaltet der Spiegel auf den naechsten Screen.'
+                : 'Wirkt, sobald es einen zweiten Screen gibt.'}
+            </span>
+          </span>
+          <div class="stepper-row">
+            <button
+              aria-label="Kuerzer"
+              ?disabled=${screen.durationSeconds <= SCREEN_DURATION_MIN}
+              @click=${() => this.#patchDuration(screen, -SCREEN_DURATION_STEP)}
+            >
+              −
+            </button>
+            <b>${formatScreenDuration(screen.durationSeconds)}</b>
+            <button
+              aria-label="Laenger"
+              ?disabled=${screen.durationSeconds >= SCREEN_DURATION_MAX}
+              @click=${() => this.#patchDuration(screen, SCREEN_DURATION_STEP)}
+            >
+              +
+            </button>
+          </div>
+        </div>
+
+        <div class="field">
+          <span class="field__label">
+            Raster
+            <span class="field__hint">Gilt fuer alle Screens – sonst wuerde jeder Wechsel springen.</span>
+          </span>
+          <div class="stepper-row">
+            <button
+              aria-label="Weniger Spalten"
+              ?disabled=${grid.columns <= GRID_MIN}
+              @click=${() => patchGrid({ columns: grid.columns - 1 })}
+            >
+              −
+            </button>
+            <b>${grid.columns} Spalten</b>
+            <button
+              aria-label="Mehr Spalten"
+              ?disabled=${grid.columns >= GRID_MAX}
+              @click=${() => patchGrid({ columns: grid.columns + 1 })}
+            >
+              +
+            </button>
+          </div>
+          <div class="stepper-row">
+            <button
+              aria-label="Weniger Zeilen"
+              ?disabled=${grid.rows <= GRID_MIN}
+              @click=${() => patchGrid({ rows: grid.rows - 1 })}
+            >
+              −
+            </button>
+            <b>${grid.rows} Zeilen</b>
+            <button
+              aria-label="Mehr Zeilen"
+              ?disabled=${grid.rows >= GRID_MAX}
+              @click=${() => patchGrid({ rows: grid.rows + 1 })}
+            >
+              +
+            </button>
+          </div>
+        </div>
+
+        <div class="card__actions">
+          <button
+            ?disabled=${index <= 0}
+            @click=${() => this.#reorderScreen(config, index, -1)}
+          >
+            Nach vorne
+          </button>
+          <button
+            ?disabled=${index < 0 || index >= config.screens.length - 1}
+            @click=${() => this.#reorderScreen(config, index, 1)}
+          >
+            Nach hinten
+          </button>
+        </div>
+
+        <div class="card__actions">
+          <button
+            class="danger"
+            ?disabled=${config.screens.length <= 1}
+            @click=${() => {
+              // Zwei Schritte statt eines Systemdialogs: der Knopf sagt beim
+              // zweiten Druck selbst, was verloren geht.
+              if (this.pendingDelete !== screen.id) {
+                this.pendingDelete = screen.id;
+                return;
+              }
+              store.send({ t: 'admin:removeScreen', screenId: screen.id });
+              this.pendingDelete = null;
+              this.screen = null;
+            }}
+          >
+            ${this.pendingDelete === screen.id
+              ? onScreen > 0
+                ? `Wirklich loeschen? ${onScreen} Modul${onScreen === 1 ? '' : 'e'} gehen mit`
+                : 'Wirklich loeschen?'
+              : 'Screen loeschen'}
+          </button>
+        </div>
+      </section>
+    `;
+  }
+
+  #patchDuration(screen: MirrorScreen, delta: number): void {
+    store.send({
+      t: 'admin:setScreen',
+      screenId: screen.id,
+      patch: { durationSeconds: clampScreenDuration(screen.durationSeconds + delta) },
+    });
+  }
+
+  #reorderScreen(config: MirrorConfig, index: number, delta: number): void {
+    const ids = config.screens.map((entry) => entry.id);
+    const target = index + delta;
+    if (index < 0 || target < 0 || target >= ids.length) return;
+    [ids[index], ids[target]] = [ids[target]!, ids[index]!];
+    store.send({ t: 'admin:reorderScreens', ids });
+  }
+
+  #currentScreen(): MirrorScreen | null {
+    const screens = this.snapshot.config?.screens ?? [];
+    return screens.find((entry) => entry.id === this.screen) ?? screens[0] ?? null;
+  }
+
+  #selectScreen(id: string): void {
+    this.screen = id;
+    this.selected = null;
+    this.pendingDelete = null;
+    // Der Spiegel folgt mit, solange die Vorschau eingeschaltet ist.
+    if (this.snapshot.previewScreenId !== null) store.send({ t: 'admin:previewScreen', screenId: id });
   }
 
   /* --------------------------------- Anzeige --------------------------------- */

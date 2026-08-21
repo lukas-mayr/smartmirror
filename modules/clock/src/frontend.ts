@@ -6,15 +6,7 @@ interface ClockConfig {
   showSeconds: boolean;
   showDate: boolean;
   dateStyle: 'full' | 'long' | 'medium';
-  size: 's' | 'm' | 'l' | 'xl';
 }
-
-const SIZES: Record<ClockConfig['size'], string> = {
-  s: '2.6rem',
-  m: '3.8rem',
-  l: '5.4rem',
-  xl: '7.5rem',
-};
 
 export default defineFrontend<Record<string, never>, ClockConfig>({
   create(host, ctx): ModuleView<Record<string, never>, ClockConfig> {
@@ -40,7 +32,7 @@ export default defineFrontend<Record<string, never>, ClockConfig>({
 
       render(
         html`
-          <div class="clock" style="--clock-size: ${SIZES[config.size] ?? SIZES.l}">
+          <div class="clock">
             <div class="clock__time">${time}</div>
             ${date ? html`<div class="clock__date">${date}</div>` : null}
           </div>

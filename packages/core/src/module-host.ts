@@ -114,7 +114,7 @@ export class ModuleHost extends EventEmitter {
       version: module.manifest.version,
       description: module.manifest.description,
       singleton: module.manifest.singleton === true,
-      preferredZone: module.manifest.preferredZone,
+      preferredSize: module.manifest.preferredSize,
       configSchema: module.manifest.configSchema,
       secrets: module.manifest.secrets ?? [],
       secretsPresent: this.#secrets.listFor(module.manifest.id),

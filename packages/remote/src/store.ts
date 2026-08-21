@@ -33,6 +33,11 @@ export interface StoreSnapshot {
    * Erlaeuterung beim Ausrichten: neben "2,5 %" steht dann auch "27 px".
    */
   viewport: Viewport | null;
+  /**
+   * Screen, den die Anzeige gerade festhaelt, weil hier daran gearbeitet wird.
+   * `null` heisst: der Spiegel schaltet selbst weiter.
+   */
+  previewScreenId: string | null;
   lastError: string | null;
 }
 
@@ -57,6 +62,7 @@ export class Store extends EventTarget {
     powerOn: true,
     update: null,
     viewport: null,
+    previewScreenId: null,
     lastError: null,
   };
 
@@ -212,6 +218,7 @@ export class Store extends EventTarget {
           powerOn: message.power.on,
           update: message.update,
           viewport: message.viewport,
+          previewScreenId: message.previewScreenId,
         });
         return;
       case 'config:update':
@@ -238,6 +245,9 @@ export class Store extends EventTarget {
         return;
       case 'display:viewport':
         this.#patch({ viewport: message.viewport });
+        return;
+      case 'display:previewScreen':
+        this.#patch({ previewScreenId: message.screenId });
         return;
       case 'update:status':
         this.#patch({ update: message.status });

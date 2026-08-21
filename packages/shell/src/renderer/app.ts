@@ -2,15 +2,15 @@ import {
   DEFAULT_FONT,
   FONT_STACKS,
   INSET_SIDES,
+  rectFor,
   validate,
-  ZONES,
   type MirrorConfig,
+  type MirrorScreen,
   type ModuleDescriptor,
   type ModuleInstance,
   type ModuleStateEnvelope,
   type ModuleView,
   type ServerMessage,
-  type Zone,
 } from '@mirror/sdk';
 import type { CoreConnection, ConnectionState } from './connection.js';
 import { loadModuleFrontend } from './module-loader.js';
@@ -43,7 +43,7 @@ const BURN_IN_PATH: readonly [number, number][] = [
 
 export class MirrorApp {
   #stage: HTMLElement;
-  #grid: HTMLElement;
+  #screens: HTMLElement;
   #dim: HTMLElement;
   #frame: HTMLElement;
   #overlay: HTMLElement;
@@ -51,18 +51,22 @@ export class MirrorApp {
   #connection: CoreConnection;
   #coreUrl: string;
 
-  #zones = new Map<Zone, HTMLElement>();
+  #screenElements = new Map<string, HTMLElement>();
   #mounted = new Map<string, MountedInstance>();
   #descriptors = new Map<string, ModuleDescriptor>();
   #states = new Map<string, ModuleStateEnvelope>();
   #config: MirrorConfig | null = null;
+  #activeScreenId: string | null = null;
+  /** Screen, den die Handy-App gerade bearbeitet. Solange gesetzt: kein Weiterschalten. */
+  #previewScreenId: string | null = null;
+  #cycleTimer: number | undefined;
   #powerOn = true;
   #burnInIndex = 0;
   #ready = false;
 
   constructor(stage: HTMLElement, connection: CoreConnection, coreUrl: string) {
     this.#stage = stage;
-    this.#grid = stage.querySelector('#grid') as HTMLElement;
+    this.#screens = stage.querySelector('#screens') as HTMLElement;
     this.#dim = stage.querySelector('#dim') as HTMLElement;
     this.#frame = stage.querySelector('#frame') as HTMLElement;
     this.#overlay = stage.querySelector('#overlay') as HTMLElement;
@@ -73,7 +77,6 @@ export class MirrorApp {
     this.#status.className = 'status';
     stage.append(this.#status);
 
-    this.#buildZones();
     this.#buildFrame();
     this.#watchViewport();
     this.#startBurnInProtection();
@@ -95,6 +98,7 @@ export class MirrorApp {
         this.#descriptors = new Map(message.modules.map((entry) => [entry.id, entry]));
         this.#states = new Map(Object.entries(message.state));
         this.#powerOn = message.power.on;
+        this.#previewScreenId = message.previewScreenId;
         this.#applyConfig(message.config);
         this.#applyPower();
         this.#hideOverlay();
@@ -137,6 +141,14 @@ export class MirrorApp {
         this.#applyPower();
         return;
 
+      case 'display:previewScreen':
+        // Die Handy-App bearbeitet einen Screen: ihn zeigen und stehen lassen,
+        // sonst schaltet der Spiegel genau dann weiter, wenn jemand hinsieht.
+        this.#previewScreenId = message.screenId;
+        if (message.screenId) this.#showScreen(message.screenId);
+        this.#scheduleCycle();
+        return;
+
       case 'pair:code':
         if (message.code && this.#config?.setup.step !== 'frame') {
           this.#showOverlay('Spiegel koppeln', message.code, 'Diesen Code in der Spiegel-App eingeben.');
@@ -168,16 +180,6 @@ export class MirrorApp {
     return (window as unknown as { mirror?: { version: string } }).mirror?.version ?? '0.0.0';
   }
 
-  #buildZones(): void {
-    for (const zone of ZONES) {
-      const element = document.createElement('section');
-      element.className = `zone zone--${zone}`;
-      element.dataset.zone = zone;
-      this.#grid.append(element);
-      this.#zones.set(zone, element);
-    }
-  }
-
   #applyConfig(config: MirrorConfig): void {
     this.#config = config;
     // Die Drehung greift damit auch fuer den Kopplungscode: die Anzeige
@@ -191,12 +193,13 @@ export class MirrorApp {
       '--mirror-font',
       FONT_STACKS[config.display.fontFamily] ?? FONT_STACKS[DEFAULT_FONT],
     );
+    document.documentElement.style.setProperty('--mirror-columns', String(config.display.grid.columns));
+    document.documentElement.style.setProperty('--mirror-rows', String(config.display.grid.rows));
     this.#applyPower();
     this.#applySetup(config);
+    this.#syncScreens(config.screens);
 
-    const desired = config.instances
-      .filter((instance) => instance.enabled)
-      .sort((a, b) => a.order - b.order);
+    const desired = config.instances.filter((instance) => instance.enabled);
     const desiredIds = new Set(desired.map((instance) => instance.id));
 
     for (const [id, mounted] of [...this.#mounted]) {
@@ -211,10 +214,7 @@ export class MirrorApp {
       if (existing && existing.moduleVersion === version) {
         existing.instance = instance;
         existing.config = this.#effectiveConfig(instance, descriptor);
-        const zone = this.#zones.get(instance.zone);
-        // Auch bei unveraenderter Zone neu anhaengen: das stellt die
-        // Reihenfolge innerhalb der Zone wieder her.
-        zone?.append(existing.host);
+        this.#place(existing.host, instance);
         this.#pushState(this.#states.get(instance.id), existing);
         continue;
       }
@@ -222,13 +222,119 @@ export class MirrorApp {
       if (existing) this.#unmount(instance.id, existing);
       void this.#mount(instance, version);
     }
+
+    this.#scheduleCycle();
+  }
+
+  /**
+   * Legt fuer jeden Screen eine Flaeche an und raeumt verschwundene weg.
+   *
+   * Die Flaechen liegen alle gleichzeitig im Dokument und werden nur ein- und
+   * ausgeblendet. Sie bei jedem Wechsel neu aufzubauen hiesse, jedes Modul neu
+   * zu starten: die Uhr faenge von vorn an zu ticken, das Wetter holte seine
+   * Daten erneut, und beim Zurueckschalten waere die Flaeche erst einmal leer.
+   */
+  #syncScreens(screens: readonly MirrorScreen[]): void {
+    const known = new Set(screens.map((screen) => screen.id));
+    for (const [id, element] of [...this.#screenElements]) {
+      if (known.has(id)) continue;
+      element.remove();
+      this.#screenElements.delete(id);
+    }
+
+    for (const screen of screens) {
+      let element = this.#screenElements.get(screen.id);
+      if (!element) {
+        element = document.createElement('section');
+        element.className = 'screen';
+        element.dataset.screen = screen.id;
+        this.#screenElements.set(screen.id, element);
+      }
+      // Auch bekannte Flaechen neu anhaengen: das stellt die Reihenfolge her,
+      // in der weitergeschaltet wird.
+      this.#screens.append(element);
+    }
+
+    // Haelt die Handy-App gerade einen Screen fest, gilt der – auch wenn die
+    // Anzeige mitten im Bearbeiten neu verbunden hat.
+    if (this.#previewScreenId && this.#screenElements.has(this.#previewScreenId)) {
+      this.#showScreen(this.#previewScreenId);
+      return;
+    }
+
+    const visible = this.#visibleScreens();
+    const stillThere = this.#activeScreenId !== null && visible.some((s) => s.id === this.#activeScreenId);
+    if (!stillThere) this.#showScreen((visible[0] ?? screens[0])?.id ?? null);
+  }
+
+  /** Setzt einen Block auf seinen Rasterplatz. */
+  #place(host: HTMLElement, instance: ModuleInstance): void {
+    const grid = this.#config?.display.grid ?? { columns: 1, rows: 1 };
+    const rect = rectFor(instance, grid);
+    host.dataset.size = instance.size;
+    host.style.gridColumn = `${rect.x + 1} / span ${rect.columns}`;
+    host.style.gridRow = `${rect.y + 1} / span ${rect.rows}`;
+    const screen = this.#screenElements.get(instance.screenId);
+    if (screen && host.parentElement !== screen) screen.append(host);
+  }
+
+  /**
+   * Screens, auf denen tatsaechlich etwas steht.
+   *
+   * Ein leerer Screen wuerde beim Weiterschalten zwanzig Sekunden schwarze
+   * Wand ergeben – und genau so aussehen, als waere der Spiegel kaputt. Wer
+   * einen Screen leert, will ihn vorbereiten, nicht abschalten.
+   */
+  #visibleScreens(): MirrorScreen[] {
+    const config = this.#config;
+    if (!config) return [];
+    return config.screens.filter((screen) =>
+      config.instances.some((instance) => instance.enabled && instance.screenId === screen.id),
+    );
+  }
+
+  #showScreen(id: string | null): void {
+    this.#activeScreenId = id;
+    for (const [screenId, element] of this.#screenElements) {
+      element.classList.toggle('screen--active', screenId === id);
+    }
+  }
+
+  /**
+   * Legt fest, wann der naechste Screen an die Reihe kommt.
+   *
+   * Kein gleichmaessiger Takt, sondern ein Timer je Screen: die Standzeit
+   * gehoert zum Screen, und ein Blick auf die Uhr braucht keine zwei Minuten,
+   * eine Einkaufsliste schon.
+   */
+  #scheduleCycle(): void {
+    window.clearTimeout(this.#cycleTimer);
+    this.#cycleTimer = undefined;
+
+    // Waehrend am Handy an einem Screen gearbeitet wird, steht die Runde.
+    if (this.#previewScreenId) return;
+
+    const visible = this.#visibleScreens();
+    if (visible.length < 2) return;
+
+    const index = visible.findIndex((screen) => screen.id === this.#activeScreenId);
+    const current = visible[index] ?? visible[0]!;
+    if (index < 0) this.#showScreen(current.id);
+
+    this.#cycleTimer = window.setTimeout(() => {
+      const next = this.#visibleScreens();
+      if (next.length === 0) return;
+      const position = next.findIndex((screen) => screen.id === this.#activeScreenId);
+      this.#showScreen(next[(position + 1) % next.length]!.id);
+      this.#scheduleCycle();
+    }, current.durationSeconds * 1000);
   }
 
   async #mount(instance: ModuleInstance, moduleVersion: string): Promise<void> {
     const host = document.createElement('div');
     host.className = `module module--${instance.moduleId}`;
     host.dataset.instance = instance.id;
-    this.#zones.get(instance.zone)?.append(host);
+    this.#place(host, instance);
 
     const descriptor = this.#descriptors.get(instance.moduleId);
     const mounted: MountedInstance = {
@@ -365,7 +471,7 @@ export class MirrorApp {
     // Rueckfallebene fuer alles, was per wlr-randr/ddcutil nicht erreichbar ist.
     const opacity = this.#powerOn ? Math.min(0.92, 1 - brightness / 100) : 1;
     this.#dim.style.opacity = String(opacity);
-    this.#grid.setAttribute('aria-hidden', this.#powerOn ? 'false' : 'true');
+    this.#screens.setAttribute('aria-hidden', this.#powerOn ? 'false' : 'true');
   }
 
   #showOverlay(title: string, code: string | null, hint: string): void {
