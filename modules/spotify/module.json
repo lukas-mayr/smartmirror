@@ -2,31 +2,60 @@
   "id": "spotify",
   "name": "Spotify",
   "version": "0.1.0",
-  "description": "Zeigt, was gerade laeuft. Braucht eine eigene Spotify-App und eine einmalige Anmeldung – Spotify gibt Wiedergabedaten nur an benannte Anwendungen heraus.",
+  "description": "Zeigt, was gerade laeuft – fuer bis zu fuenf Konten, die sich den Block abwechselnd teilen. Braucht eine eigene Spotify-App und je Konto eine einmalige Anmeldung.",
   "author": "smartmirror",
   "singleton": true,
-  "sizes": ["m", "l"],
+  "sizes": [
+    "m",
+    "l"
+  ],
   "preferredSize": "m",
-  "permissions": ["network", "secrets"],
+  "permissions": [
+    "network",
+    "secrets"
+  ],
   "network": {
-    "allow": ["api.spotify.com", "accounts.spotify.com"]
+    "allow": [
+      "api.spotify.com",
+      "accounts.spotify.com"
+    ]
   },
   "refreshInterval": "10s",
   "secrets": [
     {
       "key": "authResponse",
       "label": "Anmelde-Antwort",
-      "description": "Nach dem Anmelden zeigt der Browser eine Fehlerseite – das ist richtig so. Die Adresse aus der Adresszeile hier einfuegen.",
+      "description": "Nach dem Anmelden zeigt der Browser eine Fehlerseite – das ist richtig so. Die Adresse aus der Adresszeile hier einfuegen. Jede eingefuegte Antwort belegt den naechsten freien Platz.",
       "required": false
-    },
-    {
-      "key": "refreshToken",
-      "label": "Zugriff",
-      "managed": true
     },
     {
       "key": "verifier",
       "label": "Anmelde-Nachweis",
+      "managed": true
+    },
+    {
+      "key": "refreshToken.1",
+      "label": "Zugang Konto 1",
+      "managed": true
+    },
+    {
+      "key": "refreshToken.2",
+      "label": "Zugang Konto 2",
+      "managed": true
+    },
+    {
+      "key": "refreshToken.3",
+      "label": "Zugang Konto 3",
+      "managed": true
+    },
+    {
+      "key": "refreshToken.4",
+      "label": "Zugang Konto 4",
+      "managed": true
+    },
+    {
+      "key": "refreshToken.5",
+      "label": "Zugang Konto 5",
       "managed": true
     }
   ],
@@ -56,6 +85,14 @@
         "title": "Bei Stille ausblenden",
         "description": "Laeuft nichts, bleibt der Block leer und die Flaeche wieder Spiegel.",
         "default": true
+      },
+      "switchSeconds": {
+        "type": "integer",
+        "title": "Wechsel bei mehreren Konten (Sekunden)",
+        "description": "Hoeren mehrere gleichzeitig, zeigt der Block sie abwechselnd – so lange jeden.",
+        "minimum": 5,
+        "maximum": 60,
+        "default": 10
       }
     }
   }

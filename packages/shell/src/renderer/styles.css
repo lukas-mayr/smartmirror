@@ -543,6 +543,17 @@ body {
   color: var(--mirror-fg-muted);
 }
 
+/*
+ * Wessen Musik gerade zu sehen ist. Erscheint erst ab zwei Konten – ein Name,
+ * der nichts unterscheidet, ist nur Laerm.
+ */
+.spotify__who {
+  font-size: min(6cqh, 3.2cqw);
+  font-weight: 300;
+  letter-spacing: 0.08em;
+  color: var(--mirror-fg-dim);
+}
+
 .spotify__head {
   display: flex;
   align-items: center;

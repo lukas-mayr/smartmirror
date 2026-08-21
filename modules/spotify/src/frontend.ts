@@ -1,7 +1,14 @@
 import { html, render, nothing } from 'lit';
 import { defineFrontend, type ModuleView } from '@mirror/sdk';
 import { icon } from '@mirror/icons';
-import { elapsedFraction, formatTime, type SpotifyConfig, type SpotifyState } from './shared.js';
+import {
+  elapsedFraction,
+  formatTime,
+  nextShown,
+  type AccountPlayback,
+  type SpotifyConfig,
+  type SpotifyState,
+} from './shared.js';
 
 export default defineFrontend<SpotifyState, SpotifyConfig>({
   create(host, ctx): ModuleView<SpotifyState, SpotifyConfig> {
@@ -9,33 +16,28 @@ export default defineFrontend<SpotifyState, SpotifyConfig>({
     let config = ctx.config;
     let error: string | null = null;
     let timer: number | undefined;
+    /** Platz des gerade gezeigten Kontos. */
+    let shownSlot: number | null = null;
+    /** Sekunden, seit der Gezeigte dran ist. */
+    let sinceSwitch = 0;
 
-    /**
-     * Der Balken laeuft in der Anzeige weiter, statt im Sekundentakt gefragt
-     * zu werden. Steht die Musik, steht auch er – dann gibt es nichts zu
-     * zeichnen, und ein Spiegel, auf dem sich nichts bewegt, ist der ruhigere.
-     */
-    const schedule = (): void => {
-      if (timer !== undefined) window.clearInterval(timer);
-      timer = undefined;
-      if (!state.playing || !config.showProgress || !state.durationMs) return;
-      timer = window.setInterval(draw, 1_000);
-    };
+    /** Konten, bei denen es etwas zu zeigen gibt – laufend oder pausiert. */
+    const active = (): AccountPlayback[] => (state.accounts ?? []).filter((entry) => entry.title !== null);
 
-    function draw(): void {
-      if (state.connected === false) {
+    const draw = (): void => {
+      if ((state.connectedCount ?? 0) === 0) {
         render(
-          html`<div class="spotify spotify--hint">
-            ${error ?? 'Spotify: Anmeldung offen'}
-          </div>`,
+          html`<div class="spotify spotify--hint">${error ?? 'Spotify: Anmeldung offen'}</div>`,
           host,
         );
         return;
       }
 
-      if (!state.title) {
+      const candidates = active();
+      if (candidates.length === 0) {
         // Stille. Was der Spiegel nicht zeigt, bleibt Spiegel – deshalb ist
         // das Ausblenden die Voreinstellung und nicht ein "Nichts laeuft".
+        shownSlot = null;
         if (config.hideWhenIdle) {
           render(html``, host);
           return;
@@ -44,29 +46,42 @@ export default defineFrontend<SpotifyState, SpotifyConfig>({
         return;
       }
 
-      const fraction = elapsedFraction(state);
-      const elapsed = state.durationMs ? fraction * state.durationMs : 0;
+      // Der Gezeigte bleibt dran, solange bei ihm etwas laeuft; faellt er
+      // weg, beginnt die Runde vorne.
+      const current =
+        candidates.find((entry) => entry.slot === shownSlot) ?? (candidates[0] as AccountPlayback);
+      shownSlot = current.slot;
+
+      const fraction = elapsedFraction(current);
+      const elapsed = current.durationMs ? fraction * current.durationMs : 0;
+      // Der Name lohnt sich erst, wenn er etwas unterscheidet.
+      const showName = (state.connectedCount ?? 0) > 1;
 
       render(
         html`
-          <div class="spotify ${state.playing ? '' : 'spotify--paused'}">
+          <div class="spotify ${current.playing ? '' : 'spotify--paused'}">
+            ${showName
+              ? html`<div class="spotify__who">
+                  ${current.name}${candidates.length > 1 ? html` · ${candidates.length} hoeren` : nothing}
+                </div>`
+              : nothing}
             <div class="spotify__head">
               <span class="spotify__icon">
-                ${icon(state.playing ? 'music' : 'pause', { size: '1em', strokeWidth: 1.5 })}
+                ${icon(current.playing ? 'music' : 'pause', { size: '1em', strokeWidth: 1.5 })}
               </span>
-              <span class="spotify__title">${state.title}</span>
+              <span class="spotify__title">${current.title}</span>
             </div>
-            ${state.artist ? html`<div class="spotify__artist">${state.artist}</div>` : nothing}
-            ${config.showAlbum && state.album
-              ? html`<div class="spotify__album">${state.album}</div>`
+            ${current.artist ? html`<div class="spotify__artist">${current.artist}</div>` : nothing}
+            ${config.showAlbum && current.album
+              ? html`<div class="spotify__album">${current.album}</div>`
               : nothing}
-            ${config.showProgress && state.durationMs
+            ${config.showProgress && current.durationMs
               ? html`
                   <div class="spotify__progress">
                     <div class="spotify__bar"><i style=${`width:${(fraction * 100).toFixed(2)}%`}></i></div>
                     <div class="spotify__times">
                       <span>${formatTime(elapsed)}</span>
-                      <span>${formatTime(state.durationMs)}</span>
+                      <span>${formatTime(current.durationMs)}</span>
                     </div>
                   </div>
                 `
@@ -76,7 +91,31 @@ export default defineFrontend<SpotifyState, SpotifyConfig>({
         `,
         host,
       );
-    }
+    };
+
+    /**
+     * Ein Sekundentakt fuer beides: den mitlaufenden Balken und das
+     * Durchschalten, wenn mehrere gleichzeitig hoeren. Laeuft nur, wenn es
+     * etwas zu bewegen gibt – ein Spiegel, auf dem sich nichts tut, ist der
+     * ruhigere.
+     */
+    const schedule = (): void => {
+      if (timer !== undefined) window.clearInterval(timer);
+      timer = undefined;
+      const candidates = active();
+      const barMoves = config.showProgress && candidates.some((entry) => entry.playing);
+      if (!barMoves && candidates.length < 2) return;
+
+      timer = window.setInterval(() => {
+        sinceSwitch += 1;
+        const rotation = active();
+        if (rotation.length > 1 && sinceSwitch >= Math.max(5, config.switchSeconds)) {
+          sinceSwitch = 0;
+          shownSlot = nextShown(rotation.map((entry) => entry.slot), shownSlot);
+        }
+        draw();
+      }, 1_000);
+    };
 
     draw();
     schedule();

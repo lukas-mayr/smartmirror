@@ -3,11 +3,22 @@ export interface SpotifyConfig {
   showProgress: boolean;
   showAlbum: boolean;
   hideWhenIdle: boolean;
+  /** Hoeren mehrere gleichzeitig, so lange zeigt der Block jeden. */
+  switchSeconds: number;
 }
 
-export interface SpotifyState {
-  /** Es liegt ein gueltiger Zugang vor. Ohne ihn zeigt die Anzeige den Grund. */
-  connected: boolean;
+/**
+ * Hoechstens fuenf Konten – nicht unsere Zahl, sondern Spotifys: mehr Nutzer
+ * laesst eine App im Development Mode seit Februar 2026 nicht zu.
+ */
+export const MAX_ACCOUNTS = 5;
+
+/** Was ein verbundenes Konto gerade hoert. */
+export interface AccountPlayback {
+  /** Fester Platz 1..MAX_ACCOUNTS – bleibt stabil, auch wenn andere gehen. */
+  slot: number;
+  /** Anzeigename aus dem Spotify-Profil, sonst "Konto N". */
+  name: string;
   playing: boolean;
   title: string | null;
   /** Bei Podcasts der Name der Sendung. */
@@ -23,6 +34,13 @@ export interface SpotifyState {
    * dem Glas mehr auf als einer, der einfach laeuft.
    */
   sampledAt: string | null;
+}
+
+export interface SpotifyState {
+  /** Wie viele Konten angemeldet sind. 0 heisst: Anmeldung steht noch aus. */
+  connectedCount: number;
+  /** Alle verbundenen Konten, nach Platz sortiert – auch die stillen. */
+  accounts: AccountPlayback[];
 }
 
 /**
@@ -62,13 +80,35 @@ export function extractCode(raw: string): string {
   return code;
 }
 
+/** Zeitanteile eines laufenden Titels – nur die Felder, die dafuer zaehlen. */
+export interface PlaybackTiming {
+  playing?: boolean;
+  durationMs?: number | null;
+  progressMs?: number | null;
+  sampledAt?: string | null;
+}
+
 /** Zeigt an, wie weit der Titel gelaufen ist – 0..1, geraten aus der Zeit. */
-export function elapsedFraction(state: Partial<SpotifyState>, now = Date.now()): number {
-  const { durationMs, progressMs, sampledAt, playing } = state;
+export function elapsedFraction(entry: PlaybackTiming, now = Date.now()): number {
+  const { durationMs, progressMs, sampledAt, playing } = entry;
   if (!durationMs || progressMs === null || progressMs === undefined) return 0;
   const drift = playing && sampledAt ? now - Date.parse(sampledAt) : 0;
   const elapsed = progressMs + (Number.isFinite(drift) ? Math.max(0, drift) : 0);
   return Math.min(1, Math.max(0, elapsed / durationMs));
+}
+
+/**
+ * Wer als Naechster gezeigt wird, wenn mehrere gleichzeitig hoeren.
+ *
+ * Faellt der Gezeigte weg (Musik gestoppt, Konto getrennt), beginnt die Runde
+ * vorne – vorhersagbar ist wichtiger als fair: vor dem Spiegel soll niemand
+ * raetseln, warum die Reihenfolge springt.
+ */
+export function nextShown(slots: readonly number[], current: number | null): number | null {
+  if (slots.length === 0) return null;
+  const index = current === null ? -1 : slots.indexOf(current);
+  if (index === -1) return slots[0] as number;
+  return slots[(index + 1) % slots.length] as number;
 }
 
 /** "3:07" – Minuten und Sekunden, ohne fuehrende Stunde bei kurzen Titeln. */

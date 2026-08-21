@@ -146,8 +146,12 @@ niemand, der tippen könnte.
 
 ## Spotify anschließen
 
-Das Modul zeigt Titel, Interpret und den Fortschritt dessen, was gerade läuft.
-Es steuert nichts: vor einem Spiegel gibt es nichts zu drücken.
+Das Modul zeigt Titel, Interpret und den Fortschritt dessen, was gerade läuft —
+für **bis zu fünf Konten**. Hören mehrere gleichzeitig, teilen sie sich den
+Block abwechselnd: der Spiegel zeigt jeden für ein einstellbares Intervall
+(Voreinstellung zehn Sekunden) und blendet dazu den Namen aus dem
+Spotify-Profil ein. Es steuert nichts: vor einem Spiegel gibt es nichts zu
+drücken.
 
 **Jeder legt seine eigene Spotify-App an.** Das ist keine Bequemlichkeit,
 sondern die einzige Bauform, die trägt: Spotify erlaubt einer App im
@@ -163,6 +167,15 @@ nach fünf Spiegeln voll. Home Assistant löst es aus demselben Grund genauso.
 4. Der Block bietet daraufhin **„Bei Spotify anmelden"** an. Antippen, zustimmen.
 5. Der Browser landet auf einer Fehlerseite. **Das ist richtig so.** Die Adresse
    aus der Adresszeile kopieren und unter **Anmelde-Antwort** einfügen.
+
+**Weitere Konten** gehen denselben Weg: solange ein Platz frei ist, bietet der
+Block „Weiteres Konto verbinden" an, und jede eingefügte Antwort belegt den
+nächsten Platz. Zwei Dinge dazu: jedes Konto muss vorher im Spotify-Dashboard
+der App als Nutzer eingetragen werden (die fünf Plätze des Moduls sind genau
+Spotifys Grenze je App), und **getrennt** wird ein Konto nicht am Spiegel,
+sondern bei Spotify — unter [Konto → Apps](https://www.spotify.com/account/apps/)
+den Zugriff entziehen. Der Spiegel merkt das bei der nächsten Abfrage und gibt
+den Platz von selbst frei.
 
 Der Umweg über die Fehlerseite ist Spotifys Regelwerk geschuldet: seit April
 2025 sind nur noch HTTPS-Adressen und die Loopback-Adresse als Ziel erlaubt.

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { elapsedFraction, extractCode, formatTime, REDIRECT_URI } from '../dist/shared.js';
+import { elapsedFraction, extractCode, formatTime, nextShown, REDIRECT_URI } from '../dist/shared.js';
 
 test('rechnet den Fortschritt zwischen zwei Antworten weiter', () => {
   const sampledAt = new Date('2026-01-01T12:00:00Z').toISOString();
@@ -65,4 +65,20 @@ test('sagt es, wenn in der Adresse kein Code steht', () => {
     () => extractCode(`${REDIRECT_URI}?foo=bar`),
     (error) => error.message.includes('kein Code'),
   );
+});
+
+test('schaltet der Reihe nach durch die aktiven Konten', () => {
+  assert.equal(nextShown([1, 3, 5], 1), 3);
+  assert.equal(nextShown([1, 3, 5], 3), 5);
+  assert.equal(nextShown([1, 3, 5], 5), 1);
+});
+
+test('beginnt vorne, wenn der Gezeigte weggefallen ist', () => {
+  // Konto 3 hat die Musik gestoppt, waehrend es zu sehen war.
+  assert.equal(nextShown([1, 5], 3), 1);
+  assert.equal(nextShown([2], null), 2);
+});
+
+test('ohne aktive Konten wird niemand gezeigt', () => {
+  assert.equal(nextShown([], 1), null);
 });
