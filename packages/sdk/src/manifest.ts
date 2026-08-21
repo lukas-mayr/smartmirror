@@ -1,6 +1,6 @@
 import type { JsonSchema } from './schema.js';
 import type { Duration } from './duration.js';
-import type { WidgetSize } from './layout.js';
+import { isWidgetSize, WIDGET_SIZES, type WidgetSize } from './layout.js';
 
 /**
  * Rechte, die ein Modul im Manifest anfordern muss. Was nicht angefordert
@@ -46,7 +46,17 @@ export interface ModuleManifest {
   /** Wenn true, ist nur eine Instanz erlaubt. */
   singleton?: boolean;
   /**
-   * Blockgroesse, mit der das Modul hinzugefuegt wird.
+   * Blockgroessen, in denen es das Modul gibt. Fehlt die Angabe, sind es alle.
+   *
+   * Eine Groesse ist keine Einstellung, sondern eine Aussage ueber den Inhalt:
+   * eine Wochenvorhersage braucht Platz fuer sieben Spalten, eine Uhrzeit
+   * kommt mit einem Feld aus. Was inhaltlich nicht aufgeht, soll am Handy
+   * erst gar nicht auswaehlbar sein – besser als ein Block, in dem das halbe
+   * Modul abgeschnitten ist.
+   */
+  sizes?: readonly WidgetSize[];
+  /**
+   * Blockgroesse, mit der das Modul hinzugefuegt wird. Muss in `sizes` stehen.
    *
    * Ein Vorschlag und keine Vorgabe: welche Groesse passt, weiss das Modul
    * besser als der Nutzer, aber wohin der Block gehoert, weiss nur der Nutzer.
@@ -63,7 +73,10 @@ export interface ModuleDescriptor {
   version: string;
   description?: string;
   singleton: boolean;
-  preferredSize?: WidgetSize;
+  /** Immer gefuellt und in kanonischer Reihenfolge, auch ohne Angabe im Manifest. */
+  sizes: readonly WidgetSize[];
+  /** Immer eine Groesse aus `sizes`. */
+  preferredSize: WidgetSize;
   configSchema?: JsonSchema;
   secrets: readonly ModuleSecretDeclaration[];
   /** Welche der deklarierten Geheimnisse bereits hinterlegt sind. */
@@ -96,6 +109,28 @@ export function assertValidManifest(input: unknown, source: string): asserts inp
   if (typeof m.version !== 'string' || !SEMVER_PATTERN.test(m.version)) {
     fail(`"version" fehlt oder ist kein Semver (erhalten: ${JSON.stringify(m.version)})`);
   }
+  const sizes: unknown = m.sizes;
+  if (sizes !== undefined) {
+    if (!Array.isArray(sizes) || sizes.length === 0) {
+      fail('"sizes" muss eine nicht leere Liste von Blockgroessen sein');
+    }
+    for (const size of sizes) {
+      if (!isWidgetSize(size)) {
+        fail(`unbekannte Blockgroesse "${String(size)}" (erlaubt: ${WIDGET_SIZES.join(', ')})`);
+      }
+    }
+  }
+  if (m.preferredSize !== undefined) {
+    if (!isWidgetSize(m.preferredSize)) {
+      fail(`"preferredSize" ist keine Blockgroesse (erhalten: ${JSON.stringify(m.preferredSize)})`);
+    }
+    // Ein Modul, das sich selbst in einer Groesse vorschlaegt, die es nicht
+    // anbietet, ist ein Fehler im Manifest und keine Auslegungsfrage.
+    if (Array.isArray(sizes) && !sizes.includes(m.preferredSize)) {
+      fail(`"preferredSize" (${m.preferredSize}) steht nicht in "sizes"`);
+    }
+  }
+
   const permissions: unknown = m.permissions;
   if (permissions !== undefined) {
     if (!Array.isArray(permissions)) fail('"permissions" muss eine Liste sein');

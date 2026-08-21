@@ -7,6 +7,7 @@ import {
   findFreeSpot,
   FONT_OPTIONS,
   formatScreenDuration,
+  formatWidgetSizes,
   GRID_MAX,
   GRID_MIN,
   INSET_MAX,
@@ -28,6 +29,7 @@ import {
   sizeCells,
   WIDGET_SIZE_OPTIONS,
   WIDGET_SIZE_SPECS,
+  WIDGET_SIZES,
   type FontId,
   type GridSize,
   type InsetSide,
@@ -464,6 +466,9 @@ export class MirrorRemote extends LitElement {
               <div>
                 <strong>${descriptor.name}</strong>
                 <span class="muted small">v${descriptor.version} · ${descriptor.description ?? ''}</span>
+                ${descriptor.sizes.length < WIDGET_SIZE_OPTIONS.length
+                  ? html`<span class="muted small">Groessen: ${formatWidgetSizes(descriptor.sizes)}</span>`
+                  : nothing}
                 ${descriptor.loadError
                   ? html`<span class="banner banner--error small">${descriptor.loadError}</span>`
                   : nothing}
@@ -678,6 +683,9 @@ export class MirrorRemote extends LitElement {
     config: MirrorConfig,
   ): TemplateResult {
     const envelope = this.snapshot.state[instance.id];
+    // Ein Modul ohne Descriptor ist gerade nicht geladen – dann bleibt die
+    // Auswahl stehen, wie sie ist, statt Groessen zu verbieten.
+    const sizes = descriptor?.sizes ?? WIDGET_SIZES;
 
     return html`
       <section class="card card--sheet ${instance.enabled ? '' : 'card--off'}">
@@ -706,7 +714,11 @@ export class MirrorRemote extends LitElement {
           <div class="field">
             <span class="field__label">
               Groesse
-              <span class="field__hint">Wie viele Rasterfelder der Block belegt.</span>
+              <span class="field__hint">
+                ${sizes.length < WIDGET_SIZE_OPTIONS.length
+                  ? `Dieses Modul gibt es in ${formatWidgetSizes(sizes)} – kleiner bliebe vom Inhalt nichts uebrig.`
+                  : 'Wie viele Rasterfelder der Block belegt.'}
+              </span>
             </span>
             <div class="sizes">
               ${WIDGET_SIZE_OPTIONS.map(
@@ -714,6 +726,7 @@ export class MirrorRemote extends LitElement {
                   <button
                     class=${option.id === instance.size ? 'is-active' : ''}
                     title=${`${option.name} · ${option.columns}×${option.rows}`}
+                    ?disabled=${!sizes.includes(option.id)}
                     @click=${() => this.#resize(instance, option.id)}
                   >
                     ${option.label}
@@ -805,6 +818,8 @@ export class MirrorRemote extends LitElement {
   #resize(instance: ModuleInstance, size: WidgetSize): void {
     const config = this.snapshot.config;
     if (!config || size === instance.size) return;
+    const descriptor = this.snapshot.modules.find((entry) => entry.id === instance.moduleId);
+    if (descriptor && !descriptor.sizes.includes(size)) return;
     const grid = config.display.grid;
     const occupied = config.instances
       .filter((entry) => entry.screenId === instance.screenId && entry.id !== instance.id)
