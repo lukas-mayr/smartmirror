@@ -1,12 +1,9 @@
 import { EventEmitter } from 'node:events';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import type { UpdateStatus } from '@mirror/sdk';
 import { readJson, writeJsonAtomic } from './atomic-file.js';
 import { createLogger } from './logger.js';
 import { appVersion, updateRequestFile, updateStatusFile } from './paths.js';
 
-const run = promisify(execFile);
 const log = createLogger('update');
 
 const POLL_MS = 5_000;
@@ -59,13 +56,21 @@ export class UpdateBridge extends EventEmitter {
 
   async #request(request: UpdateRequest): Promise<void> {
     await writeJsonAtomic(updateRequestFile, request);
-    // Der Timer wuerde die Anfrage ohnehin einsammeln; das hier macht den
-    // Knopf in der App unmittelbar wirksam statt erst in 15 Minuten.
-    try {
-      await run('systemctl', ['start', 'mirror-updater.service'], { timeout: 5_000 });
-    } catch {
-      log.debug('systemctl nicht verfuegbar – Updater holt die Anfrage beim naechsten Lauf ab.');
-    }
+
+    // Ausgeloest wird der Updater von mirror-updater.path, das auf genau diese
+    // Datei wartet. Frueher stand hier ein "systemctl start" – das konnte nie
+    // funktionieren: der Core laeuft unprivilegiert, und polkit beantwortet
+    // jeden Versuch mit "Interactive authentication required". Der Fehler fiel
+    // in ein leeres catch, und der Knopf in der App wirkte erst, wenn der
+    // Timer von sich aus lief: bis zu zwanzig Minuten spaeter.
+    //
+    // Die Phase hier schon zu setzen ist der Rest desselben Problems: der
+    // Updater braucht einen Moment, bis er seinen Status geschrieben hat, und
+    // #poll sieht ihn erst danach. Ohne diese Zeile bliebe der Knopf mehrere
+    // Sekunden ohne Reaktion. Bleibt der Ausloeser aus, ruecken der naechste
+    // Timer-Lauf und der naechste Poll die Phase wieder zurecht.
+    this.#status = { ...this.#status, phase: 'checking', lastError: undefined };
+    this.emit('status', this.#status);
   }
 
   async #poll(): Promise<void> {

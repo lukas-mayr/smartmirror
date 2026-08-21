@@ -18,7 +18,7 @@ Drei Prozesse, bewusst getrennt:
 |---|---|---|
 | **Core** | `mirror-core.service` | Node/Fastify. Modul-Backends, Zustand, WebSocket-Bus, Konfiguration, liefert die Handy-App aus. Läuft unprivilegiert. |
 | **Anzeige** | `mirror-shell.service` | Electron unter [`cage`](https://github.com/cage-kiosk/cage), einem Wayland-Compositor für genau ein Fenster. Kein Desktop, keine Browser-Bedienelemente. |
-| **Updater** | `mirror-updater.service` + `.timer` | Prüft GitHub Releases, verifiziert Signaturen, tauscht Symlinks, rollt bei fehlgeschlagenem Healthcheck zurück. Einziger Teil mit Root-Rechten. |
+| **Updater** | `mirror-updater.service` + `.timer` + `.path` | Prüft GitHub Releases, verifiziert Signaturen, tauscht Symlinks, rollt bei fehlgeschlagenem Healthcheck zurück. Einziger Teil mit Root-Rechten. Der Timer prüft regelmäßig, die Path-Unit startet ihn sofort, wenn die App darum bittet. |
 
 Der Updater ist ein eigener Dienst, weil er genau die Dateien ersetzt, aus
 denen der Core läuft, und ihn danach neu startet — im selben Prozess würde er
@@ -271,6 +271,14 @@ installiert dann in dieser Reihenfolge:
 
 Von Hand: `sudo systemctl start mirror-updater.service`, oder der Knopf in der
 Handy-App.
+
+Der Knopf nimmt einen Umweg: Der Core schreibt eine Anfragedatei ins
+Datenverzeichnis, und `mirror-updater.path` startet daraufhin den Updater. Den
+Dienst direkt zu starten kann der Core nicht — er läuft unprivilegiert, und
+polkit beantwortet den Versuch mit „Interactive authentication required". Ihm
+das Recht zu geben hieße, dem einzigen ans Netz gebundenen Dienst den Start des
+einzigen Dienstes mit Root-Rechten zu erlauben. Eine Datei zu schreiben, die er
+ohnehin schreibt, genügt.
 
 ### Warum eine Signatur zwingend ist
 

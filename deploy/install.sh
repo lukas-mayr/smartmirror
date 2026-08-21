@@ -433,11 +433,16 @@ systemctl enable --now avahi-daemon >/dev/null 2>&1 || true
 log "systemd-Units installieren"
 install -m 0644 "$INSTALL_ROOT/current/deploy/systemd/"*.service /etc/systemd/system/
 install -m 0644 "$INSTALL_ROOT/current/deploy/systemd/"*.timer   /etc/systemd/system/
+install -m 0644 "$INSTALL_ROOT/current/deploy/systemd/"*.path    /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable mirror-core.service mirror-shell.service mirror-updater.timer >/dev/null
+# Die .path-Unit ist der Knopf "Jetzt pruefen" in der Handy-App: der Core kann
+# den Updater nicht selbst starten (unprivilegiert), also loest die Datei aus,
+# die er schreibt. Der Timer bleibt die regelmaessige Pruefung.
+systemctl enable mirror-core.service mirror-shell.service mirror-updater.timer mirror-updater.path >/dev/null
 systemctl restart mirror-core.service
 systemctl restart mirror-shell.service
 systemctl start mirror-updater.timer
+systemctl start mirror-updater.path
 
 # --------------------------------- Abschluss ----------------------------------
 
