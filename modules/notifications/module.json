@@ -2,7 +2,7 @@
   "id": "notifications",
   "name": "Mitteilungen",
   "version": "0.1.0",
-  "description": "Ein Feed aus drei Mitteilungen: die oberste gross und mit Flaeche, die beiden darunter als Ausblick. Feste Eintraege aus den Einstellungen, alles Weitere per Kommando von aussen.",
+  "description": "Ein Feed aus Mitteilungen: die oberste gross und mit Flaeche, darunter so viele als Ausblick, wie in den Block passen. Feste Eintraege aus den Einstellungen, alles Weitere per Kommando von aussen.",
   "author": "smartmirror",
   "singleton": true,
   "sizes": ["l", "xl"],
@@ -25,6 +25,14 @@
         "minimum": 2,
         "maximum": 60,
         "default": 3.4
+      },
+      "visibleCount": {
+        "type": "integer",
+        "title": "Sichtbare Mitteilungen",
+        "description": "0 heisst: so viele, wie in den Block passen. Mehr als das wird nie gezeigt, auch wenn hier eine groessere Zahl steht.",
+        "minimum": 0,
+        "maximum": 8,
+        "default": 0
       },
       "showHeading": {
         "type": "boolean",

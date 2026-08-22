@@ -289,26 +289,58 @@ export const MOTION = {
 /* ------------------------------ Mitteilungsfeed ---------------------------- */
 
 /**
- * Der Feed zeigt genau drei Mitteilungen.
+ * Der Feed zeigt eine Mitteilung gross und darunter so viele als Ausblick, wie
+ * in den Block passen.
  *
- * Die oberste traegt die Flaeche und die volle Groesse, die beiden darunter
- * stehen frei und gedimmt als Ausblick. Damit liest man aus 3 m nur die
- * oberste Zeile und weiss trotzdem, dass mehr wartet. Ein leerer Feed heisst
- * leere Hauptzone – kein "Keine Mitteilungen".
+ * Die oberste traegt die Flaeche und die volle Groesse, die darunter stehen
+ * frei und nach unten hin blasser. Damit liest man aus 3 m nur die oberste
+ * Zeile und weiss trotzdem, dass mehr wartet. Ein leerer Feed heisst leere
+ * Hauptzone – kein "Keine Mitteilungen".
+ *
+ * Wieviele Positionen es sind, steht bewusst nicht hier: das entscheidet die
+ * Blockhoehe. Eine feste Zahl waere in einem hohen Block eine halbleere Liste
+ * und in einem flachen eine abgeschnittene. Was hier steht, sind die Masse,
+ * aus denen sich die Zahl ergibt.
  */
 export const FEED = {
-  visible: 3,
+  /** Ohne die oberste Position ist es kein Feed, sondern eine Meldung. */
+  visibleMin: 1,
+  /**
+   * Obergrenze der Positionen.
+   *
+   * Nicht, weil mehr nicht passten, sondern weil ab hier niemand mehr eine
+   * Liste liest, sondern eine Wand aus Text sieht – und die untersten Zeilen
+   * waeren so blass, dass sie ohnehin nur noch Textur sind.
+   */
+  visibleMax: 8,
   /** Wie lange, bis die Liste eine Position nachrueckt. */
   advance: 3400,
   /** Hoehe der obersten Position in Pixeln. */
   itemHeight: 232,
-  /** Hoehe der beiden darunter. */
+  /** Hoehe jeder weiteren. */
   itemHeightRest: 148,
+  /**
+   * Anteil der Blockhoehe, den eine Position hoechstens einnimmt.
+   *
+   * Dieselben Werte wie die `cqh`-Deckel im Stylesheet: in einem flachen Block
+   * gewinnt der Anteil, in einem hohen die Pixelhoehe. Sie stehen hier, weil
+   * die Anzeige mit genau dieser Rechnung ermittelt, wieviele Positionen sie
+   * besetzen darf – rechnete sie anders als das Stylesheet legt, waere die
+   * unterste Zeile mal angeschnitten und mal fehlte eine.
+   */
+  itemShare: 0.3,
+  itemShareRest: 0.19,
   gap: 32,
-  /** Schriftgroesse des Titels auf Position 1 bzw. 2 und 3. */
+  /** Schriftgroesse des Titels oben bzw. auf den Ausblick-Positionen. */
   titleSize: 72,
   titleSizeRest: 56,
-  /** Deckkraft von Position 2 und 3. */
+  /**
+   * Deckkraft der Ausblick-Positionen: die erste darunter, die unterste.
+   *
+   * Dazwischen wird verteilt. Der Verlauf ist die Rangfolge – wer nur zwei
+   * Stufen haette, muesste bei sechs Positionen vier davon gleich hell zeigen,
+   * und dann steht dort eine Liste ohne Reihenfolge.
+   */
   dim1: 0.8,
   dim2: 0.45,
 } as const;

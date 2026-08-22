@@ -2107,12 +2107,18 @@ body {
 /* ----------------------------- Mitteilungsfeed ---------------------------- */
 
 /*
- * Der Feed zeigt genau drei Mitteilungen.
+ * Der Feed zeigt eine Mitteilung gross und darunter so viele als Ausblick, wie
+ * in den Block passen.
  *
- * Die oberste traegt die Flaeche und die volle Groesse, die beiden darunter
- * stehen frei und gedimmt als Ausblick. Damit liest man aus 3 m nur die
- * oberste Zeile und weiss trotzdem, dass mehr wartet — der Rest ist kein Text,
- * den man lesen soll, sondern die Auskunft "da kommt noch was".
+ * Die oberste traegt die Flaeche und die volle Groesse, die darunter stehen
+ * frei und nach unten hin blasser. Damit liest man aus 3 m nur die oberste
+ * Zeile und weiss trotzdem, dass mehr wartet — der Rest ist kein Text, den man
+ * lesen soll, sondern die Auskunft "da kommt noch was".
+ *
+ * Wieviele Positionen es sind, rechnet die Anzeige aus der Blockhoehe aus. Das
+ * Stylesheet kennt deshalb nur zwei Rollen — die oberste und der Rest — und
+ * keine Position mit Nummer: eine Regel je Nummer ginge nur mit einer festen
+ * Zahl von Positionen, und die gibt es hier nicht mehr.
  *
  * Ein leerer Feed heisst leere Hauptzone. Kein "Keine Mitteilungen": eine
  * leere Flaeche auf einem Spiegel ist ein Spiegel, ein Satz darueber ist eine
@@ -2159,8 +2165,10 @@ body {
   flex: 1 1 auto;
   min-height: 0;
   /*
-   * Die unterste Karte faellt aus dem Bild, statt den Block aufzuziehen. Ohne
-   * das schoebe jedes Nachruecken die halbe Anzeige mit.
+   * Sicherheitsnetz: die Anzeige besetzt nur so viele Positionen, wie ganz
+   * hineinpassen — bliebe trotzdem eine uebrig, faellt sie aus dem Bild, statt
+   * den Block aufzuziehen. Ohne das schoebe ein einziger zu langer Titel die
+   * halbe Anzeige mit.
    */
   overflow: hidden;
 }
@@ -2184,7 +2192,7 @@ body {
   flex: none;
 }
 
-.feed__item--1 {
+.feed__item--lead {
   min-height: min(var(--feed-item-h), 30cqh);
   padding: 0 var(--mirror-box-pad);
   background: var(--mirror-accent);
@@ -2193,23 +2201,23 @@ body {
 }
 
 /* Dringendes bekommt Sand statt Salbei und rueckt sofort auf Position 1. */
-.feed__item--1.feed__item--urgent {
+.feed__item--lead.feed__item--urgent {
   background: var(--mirror-accent-warm);
   color: var(--mirror-on-accent-warm);
 }
 
-.feed__item--2,
-.feed__item--3 {
+/*
+ * Die Ausblick-Positionen.
+ *
+ * Die Deckkraft steht als Ausgangswert hier und wird beim Zeichnen je Position
+ * gesetzt: sie verteilt sich von --feed-dim-1 bis --feed-dim-2 auf so viele
+ * Positionen, wie gerade besetzt sind. Bei drei Eintraegen kommt derselbe
+ * Verlauf heraus wie frueher, bei sechs verteilt er sich eben auf sechs.
+ */
+.feed__item--rest {
   min-height: min(var(--feed-item-h-rest), 19cqh);
   color: var(--mirror-fg);
-}
-
-.feed__item--2 {
   opacity: var(--feed-dim-1);
-}
-
-.feed__item--3 {
-  opacity: var(--feed-dim-2);
 }
 
 .feed__label {
@@ -2223,11 +2231,11 @@ body {
   text-overflow: ellipsis;
 }
 
-.feed__item--1 .feed__label {
+.feed__item--lead .feed__label {
   color: color-mix(in srgb, var(--mirror-on-accent) 62%, transparent);
 }
 
-.feed__item--1.feed__item--urgent .feed__label {
+.feed__item--lead.feed__item--urgent .feed__label {
   color: color-mix(in srgb, var(--mirror-on-accent-warm) 62%, transparent);
 }
 
@@ -2239,12 +2247,11 @@ body {
   text-overflow: ellipsis;
 }
 
-.feed__item--1 .feed__title {
+.feed__item--lead .feed__title {
   font-size: min(9.4cqh, 6.6cqw);
 }
 
-.feed__item--2 .feed__title,
-.feed__item--3 .feed__title {
+.feed__item--rest .feed__title {
   font-size: min(7.3cqh, 5.2cqw);
 }
 
@@ -2258,11 +2265,11 @@ body {
   text-overflow: ellipsis;
 }
 
-.feed__item--1 .feed__meta {
+.feed__item--lead .feed__meta {
   color: color-mix(in srgb, var(--mirror-on-accent) 70%, transparent);
 }
 
-.feed__item--1.feed__item--urgent .feed__meta {
+.feed__item--lead.feed__item--urgent .feed__meta {
   color: color-mix(in srgb, var(--mirror-on-accent-warm) 70%, transparent);
 }
 
@@ -2270,18 +2277,18 @@ body {
  * Nachts traegt auch die oberste Position keine Flaeche mehr — dieselbe Regel
  * wie fuer jedes andere Highlight. Uebrig bleibt eine Liste in Grau.
  */
-[data-night='1'] .feed__item--1 {
+[data-night='1'] .feed__item--lead {
   background: transparent;
   color: inherit;
   padding: 0;
   animation: none;
 }
 
-[data-night='1'] .feed__item--1 .feed__label {
+[data-night='1'] .feed__item--lead .feed__label {
   color: var(--mirror-accent);
 }
 
-[data-night='1'] .feed__item--1 .feed__meta {
+[data-night='1'] .feed__item--lead .feed__meta {
   color: var(--mirror-fg-dim);
 }
 
@@ -2308,7 +2315,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .feed__item--1 {
+  .feed__item--lead {
     animation: none;
   }
 }

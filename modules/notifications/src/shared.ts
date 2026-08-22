@@ -3,11 +3,15 @@ import { FEED } from '@mirror/sdk';
 /**
  * Der Mitteilungsfeed.
  *
- * Er zeigt genau drei Eintraege: der oberste traegt die Flaeche und die volle
- * Groesse, die beiden darunter stehen frei und gedimmt als Ausblick. Damit
- * liest man aus 3 m nur die oberste Zeile und weiss trotzdem, dass mehr
- * wartet — der Rest ist kein Text, den man lesen soll, sondern die Auskunft
- * "da kommt noch was".
+ * Er zeigt eine Mitteilung gross und mit Flaeche und darunter so viele als
+ * Ausblick, wie in den Block passen. Damit liest man aus 3 m nur die oberste
+ * Zeile und weiss trotzdem, dass mehr wartet — der Rest ist kein Text, den man
+ * lesen soll, sondern die Auskunft "da kommt noch was".
+ *
+ * Wieviele Positionen es sind, entscheidet die Blockhoehe und nicht eine feste
+ * Zahl: durchgeschaltet wird ohnehin, und ob dabei drei oder sieben Eintraege
+ * gleichzeitig stehen, ist keine Frage der Gestaltung, sondern des Platzes.
+ * Eine feste Drei war in einem hohen Block eine halbleere Liste.
  *
  * Ein leerer Feed heisst leere Hauptzone. Kein "Keine Mitteilungen": eine
  * leere Flaeche auf einem Spiegel ist ein Spiegel, ein Satz darueber ist eine
@@ -29,6 +33,15 @@ export interface NotificationsConfig {
   advanceSeconds: number;
   /** Ueberschrift ueber der Liste zeigen. */
   showHeading: boolean;
+  /**
+   * Wieviele Positionen der Feed besetzt. 0 heisst: so viele wie passen.
+   *
+   * Die Voreinstellung ist die Null, weil der Platz die bessere Antwort gibt
+   * als eine Zahl, die jemand einmal eingestellt und beim naechsten Umbau der
+   * Anordnung vergessen hat. Die Einstellung gibt es trotzdem, weil "nur die
+   * naechste Sache, sonst nichts" ein legitimer Wunsch ist und kein Platzmangel.
+   */
+  visibleCount: number;
 }
 
 export interface Notification {
@@ -57,14 +70,9 @@ export interface NotificationsState {
   items: Notification[];
 }
 
-/**
- * Wieviele Mitteilungen gleichzeitig sichtbar sind.
- *
- * Aus dem Design-System und nicht als zweite Drei hier: die Zahl steht auch im
- * Stylesheet, das den drei Positionen ihre Groessen gibt, und zwei Dreien an
- * zwei Orten sind eine Dreiviertel-Aenderung, wenn jemand vier haben will.
- */
-export const VISIBLE = FEED.visible;
+/** Grenzen der sichtbaren Positionen, aus dem Design-System. */
+export const VISIBLE_MIN = FEED.visibleMin;
+export const VISIBLE_MAX = FEED.visibleMax;
 
 /** Voreingestellte Taktung in Sekunden, aus dem Design-System. */
 export const ADVANCE_SECONDS = FEED.advance / 1000;
@@ -129,7 +137,66 @@ export function activeNotifications(
 }
 
 /**
- * Die drei Positionen, so wie sie gerade besetzt sind.
+ * Wieviele Positionen in eine Liste dieser Hoehe passen.
+ *
+ * `listHeight` ist der Platz, der der Liste tatsaechlich bleibt (also ohne
+ * Ueberschrift), `blockHeight` die Hoehe des ganzen Blocks — an der haengen
+ * die `cqh`-Deckel der Positionen im Stylesheet, und deshalb muessen beide
+ * Masse herein. Gerechnet wird mit denselben Formeln wie dort: passte hier
+ * eine Position mehr als dort, waere die unterste angeschnitten.
+ *
+ * Angeschnitten wird nichts: was nicht ganz hineinpasst, wird nicht gezeigt.
+ * Eine halbe Zeile am unteren Rand liest sich als Fehler, nicht als Ausblick.
+ */
+export function fitCount(listHeight: number, blockHeight: number): number {
+  if (!Number.isFinite(listHeight) || !Number.isFinite(blockHeight)) return VISIBLE_MIN;
+
+  const lead = Math.min(FEED.itemHeight, blockHeight * FEED.itemShare);
+  const rest = Math.min(FEED.itemHeightRest, blockHeight * FEED.itemShareRest);
+  if (rest <= 0) return VISIBLE_MIN;
+
+  // Jede weitere Position kostet ihre Hoehe plus den Abstand davor.
+  const room = listHeight - lead;
+  const extra = room <= 0 ? 0 : Math.floor(room / (rest + FEED.gap));
+  return Math.max(VISIBLE_MIN, Math.min(VISIBLE_MAX, 1 + extra));
+}
+
+/**
+ * Wieviele Positionen der Feed besetzen soll.
+ *
+ * Die Einstellung gewinnt, wenn sie gesetzt ist, aber nur bis zu dem, was
+ * hineinpasst: wer acht Positionen einstellt und den Block danach auf die
+ * halbe Hoehe zieht, soll eine kuerzere Liste sehen und keine abgeschnittene.
+ */
+export function slotCount(configured: number, fits: number): number {
+  const wanted = Math.round(Number(configured));
+  if (!Number.isFinite(wanted) || wanted <= 0) return fits;
+  return Math.max(VISIBLE_MIN, Math.min(fits, wanted));
+}
+
+/**
+ * Deckkraft einer Ausblick-Position.
+ *
+ * `step` zaehlt ab 1 unterhalb der obersten, `total` ist die Zahl der
+ * Ausblick-Positionen. Die erste bekommt dim1, die letzte dim2, dazwischen
+ * wird linear verteilt — bei nur einer bleibt es bei dim1, weil sie sonst als
+ * "letzte" sofort auf den blassesten Wert fiele.
+ *
+ * Das rechnet die Anzeige und nicht das Stylesheet: eine Regel je Position
+ * ginge nur mit einer festen Zahl von Positionen, und genau die gibt es hier
+ * nicht mehr.
+ */
+export function restOpacity(step: number, total: number): number {
+  if (total <= 1) return FEED.dim1;
+  const share = Math.min(1, Math.max(0, (step - 1) / (total - 1)));
+  const value = FEED.dim1 + (FEED.dim2 - FEED.dim1) * share;
+  // Zwei Nachkommastellen: sonst aendert sich die Zahl bei jedem Zeichnen in
+  // der siebten Stelle und das Stylesheet wird ohne Grund neu gesetzt.
+  return Math.round(value * 100) / 100;
+}
+
+/**
+ * Die Positionen, so wie sie gerade besetzt sind.
  *
  * Der Rang steckt in der Position und nicht im Eintrag: ein Eintrag weiss
  * nicht, der wievielte er ist — er wird an eine Position gehaengt, und die
@@ -137,16 +204,18 @@ export function activeNotifications(
  * sich damit nur, welcher Eintrag an welcher Position haengt, und die Form der
  * Liste bleibt exakt dieselbe.
  *
- * Sind es weniger als drei, bleibt die Liste kuerzer, statt sich zu
- * wiederholen: derselbe Termin dreimal untereinander sieht nach einem Fehler
- * aus. Erst ab vier lohnt das Nachruecken ueberhaupt.
+ * Gibt es weniger Eintraege als Plaetze, bleibt die Liste kuerzer, statt sich
+ * zu wiederholen: derselbe Termin zweimal untereinander sieht nach einem
+ * Fehler aus. Erst ab einem Eintrag mehr als Plaetzen lohnt das Nachruecken
+ * ueberhaupt.
  */
 export function visibleWindow(
   items: readonly Notification[],
   offset: number,
+  slots: number,
 ): Notification[] {
-  if (items.length === 0) return [];
-  const count = Math.min(VISIBLE, items.length);
-  const start = items.length > VISIBLE ? ((offset % items.length) + items.length) % items.length : 0;
+  if (items.length === 0 || slots <= 0) return [];
+  const count = Math.min(slots, items.length);
+  const start = items.length > slots ? ((offset % items.length) + items.length) % items.length : 0;
   return Array.from({ length: count }, (_, step) => items[(start + step) % items.length] as Notification);
 }

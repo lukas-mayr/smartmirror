@@ -5,10 +5,16 @@ import { parseEntries, type Notification, type NotificationsConfig, type Notific
  * Wieviele Mitteilungen der Feed hoechstens haelt.
  *
  * Nicht, weil mehr nicht in den Speicher passten, sondern weil ein Feed, durch
- * den man zwei Minuten blaettern muesste, keiner mehr ist. Wer zwanzig
- * Mitteilungen hat, hat kein Anzeigeproblem.
+ * den man zwei Minuten blaettern muesste, keiner mehr ist. Der Deckel liegt
+ * hoeher als frueher, weil die Anzeige inzwischen so viele Positionen besetzt,
+ * wie in den Block passen: in einem hohen Block stehen sechs Eintraege
+ * gleichzeitig da, und eine Runde durch vierzig ist dann kein Blaettern mehr,
+ * sondern ein knappes Dutzend Takte.
+ *
+ * Der aelteste faellt heraus und nicht der neueste: was zuletzt hereinkam, ist
+ * der Grund, warum ueberhaupt jemand hinsieht.
  */
-const MAX_ITEMS = 12;
+const MAX_ITEMS = 40;
 
 /**
  * Wie oft abgelaufene Mitteilungen aufgeraeumt werden.

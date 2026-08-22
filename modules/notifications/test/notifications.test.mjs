@@ -2,9 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   activeNotifications,
+  fitCount,
   parseEntries,
   parseEntry,
-  VISIBLE,
+  restOpacity,
+  slotCount,
+  VISIBLE_MAX,
+  VISIBLE_MIN,
   visibleWindow,
 } from '../dist/shared.js';
 
@@ -96,14 +100,15 @@ test('behandelt einen unlesbaren Zeitstempel als "gilt weiter"', () => {
 
 /* ------------------------------- Positionen ------------------------------- */
 
-test('besetzt hoechstens drei Positionen', () => {
+test('besetzt so viele Positionen, wie es Plaetze gibt', () => {
   const items = ['a', 'b', 'c', 'd', 'e'].map((id) => item(id));
-  assert.equal(visibleWindow(items, 0).length, VISIBLE);
+  assert.equal(visibleWindow(items, 0, 3).length, 3);
+  assert.equal(visibleWindow(items, 0, 5).length, 5);
 });
 
 test('rueckt eine Position weiter und laeuft dabei im Kreis', () => {
   const items = ['a', 'b', 'c', 'd'].map((id) => item(id));
-  const ids = (offset) => visibleWindow(items, offset).map((entry) => entry.id);
+  const ids = (offset) => visibleWindow(items, offset, 3).map((entry) => entry.id);
   assert.deepEqual(ids(0), ['a', 'b', 'c']);
   assert.deepEqual(ids(1), ['b', 'c', 'd']);
   assert.deepEqual(ids(3), ['d', 'a', 'b']);
@@ -112,24 +117,84 @@ test('rueckt eine Position weiter und laeuft dabei im Kreis', () => {
 });
 
 test('wiederholt nichts, wenn es weniger gibt als Plaetze', () => {
-  // Derselbe Termin dreimal untereinander sieht nach einem Fehler aus.
+  // Derselbe Termin zweimal untereinander sieht nach einem Fehler aus.
   const items = [item('a'), item('b')];
   assert.deepEqual(
-    visibleWindow(items, 7).map((entry) => entry.id),
+    visibleWindow(items, 7, 5).map((entry) => entry.id),
     ['a', 'b'],
   );
 });
 
-test('bleibt bei genau drei Eintraegen stehen', () => {
-  // Nachruecken auf drei Plaetzen bei drei Eintraegen waere Bewegung ohne
+test('bleibt stehen, wenn genau alle Eintraege Platz haben', () => {
+  // Nachruecken auf vier Plaetzen bei vier Eintraegen waere Bewegung ohne
   // Inhalt – dieselbe Liste, nur verschoben.
-  const items = ['a', 'b', 'c'].map((id) => item(id));
+  const items = ['a', 'b', 'c', 'd'].map((id) => item(id));
   assert.deepEqual(
-    visibleWindow(items, 2).map((entry) => entry.id),
-    ['a', 'b', 'c'],
+    visibleWindow(items, 2, 4).map((entry) => entry.id),
+    ['a', 'b', 'c', 'd'],
   );
 });
 
 test('gibt fuer eine leere Liste nichts zurueck', () => {
-  assert.deepEqual(visibleWindow([], 0), []);
+  assert.deepEqual(visibleWindow([], 0, 3), []);
+  assert.deepEqual(visibleWindow([item('a')], 0, 0), []);
+});
+
+/* --------------------------------- Plaetze -------------------------------- */
+
+test('fuellt einen hohen Block mit mehr Positionen als einen flachen', () => {
+  // Dieselbe Rechnung wie im Stylesheet: oben 232 px, darunter je 148 px plus
+  // 32 px Abstand.
+  assert.equal(fitCount(726, 800), 3);
+  assert.equal(fitCount(1400, 1400), 7);
+  assert.ok(fitCount(400, 400) < fitCount(900, 900));
+});
+
+test('gibt auch ohne brauchbares Mass noch die oberste Position her', () => {
+  // Lieber eine Mitteilung zu gross als ein Block, der nichts zeigt: gemessen
+  // wird vor dem ersten Zeichnen, und da steht die Liste noch auf null.
+  assert.equal(fitCount(0, 0), VISIBLE_MIN);
+  assert.equal(fitCount(-50, 800), VISIBLE_MIN);
+  assert.equal(fitCount(Number.NaN, 800), VISIBLE_MIN);
+});
+
+test('schneidet keine Position an', () => {
+  // Eine halbe Zeile am unteren Rand liest sich als Fehler und nicht als
+  // Ausblick: was nicht ganz hineinpasst, wird nicht gezeigt.
+  const block = 1000;
+  const lead = Math.min(232, block * 0.3);
+  const row = Math.min(148, block * 0.19);
+  const list = lead + 2 * (row + 32) + row / 2;
+  assert.equal(fitCount(list, block), 3);
+});
+
+test('haelt sich an die Obergrenze aus dem Design-System', () => {
+  // Ab hier liest niemand mehr eine Liste, sondern sieht eine Wand aus Text.
+  assert.equal(fitCount(10_000, 10_000), VISIBLE_MAX);
+});
+
+test('nimmt die eingestellte Zahl, aber nur soweit sie hineinpasst', () => {
+  assert.equal(slotCount(0, 4), 4);
+  assert.equal(slotCount(2, 4), 2);
+  assert.equal(slotCount(9, 4), 4);
+  assert.equal(slotCount(-3, 4), 4);
+});
+
+/* -------------------------------- Deckkraft ------------------------------- */
+
+test('verteilt den Verlauf auf die Positionen, die es gerade gibt', () => {
+  // Bei zwei Ausblick-Positionen dieselben Werte wie frueher, bei mehr
+  // dieselben Enden und Stufen dazwischen.
+  assert.equal(restOpacity(1, 2), 0.8);
+  assert.equal(restOpacity(2, 2), 0.45);
+  const five = [1, 2, 3, 4, 5].map((step) => restOpacity(step, 5));
+  assert.equal(five[0], 0.8);
+  assert.equal(five.at(-1), 0.45);
+  for (let i = 1; i < five.length; i += 1) assert.ok(five[i] < five[i - 1]);
+});
+
+test('laesst eine einzelne Ausblick-Position hell', () => {
+  // Sie ist die erste darunter und nicht die letzte – als "letzte" fiele sie
+  // sofort auf den blassesten Wert.
+  assert.equal(restOpacity(1, 1), 0.8);
 });
