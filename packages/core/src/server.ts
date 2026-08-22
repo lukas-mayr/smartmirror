@@ -11,9 +11,13 @@ import {
   isClientMessage,
   nearestWidgetSize,
   nextScreenId,
+  normalizeScreenLayout,
   normalizeWidgetSize,
+  normalizeZone,
   rectFor,
   withSetupStep,
+  ZONE_CAPACITY,
+  ZONE_SPECS,
   type ClientMessage,
   type ClientType,
   type ErrorCode,
@@ -22,6 +26,7 @@ import {
   type PairingState,
   type ServerMessage,
   type Viewport,
+  type Zone,
 } from '@mirror/sdk';
 import type { WebSocket } from 'ws';
 import type { AuthStore } from './auth.js';
@@ -566,6 +571,7 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
             }
             if (Number.isFinite(update.x)) instance.x = Number(update.x);
             if (Number.isFinite(update.y)) instance.y = Number(update.y);
+            if (update.zone !== undefined) instance.zone = normalizeZone(update.zone, instance.zone);
             if (update.size !== undefined) {
               // Nicht jedes Modul gibt es in jeder Groesse. Eine Groesse, die
               // es nicht anbietet, wird auf die naechstliegende gezogen statt
@@ -592,14 +598,45 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
             normalizeWidgetSize(message.size, descriptor.preferredSize),
             descriptor.sizes,
           );
-          const occupied = draft.instances
-            .filter((entry) => entry.screenId === screen.id)
-            .map((entry) => rectFor(entry, draft.display.grid));
+          const siblings = draft.instances.filter((entry) => entry.screenId === screen.id);
+          const occupied = siblings.map((entry) => rectFor(entry, draft.display.grid));
           const preferred =
             Number.isFinite(message.x) && Number.isFinite(message.y)
               ? { x: Number(message.x), y: Number(message.y) }
               : undefined;
           const spot = findFreeSpot(occupied, draft.display.grid, size, preferred);
+
+          /**
+           * Ist der Screen eine Szene, entscheidet das Band ueber den Platz
+           * und nicht das Raster.
+           *
+           * Der Rasterplatz wird trotzdem gesucht und mitgeschrieben: ein
+           * Screen laesst sich zwischen beiden Anordnungen umschalten, und ein
+           * Block ohne Koordinaten laege danach auf 0,0 – also unter der Uhr.
+           * Findet sich keiner, ist das hier kein Grund zur Absage.
+           */
+          if (screen.layout === 'zones') {
+            const zone = normalizeZone(message.zone, defaultZoneFor(descriptor.id));
+            const taken = siblings.filter((entry) => entry.zone === zone).length;
+            if (taken >= ZONE_CAPACITY[zone]) {
+              throw new Error(
+                `Im Band "${ZONE_SPECS[zone].name}" ist kein Platz mehr – dort passen ${ZONE_CAPACITY[zone]} Bloecke.`,
+              );
+            }
+            draft.instances.push({
+              id: nextInstanceId(draft.instances.map((entry) => entry.id), descriptor.id),
+              moduleId: descriptor.id,
+              screenId: screen.id,
+              x: spot?.x ?? 0,
+              y: spot?.y ?? 0,
+              zone,
+              size,
+              enabled: true,
+              config: {},
+            });
+            return;
+          }
+
           // Lieber eine klare Absage als ein Block, der unter einem anderen
           // liegt: auf dem Spiegel waere davon nichts zu sehen.
           if (!spot) throw new Error(`Auf "${screen.name}" ist kein Platz frei fuer diese Groesse`);
@@ -610,6 +647,7 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
             screenId: screen.id,
             x: spot.x,
             y: spot.y,
+            zone: normalizeZone(message.zone, defaultZoneFor(descriptor.id)),
             size,
             enabled: true,
             config: {},
@@ -658,6 +696,9 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
           if (name) screen.name = name.slice(0, 40);
           if (message.patch.durationSeconds !== undefined) {
             screen.durationSeconds = clampScreenDuration(message.patch.durationSeconds);
+          }
+          if (message.patch.layout !== undefined) {
+            screen.layout = normalizeScreenLayout(message.patch.layout, screen.layout);
           }
         });
         return;
@@ -749,4 +790,18 @@ function nextInstanceId(existing: string[], moduleId: string): string {
     if (!existing.includes(candidate)) return candidate;
   }
   throw new Error('Keine freie Instanz-ID gefunden');
+}
+
+/**
+ * In welches Band ein Modul kommt, wenn niemand etwas anderes sagt.
+ *
+ * Die Uhr in den Kopf: sie sitzt in jeder Szene links oben, und wer sie
+ * hinzufuegt, meint genau diesen Platz. Was laeuft, ins Fussband – das Band
+ * ist fuer breite, flache Elemente da, und "Laeuft gerade" ist die Vorlage
+ * dafuer. Alles andere traegt die Aussage der Szene und gehoert in die Mitte.
+ */
+function defaultZoneFor(moduleId: string): Zone {
+  if (moduleId === 'clock') return 'head';
+  if (moduleId === 'spotify') return 'foot';
+  return 'main';
 }

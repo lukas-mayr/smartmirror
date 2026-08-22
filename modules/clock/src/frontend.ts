@@ -24,9 +24,16 @@ export default defineFrontend<Record<string, never>, ClockConfig>({
       }).format(now);
 
       /**
-       * Der Wochentag steht ueber der Uhrzeit, das Datum darunter – dieselben
-       * drei Ebenen wie im Spotify-Block. Den Wochentag gibt es nur im vollen
-       * Datumsformat, weil ihn die beiden kuerzeren auch bisher nicht nennen.
+       * Wochentag und Datum stehen zusammen in *einer* Zeile unter der Uhrzeit.
+       *
+       * Bis 0.8 war der Wochentag eine Beschriftung ueber der Zahl und das
+       * Datum eine Zeile darunter – drei Ebenen fuer zwei Angaben, die
+       * dasselbe beantworten ("welcher Tag ist heute?"). Zusammengelegt bleibt
+       * der Sprung von der Uhrzeit auf die Zeile darunter der einzige, den das
+       * Auge machen muss, und genau davon lebt die Hierarchie.
+       *
+       * Den Wochentag gibt es nur im vollen Datumsformat, weil ihn die beiden
+       * kuerzeren auch bisher nicht nennen.
        */
       const weekday =
         config.showDate && config.dateStyle === 'full'
@@ -62,12 +69,16 @@ export default defineFrontend<Record<string, never>, ClockConfig>({
        * und waere in allen anderen zu klein. Mit der Zeichenzahl rechnet das
        * Stylesheet die Groesse selbst aus.
        */
+      // "Mittwoch · 12. Maerz". Der Mittelpunkt statt eines Kommas: er trennt
+      // zwei gleichrangige Angaben, ein Komma ordnete die zweite der ersten
+      // unter.
+      const label = [weekday, date].filter(Boolean).join(' · ');
+
       render(
         html`
           <div class="clock" style=${`--clock-chars:${time.length}`}>
-            ${weekday ? html`<div class="clock__weekday">${weekday}</div>` : nothing}
             <div class="clock__time">${time}</div>
-            ${date ? html`<div class="clock__date">${date}</div>` : nothing}
+            ${label ? html`<div class="clock__label">${label}</div>` : nothing}
           </div>
         `,
         host,

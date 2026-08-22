@@ -22,6 +22,20 @@ export interface GridSize {
  */
 export const DEFAULT_GRID: GridSize = { columns: 6, rows: 4 };
 
+/**
+ * Hochkant aufgehaengt: vier Spalten, zehn Zeilen.
+ *
+ * Nicht das gedrehte Querformat (das waere 4 x 6), sondern das Raster aus dem
+ * Design-System – die Zelle ist dort bewusst quer (224 x 148, also 3:2) statt
+ * quadratisch. Eine Box traegt eine Beschriftung und darunter einen grossen
+ * Wert; dafuer ist Breite mehr wert als Hoehe. Zehn Zeilen klingen nach viel,
+ * sind aber die Voraussetzung dafuer, dass hoechstens sechs davon belegt sein
+ * duerfen: die leeren Zeilen gruppieren die Boecke.
+ *
+ * Die zugehoerigen Masse in Pixeln stehen in MIRROR_RASTER (design.ts).
+ */
+export const PORTRAIT_GRID: GridSize = { columns: 4, rows: 10 };
+
 /** Unter zwei Spalten ist es kein Raster mehr, ueber zwoelf keine Flaeche fuer Inhalt. */
 export const GRID_MIN = 2;
 export const GRID_MAX = 12;
@@ -43,6 +57,30 @@ export function normalizeGrid(value: unknown, fallback: GridSize = DEFAULT_GRID)
 
 export function gridEqual(a: GridSize, b: GridSize): boolean {
   return a.columns === b.columns && a.rows === b.rows;
+}
+
+/**
+ * Das Raster, das zur Aufhaengung passt.
+ *
+ * Quer bleibt es bei sechs mal vier, hochkant gilt das Raster des
+ * Design-Systems. Die Drehung kommt als Zahl herein und nicht als `Rotation`,
+ * damit dieses Modul nichts importieren muss – gebraucht wird nur, ob der
+ * Bildschirm steht oder liegt.
+ */
+export function defaultGridForRotation(rotation: number): GridSize {
+  return rotation % 180 === 0 ? { ...DEFAULT_GRID } : { ...PORTRAIT_GRID };
+}
+
+/**
+ * Ist das Raster noch die Voreinstellung fuer *irgendeine* Aufhaengung?
+ *
+ * Gebraucht beim Drehen: wer sein Raster von Hand eingestellt hat, soll es
+ * behalten. Wer es nie angefasst hat, bekommt beim Wechsel von quer auf
+ * hochkant das passende – sonst stuenden auf einem stehenden Bildschirm
+ * liegende Zellen.
+ */
+export function isDefaultGrid(grid: GridSize): boolean {
+  return gridEqual(grid, DEFAULT_GRID) || gridEqual(grid, PORTRAIT_GRID);
 }
 
 /* ------------------------------- Blockgroessen ------------------------------ */

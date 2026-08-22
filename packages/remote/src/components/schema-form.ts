@@ -100,6 +100,25 @@ export class SchemaForm extends LitElement {
       `;
     }
 
+    /*
+     * Mehrere Zeilen brauchen ein mehrzeiliges Feld. In einer einzeiligen
+     * Eingabe tippt man ab dem zweiten Satz blind, und genau das ist die
+     * Form, in der Mitteilungen eingetragen werden.
+     */
+    if (schema.format === 'textarea') {
+      return html`
+        <label class="field">
+          <span class="field__label">${label}${hint}</span>
+          <textarea
+            rows="4"
+            .value=${String(current ?? '')}
+            maxlength=${schema.maxLength ?? nothing}
+            @change=${(event: Event) => this.#emit(key, (event.target as HTMLTextAreaElement).value)}
+          ></textarea>
+        </label>
+      `;
+    }
+
     return html`
       <label class="field">
         <span class="field__label">${label}${hint}</span>

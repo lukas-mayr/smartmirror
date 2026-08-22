@@ -71,8 +71,11 @@ test('macht aus Zonen Rasterplaetze', () => {
   assert.deepEqual({ x: clock.x, y: clock.y }, { x: 2, y: 0 });
   assert.deepEqual({ x: weather.x, y: weather.y }, { x: 4, y: 0 });
   assert.equal(clock.screenId, config.screens[0].id);
-  assert.equal(clock.zone, undefined);
   assert.equal(clock.order, undefined);
+  // Die alte Zonen-Zeichenkette ist weg; `zone` heisst ab Version 5 das Band
+  // der Szene und ist etwas anderes. Die Uhr landet dort immer im Kopf.
+  assert.equal(clock.zone, 'head');
+  assert.equal(weather.zone, 'head');
 });
 
 test('stapelt zwei Module aus derselben Zone untereinander', () => {
@@ -116,7 +119,9 @@ test('laesst schon vorhandene Rasterplaetze stehen', () => {
     },
     silent,
   );
-  assert.deepEqual(config.screens, [{ id: 'screen-2', name: 'Abends', durationSeconds: 45 }]);
+  assert.deepEqual(config.screens, [
+    { id: 'screen-2', name: 'Abends', durationSeconds: 45, layout: 'grid' },
+  ]);
   assert.deepEqual(
     { x: config.instances[0].x, y: config.instances[0].y, size: config.instances[0].size },
     { x: 1, y: 2, size: 'xl' },
@@ -128,4 +133,52 @@ test('faehrt mit einer zu neuen Config unveraendert weiter', () => {
   const { config, changed } = migrateToLatest(input, silent);
   assert.equal(changed, false);
   assert.equal(config, input);
+});
+
+test('ergaenzt Anordnungsart, Band und Nachtabsenkung', () => {
+  const { config } = migrateToLatest(
+    {
+      schemaVersion: 4,
+      display: { grid: { columns: 4, rows: 10 } },
+      screens: [{ id: 'screen-1', name: 'Screen 1', durationSeconds: 20 }],
+      instances: [
+        { id: 'clock-1', moduleId: 'clock', screenId: 'screen-1', x: 0, y: 4, size: 'l' },
+        { id: 'weather-1', moduleId: 'weather', screenId: 'screen-1', x: 0, y: 4, size: 'l' },
+        { id: 'spotify-1', moduleId: 'spotify', screenId: 'screen-1', x: 0, y: 8, size: 'xl' },
+        { id: 'bus-1', moduleId: 'bus', screenId: 'screen-1', x: 3, y: 0, size: 's' },
+      ],
+    },
+    silent,
+  );
+
+  // Bestehende Screens bleiben im freien Raster – ein Update ordnet die Wand
+  // nicht ungefragt neu an.
+  assert.equal(config.screens[0].layout, 'grid');
+
+  const zone = (id) => config.instances.find((entry) => entry.id === id).zone;
+  // Die Uhr gehoert in den Kopf, egal wo sie im Raster lag.
+  assert.equal(zone('clock-1'), 'head');
+  // Sonst entscheidet die Zeile: oberstes Fuenftel Kopf, unterstes Fussband.
+  assert.equal(zone('bus-1'), 'head');
+  assert.equal(zone('weather-1'), 'main');
+  assert.equal(zone('spotify-1'), 'foot');
+
+  assert.deepEqual(config.display.nightMode, { enabled: true, from: '22:30', to: '06:00' });
+});
+
+test('laesst eine schon gesetzte Anordnung und ein gesetztes Band stehen', () => {
+  // Nach einem zurueckgerollten Update steht die Versionsnummer wieder auf 4,
+  // die neuen Felder aber schon in der Datei.
+  const { config } = migrateToLatest(
+    {
+      schemaVersion: 4,
+      display: { nightMode: { enabled: false, from: '23:00', to: '05:30' } },
+      screens: [{ id: 'screen-1', name: 'Screen 1', durationSeconds: 20, layout: 'zones' }],
+      instances: [{ id: 'clock-1', moduleId: 'clock', screenId: 'screen-1', x: 0, y: 0, zone: 'foot' }],
+    },
+    silent,
+  );
+  assert.equal(config.screens[0].layout, 'zones');
+  assert.equal(config.instances[0].zone, 'foot');
+  assert.deepEqual(config.display.nightMode, { enabled: false, from: '23:00', to: '05:30' });
 });

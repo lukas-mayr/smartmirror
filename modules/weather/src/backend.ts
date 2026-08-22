@@ -1,5 +1,5 @@
 import { defineBackend } from '@mirror/sdk';
-import type { ForecastDay, WeatherConfig, WeatherState } from './shared.js';
+import type { ForecastDay, HourlyPoint, WeatherConfig, WeatherState } from './shared.js';
 
 interface GeocodeResponse {
   results?: { name: string; country_code?: string; admin1?: string; latitude: number; longitude: number }[];
@@ -18,6 +18,10 @@ interface ForecastResponse {
     temperature_2m_min: number[];
     temperature_2m_max: number[];
     weather_code: number[];
+  };
+  hourly?: {
+    time: string[];
+    temperature_2m: number[];
   };
   current_units: { temperature_2m: string; wind_speed_10m: string };
 }
@@ -67,10 +71,32 @@ export default defineBackend<WeatherConfig, WeatherState>({
         // Open-Meteo zaehlt den heutigen Tag mit; wir wollen die naechsten N.
         url.searchParams.set('forecast_days', String(Math.min(ctx.config.forecastDays + 1, 16)));
       }
+      // Der Tagesverlauf nur, wenn er auch gezeigt wird: er verdoppelt die
+      // Antwort, und der Spiegel fragt alle 15 Minuten.
+      if (ctx.config.showHourly) url.searchParams.set('hourly', 'temperature_2m');
 
       const response = await ctx.fetch(url.toString());
       if (!response.ok) throw new Error(`Wetterabfrage fehlgeschlagen (HTTP ${response.status})`);
       const body = (await response.json()) as ForecastResponse;
+
+      /**
+       * Nur der heutige Tag.
+       *
+       * Open-Meteo liefert die Stunden aller angefragten Tage am Stueck;
+       * "Tagesverlauf" meint aber den Verlauf von heute. Verglichen wird ueber
+       * das Datum im Zeitstempel, weil die Antwort schon in der Zeitzone des
+       * Spiegels kommt – die erste Stunde ist also dessen Mitternacht.
+       */
+      const hourly: HourlyPoint[] = [];
+      if (body.hourly) {
+        const today = (body.hourly.time[0] ?? '').slice(0, 10);
+        body.hourly.time.forEach((stamp, index) => {
+          if (!stamp.startsWith(today)) return;
+          const value = body.hourly?.temperature_2m[index];
+          if (typeof value !== 'number') return;
+          hourly.push({ hour: stamp.slice(11, 13), temperature: Math.round(value) });
+        });
+      }
 
       const forecast: ForecastDay[] = [];
       if (body.daily) {
@@ -95,6 +121,7 @@ export default defineBackend<WeatherConfig, WeatherState>({
           isDay: body.current.is_day === 1,
         },
         forecast,
+        hourly,
         temperatureUnit: body.current_units.temperature_2m,
         windUnit: body.current_units.wind_speed_10m,
         fetchedAt: new Date().toISOString(),

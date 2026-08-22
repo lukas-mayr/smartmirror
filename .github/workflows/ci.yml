@@ -32,6 +32,8 @@ jobs:
           npx tsc --noEmit -p packages/icons
           npx tsc --noEmit -p modules/clock
           npx tsc --noEmit -p modules/weather
+          npx tsc --noEmit -p modules/spotify
+          npx tsc --noEmit -p modules/notifications
 
       - name: Tests
         run: npm test

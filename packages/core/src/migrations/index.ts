@@ -4,12 +4,16 @@ import {
   DEFAULT_GRID,
   findFreeSpot,
   normalizeInsets,
+  normalizeNightMode,
   normalizeRotation,
+  normalizeScreenLayout,
+  normalizeZone,
   rectFor,
   sizeCells,
   type GridRect,
   type GridSize,
   type WidgetSize,
+  type Zone,
 } from '@mirror/sdk';
 
 /**
@@ -105,6 +109,49 @@ export const migrations: readonly Migration[] = [
         });
 
       return { ...config, screens, instances, display: { ...display, grid } };
+    },
+  },
+  {
+    from: 4,
+    describe: 'Design-System: Anordnungsart je Screen, Band je Block, Nachtabsenkung',
+    migrate: (config) => {
+      const display = (config.display ?? {}) as Record<string, unknown>;
+
+      // Bestehende Screens bleiben im freien Raster. Die Szene ist das
+      // ausdrucksstaerkere Layout, aber sie ordnet die Wand neu an – das darf
+      // ein Update nicht ungefragt tun. Wer sie will, schaltet sie am Handy um.
+      const screens = (Array.isArray(config.screens) ? config.screens : []).map((entry) => {
+        const screen = (typeof entry === 'object' && entry !== null ? entry : {}) as Record<string, unknown>;
+        return { ...screen, layout: normalizeScreenLayout(screen.layout) };
+      });
+
+      /**
+       * Ein Band fuer jeden Block, damit das Umschalten auf die Szene nicht in
+       * einem Stapel in der Hauptzone endet.
+       *
+       * Abgeleitet aus dem Rasterplatz, weil der schon eine Aussage enthaelt:
+       * das obere Fuenftel ist der Kopf, das untere das Fussband, dazwischen
+       * liegt die Hauptzone. Die Uhr landet unabhaengig davon im Kopf – sie
+       * gehoert dort hin, und wer sie unten stehen hatte, hat sie dort nicht
+       * gesucht, sondern nur Platz gehabt.
+       */
+      const rows = Math.max(1, Number((display.grid as GridSize | undefined)?.rows ?? DEFAULT_GRID.rows));
+      const instances = (Array.isArray(config.instances) ? config.instances : []).map((entry) => {
+        const instance = (typeof entry === 'object' && entry !== null ? entry : {}) as Record<string, unknown>;
+        if (instance.zone !== undefined) return { ...instance, zone: normalizeZone(instance.zone) };
+        if (instance.moduleId === 'clock') return { ...instance, zone: 'head' };
+        const y = Number(instance.y);
+        const share = Number.isFinite(y) ? y / rows : 0.5;
+        const zone: Zone = share < 0.2 ? 'head' : share >= 0.8 ? 'foot' : 'main';
+        return { ...instance, zone };
+      });
+
+      return {
+        ...config,
+        screens,
+        instances,
+        display: { ...display, nightMode: normalizeNightMode(display.nightMode) },
+      };
     },
   },
 ];

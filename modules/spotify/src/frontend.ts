@@ -131,7 +131,7 @@ export default defineFrontend<SpotifyState, SpotifyConfig>({
         current.durationMs
           ? html`
               <div class="spotify__progress">
-                <div class="spotify__bar"><i style=${`width:${(fraction * 100).toFixed(2)}%;background:${accent}`}></i></div>
+                <div class="progress spotify__bar"><i style=${`width:${(fraction * 100).toFixed(2)}%;background:${accent}`}></i></div>
                 <div class="spotify__times"><span>${formatTime(elapsed)}</span><span>${formatTime(current.durationMs)}</span></div>
               </div>
             `
@@ -181,9 +181,25 @@ export default defineFrontend<SpotifyState, SpotifyConfig>({
         `;
       }
 
+      /*
+       * Die deckende Flaeche ist eine Einstellung und keine Automatik: das
+       * Design-System erlaubt genau eine pro Anordnung, und welcher Block sie
+       * bekommt, kann nur entscheiden, wer die Anordnung kennt.
+       *
+       * Musik traegt sie in Sand und nicht in Salbei — sie ist das Highlight
+       * des Abends, und Salbei ist ueber den ganzen Tag hinweg der Ton der
+       * Normalwerte. Pausiert wird nichts hervorgehoben: eine Flaeche fuer
+       * einen Titel, der gerade nicht laeuft, behauptet mehr als da ist.
+       */
+      const solid = config.highlight && current.playing;
+
       render(
         html`
-          <div class="spotify spotify--${size} ${current.playing ? '' : 'spotify--paused'}">
+          <div
+            class="spotify spotify--${size} ${current.playing ? '' : 'spotify--paused'} ${solid
+              ? 'box box--solid-warm'
+              : ''}"
+          >
             ${body}
             ${error ? html`<div class="spotify__hint">${error}</div>` : nothing}
           </div>

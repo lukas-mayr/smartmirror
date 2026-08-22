@@ -1,7 +1,7 @@
 {
   "id": "spotify",
   "name": "Spotify",
-  "version": "0.2.0",
+  "version": "0.4.0",
   "description": "Zeigt, was gerade laeuft – mit Cover, fuer bis zu fuenf Konten abwechselnd. Braucht eine eigene Spotify-App und je Konto eine einmalige Anmeldung. S zeigt nur das Cover, M Titel und Interpret, L den Fortschritt, XL alles in voller Breite.",
   "author": "smartmirror",
   "singleton": true,
@@ -85,6 +85,12 @@
         "minimum": 5,
         "maximum": 60,
         "default": 10
+      },
+      "highlight": {
+        "type": "boolean",
+        "title": "Als Highlight zeigen",
+        "description": "Der Block traegt die eine deckende Flaeche der Anordnung, in Sand. Hoechstens ein Block pro Screen – zwei summieren sich hinter dem Glas zum Leuchtfeld.",
+        "default": false
       }
     }
   }

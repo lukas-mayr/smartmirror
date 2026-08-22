@@ -4,12 +4,14 @@ import {
   adjustInset,
   clampScreenDuration,
   createDefaultInsets,
+  defaultGridForRotation,
   findFreeSpot,
   FONT_OPTIONS,
   formatScreenDuration,
   formatWidgetSizes,
   GRID_MAX,
   GRID_MIN,
+  gridEqual,
   INSET_MAX,
   INSET_MIN,
   INSET_SIDE_OPTIONS,
@@ -23,6 +25,7 @@ import {
   SCREEN_DURATION_MAX,
   SCREEN_DURATION_MIN,
   SCREEN_DURATION_STEP,
+  SCREEN_LAYOUT_OPTIONS,
   SETUP_FLOW_STEPS,
   SETUP_STEP_TITLES,
   setupStepNumber,
@@ -30,6 +33,9 @@ import {
   WIDGET_SIZE_OPTIONS,
   WIDGET_SIZE_SPECS,
   WIDGET_SIZES,
+  ZONE_CAPACITY,
+  ZONE_OPTIONS,
+  ZONE_SPECS,
   type FontId,
   type GridSize,
   type InsetSide,
@@ -38,6 +44,7 @@ import {
   type ModuleDescriptor,
   type ModuleInstance,
   type PairedDevice,
+  type Zone,
   type ScreenInsets,
   type SetupStep,
   type WidgetSize,
@@ -57,6 +64,30 @@ const FALLBACK_ASPECT = 16 / 9;
  * Antippen. Darunter waere jeder Fingerwackler ein verschobener Block.
  */
 const DRAG_THRESHOLD = 6;
+
+/**
+ * Eine Bestaetigung am unteren Rand.
+ *
+ * `action` ist optional, weil nicht jede Aenderung eine sinnvolle Ruecknahme
+ * hat: eine Groesse laesst sich zurueckstellen, ein abgeschickter Neustart
+ * nicht. Wo es keine gibt, steht der Toast trotzdem – "getan" ist auch ohne
+ * Ruecknahme eine Auskunft.
+ */
+interface Toast {
+  id: number;
+  text: string;
+  tone: 'ok' | 'warn' | 'error';
+  action?: { label: string; run: () => void };
+}
+
+/**
+ * Wie lange ein Toast steht.
+ *
+ * Lang genug, um eine Aenderung zurueckzunehmen, die man versehentlich
+ * gemacht hat – und kurz genug, dass er nicht die Liste verdeckt, an der man
+ * gerade arbeitet.
+ */
+const TOAST_MS = 6_000;
 
 interface DragState {
   id: string;
@@ -115,6 +146,7 @@ export class MirrorRemote extends LitElement {
     drag: { state: true },
     pendingDelete: { state: true },
     notice: { state: true },
+    toasts: { state: true },
     code: { state: true },
   };
 
@@ -129,6 +161,15 @@ export class MirrorRemote extends LitElement {
   declare pendingDelete: string | null;
   /** Hinweis, der nicht vom Spiegel kommt, sondern hier entsteht. */
   declare notice: string | null;
+  /**
+   * Bestaetigungen am unteren Rand.
+   *
+   * Jede Aenderung geht sofort an den Spiegel – es gibt kein "Speichern", und
+   * damit auch keinen Moment, in dem man sie noch zuruecknehmen koennte. Der
+   * Toast ist dieser Moment: er sagt, was passiert ist, und bietet an, es
+   * rueckgaengig zu machen, solange er steht.
+   */
+  declare toasts: Toast[];
   declare code: string;
 
   constructor() {
@@ -140,6 +181,7 @@ export class MirrorRemote extends LitElement {
     this.drag = null;
     this.pendingDelete = null;
     this.notice = null;
+    this.toasts = [];
     this.code = '';
   }
 
@@ -158,8 +200,71 @@ export class MirrorRemote extends LitElement {
   }
 
   #onChange = (): void => {
+    const before = this.snapshot;
     this.snapshot = store.value;
+
+    /*
+     * Der Verbindungsverlust ist die eine Meldung, die von selbst kommt.
+     *
+     * Als Toast und nicht als Banner: ein Banner oben faellt beim Arbeiten an
+     * einer Liste nicht auf, ein Toast unten steht dort, wo der Daumen ohnehin
+     * ist. Nur beim Uebergang, nicht bei jedem Zustandswechsel – sonst
+     * stapelten sich waehrend eines Neustarts ein Dutzend davon.
+     */
+    if (before.status !== 'offline' && this.snapshot.status === 'offline') {
+      this.#toast('Spiegel nicht erreichbar', 'warn', {
+        label: 'Erneut',
+        run: () => store.connect(),
+      });
+    }
   };
+
+  /**
+   * Zeigt eine Bestaetigung und raeumt sie nach einer Weile weg.
+   *
+   * Die Id kommt aus einem Zaehler und nicht aus der Uhrzeit: zwei Toasts in
+   * derselben Millisekunde haetten sonst dieselbe Id, und lit haengt seine
+   * Wiederverwendung genau daran.
+   */
+  #toastId = 0;
+
+  #toast(text: string, tone: Toast['tone'] = 'ok', action?: Toast['action']): void {
+    this.#toastId += 1;
+    const id = this.#toastId;
+    this.toasts = [...this.toasts, { id, text, tone, ...(action ? { action } : {}) }];
+    window.setTimeout(() => this.#dismissToast(id), TOAST_MS);
+  }
+
+  #dismissToast(id: number): void {
+    this.toasts = this.toasts.filter((entry) => entry.id !== id);
+  }
+
+  /** Die Bestaetigungen selbst – immer im Dokument, damit sie nichts verschieben. */
+  #renderToasts(): TemplateResult | typeof nothing {
+    if (this.toasts.length === 0) return nothing;
+    return html`
+      <div class="toasts">
+        ${this.toasts.map(
+          (toast) => html`
+            <div class="toast toast--${toast.tone}">
+              <span class="toast__text">${toast.text}</span>
+              ${toast.action
+                ? html`<button
+                    class="toast__action"
+                    @click=${() => {
+                      toast.action?.run();
+                      this.#dismissToast(toast.id);
+                    }}
+                  >
+                    ${toast.action.label}
+                  </button>`
+                : nothing}
+            </div>
+          `,
+        )}
+      </div>
+    `;
+  }
 
   protected override render(): TemplateResult {
     const { status, config } = this.snapshot;
@@ -171,10 +276,13 @@ export class MirrorRemote extends LitElement {
     // schon gekoppelten dazukommt. Das zweite ist keine Einrichtung und darf
     // sich auch nicht so anfuehlen.
     if (status === 'pairing') {
-      return this.snapshot.mirrorPaired ? this.#renderJoin() : this.#renderSetup('pair');
+      return html`${this.snapshot.mirrorPaired ? this.#renderJoin() : this.#renderSetup('pair')}
+      ${this.#renderToasts()}`;
     }
-    if (!config) return this.#renderLoading();
-    if (config.setup.step !== 'done') return this.#renderSetup(config.setup.step);
+    if (!config) return html`${this.#renderLoading()}${this.#renderToasts()}`;
+    if (config.setup.step !== 'done') {
+      return html`${this.#renderSetup(config.setup.step)}${this.#renderToasts()}`;
+    }
 
     return html`
       <header class="topbar">
@@ -213,6 +321,8 @@ export class MirrorRemote extends LitElement {
             ? this.#renderDisplay()
             : this.#renderSystem()}
       </main>
+
+      ${this.#renderToasts()}
     `;
   }
 
@@ -609,6 +719,13 @@ export class MirrorRemote extends LitElement {
       return html`<div class="board__cell" style=${`grid-column:${x + 1};grid-row:${y + 1}`}></div>`;
     });
 
+    /*
+     * Eine Szene hat kein Raster, in das man Bloecke schiebt – sie hat drei
+     * Baender. Das Brett zeigt deshalb etwas anderes, sobald der Screen als
+     * Szene laeuft: Ziehen gaebe es dort nichts zu tun.
+     */
+    if (screen.layout === 'zones') return this.#renderZoneBoard(config, screen, aspect);
+
     return html`
       <div class="board" style=${`aspect-ratio: ${aspect}`}>
         <div
@@ -636,6 +753,83 @@ export class MirrorRemote extends LitElement {
           </p>`
         : nothing}
     `;
+  }
+
+  /**
+   * Das Brett einer Szene: drei Baender statt eines Rasters.
+   *
+   * Es hat dieselben Proportionen wie der Spiegel und dieselben Anteile wie
+   * die Anzeige (20 / 60 / 20), damit die Frage, um die es hier geht, auch
+   * hier beantwortet wird: wie sieht das zusammen aus?
+   *
+   * Gezogen wird nichts. In einer Szene gibt es je Band nur "drin" oder
+   * "nicht drin" – und ein Band waehlt man am Block aus, nicht durch Zielen
+   * mit dem Daumen auf ein Fuenftel Bildschirmhoehe.
+   */
+  #renderZoneBoard(config: MirrorConfig, screen: MirrorScreen, aspect: number): TemplateResult {
+    const insets = config.display.insets;
+    const instances = config.instances.filter((entry) => entry.screenId === screen.id);
+
+    return html`
+      <div class="board" style=${`aspect-ratio: ${aspect}`}>
+        <div
+          class="board__area board__area--zones"
+          style=${`top:${insets.top}%;right:${insets.right}%;bottom:${insets.bottom}%;left:${insets.left}%`}
+        >
+          ${ZONE_OPTIONS.map((zone) => {
+            const inZone = instances.filter((entry) => entry.zone === zone.id);
+            return html`
+              <div
+                class="board__zone board__zone--${zone.id} ${inZone.length > ZONE_CAPACITY[zone.id]
+                  ? 'is-overfull'
+                  : ''}"
+              >
+                <span class="board__zone-name">${zone.name}</span>
+                ${inZone.map(
+                  (entry) => html`
+                    <button
+                      class="board__widget board__widget--zone ${entry.id === this.selected
+                        ? 'is-selected'
+                        : ''} ${entry.enabled ? '' : 'is-off'}"
+                      @click=${() => {
+                        this.selected = this.selected === entry.id ? null : entry.id;
+                      }}
+                    >
+                      <span class="board__name">${this.#moduleName(entry.moduleId)}</span>
+                      <span class="board__size">${WIDGET_SIZE_SPECS[entry.size].label}</span>
+                    </button>
+                  `,
+                )}
+              </div>
+            `;
+          })}
+          ${instances.length === 0
+            ? html`<p class="board__empty muted small">Noch kein Modul in dieser Szene.</p>`
+            : nothing}
+        </div>
+      </div>
+      ${this.#zoneWarning(instances)}
+    `;
+  }
+
+  /**
+   * Zu voll ist kein Fehler, sondern ein Hinweis.
+   *
+   * Ein Band, in dem mehr steht, als hineingehoert, wird auf dem Spiegel
+   * einfach enger – nichts geht verloren, nichts ueberdeckt sich. Deshalb
+   * lehnt die App das nicht ab, sondern sagt es: das Design-System nennt drei
+   * Elemente je Szene als Obergrenze, und ob die vierte Zeile es wert ist,
+   * entscheidet, wer davorsteht.
+   */
+  #zoneWarning(instances: readonly ModuleInstance[]): TemplateResult | typeof nothing {
+    const full = ZONE_OPTIONS.filter(
+      (zone) => instances.filter((entry) => entry.zone === zone.id).length > ZONE_CAPACITY[zone.id],
+    );
+    if (full.length === 0) return nothing;
+    return html`<p class="banner banner--hint small">
+      ${full.map((zone) => zone.name).join(' und ')} traegt mehr Bloecke als vorgesehen. Auf dem Spiegel
+      ruecken sie zusammen – eine Szene liest sich mit hoechstens drei Elementen am schnellsten.
+    </p>`;
   }
 
   /**
@@ -683,6 +877,11 @@ export class MirrorRemote extends LitElement {
         ${envelope?.error ? html`<span class="dot dot--error" title=${envelope.error}></span>` : nothing}
       </div>
     `;
+  }
+
+  /** Der Name, den der Spiegel fuer ein Modul kennt – sonst seine Id. */
+  #moduleName(moduleId: string): string {
+    return this.snapshot.modules.find((entry) => entry.id === moduleId)?.name ?? moduleId;
   }
 
   /** Rasterplatz als Inline-Style. Dieselbe Rechnung wie in der Anzeige. */
@@ -755,9 +954,15 @@ export class MirrorRemote extends LitElement {
     if (!drag.target || !drag.valid) return;
     if (drag.target.x === drag.origin.x && drag.target.y === drag.origin.y) return;
 
+    const origin = drag.origin;
     store.send({
       t: 'admin:setLayout',
       instances: [{ id: instance.id, x: drag.target.x, y: drag.target.y }],
+    });
+    this.#toast('Block verschoben', 'ok', {
+      label: 'Rueckgaengig',
+      run: () =>
+        store.send({ t: 'admin:setLayout', instances: [{ id: instance.id, x: origin.x, y: origin.y }] }),
     });
   }
 
@@ -856,6 +1061,32 @@ export class MirrorRemote extends LitElement {
             </div>
           </div>
 
+          ${config.screens.find((entry) => entry.id === instance.screenId)?.layout === 'zones'
+            ? html`
+                <div class="field">
+                  <span class="field__label">
+                    Band
+                    <span class="field__hint">
+                      ${ZONE_SPECS[instance.zone].note}
+                    </span>
+                  </span>
+                  <div class="segmented">
+                    ${ZONE_OPTIONS.map(
+                      (zone) => html`
+                        <button
+                          class=${zone.id === instance.zone ? 'is-active' : ''}
+                          title=${`${zone.name} · ${zone.share} %`}
+                          @click=${() => this.#moveToZone(instance, zone.id)}
+                        >
+                          ${zone.name}
+                        </button>
+                      `,
+                    )}
+                  </div>
+                </div>
+              `
+            : nothing}
+
           ${config.screens.length > 1
             ? html`
                 <label class="field">
@@ -942,6 +1173,23 @@ export class MirrorRemote extends LitElement {
    * Aenderung abzulehnen, sucht die App einen freien Platz – meistens rutscht
    * der Block nur eine Zelle nach links und niemandem faellt es auf.
    */
+  /**
+   * Ein Block wechselt sein Band.
+   *
+   * Der Rasterplatz bleibt unangetastet: ein Screen laesst sich zwischen
+   * Raster und Szene umschalten, und beim Zurueckschalten soll der Block
+   * wieder dort liegen, wo er lag.
+   */
+  #moveToZone(instance: ModuleInstance, zone: Zone): void {
+    if (zone === instance.zone) return;
+    const previous = instance.zone;
+    store.send({ t: 'admin:setLayout', instances: [{ id: instance.id, zone }] });
+    this.#toast(`In ${ZONE_SPECS[zone].name} verschoben`, 'ok', {
+      label: 'Rueckgaengig',
+      run: () => store.send({ t: 'admin:setLayout', instances: [{ id: instance.id, zone: previous }] }),
+    });
+  }
+
   #resize(instance: ModuleInstance, size: WidgetSize): void {
     const config = this.snapshot.config;
     if (!config || size === instance.size) return;
@@ -957,7 +1205,12 @@ export class MirrorRemote extends LitElement {
       return;
     }
     this.notice = null;
+    const before = { size: instance.size, x: instance.x, y: instance.y };
     store.send({ t: 'admin:setLayout', instances: [{ id: instance.id, size, x: spot.x, y: spot.y }] });
+    this.#toast(`Groesse ${WIDGET_SIZE_SPECS[size].label}`, 'ok', {
+      label: 'Rueckgaengig',
+      run: () => store.send({ t: 'admin:setLayout', instances: [{ id: instance.id, ...before }] }),
+    });
   }
 
   #moveToScreen(instance: ModuleInstance, screenId: string): void {
@@ -973,8 +1226,16 @@ export class MirrorRemote extends LitElement {
       return;
     }
     this.notice = null;
+    const before = { screenId: instance.screenId, x: instance.x, y: instance.y };
     store.send({ t: 'admin:setLayout', instances: [{ id: instance.id, screenId, x: spot.x, y: spot.y }] });
     this.screen = screenId;
+    this.#toast('Auf anderen Screen gelegt', 'ok', {
+      label: 'Rueckgaengig',
+      run: () => {
+        store.send({ t: 'admin:setLayout', instances: [{ id: instance.id, ...before }] });
+        this.screen = before.screenId;
+      },
+    });
   }
 
   /* ------------------------------ Screen-Einstellungen ------------------------------ */
@@ -983,6 +1244,13 @@ export class MirrorRemote extends LitElement {
     const index = config.screens.findIndex((entry) => entry.id === screen.id);
     const onScreen = config.instances.filter((entry) => entry.screenId === screen.id).length;
     const grid = config.display.grid;
+    /*
+     * Das Raster, das zur Aufhaengung passt: quer sechs mal vier, hochkant das
+     * Raster des Design-Systems. Als Vorschlag und nicht als Automatik – wer
+     * seines von Hand eingestellt hat, soll es behalten, auch wenn er den
+     * Spiegel spaeter dreht.
+     */
+    const preset = defaultGridForRotation(config.display.rotation);
     const patchGrid = (patch: Partial<GridSize>): void =>
       store.send({
         t: 'admin:setSettings',
@@ -1036,9 +1304,49 @@ export class MirrorRemote extends LitElement {
 
         <div class="field">
           <span class="field__label">
-            Raster
-            <span class="field__hint">Gilt fuer alle Screens – sonst wuerde jeder Wechsel springen.</span>
+            Anordnung
+            <span class="field__hint">
+              ${screen.layout === 'zones'
+                ? 'Drei Baender: Kopf, Hauptzone, Fussband. Am schnellsten zu lesen mit hoechstens drei Bloecken.'
+                : 'Bloecke frei auf dem Raster. Kann alles – auch zu viel.'}
+            </span>
           </span>
+          <div class="segmented">
+            ${SCREEN_LAYOUT_OPTIONS.map(
+              (option) => html`
+                <button
+                  class=${screen.layout === option.id ? 'is-active' : ''}
+                  @click=${() =>
+                    store.send({
+                      t: 'admin:setScreen',
+                      screenId: screen.id,
+                      patch: { layout: option.id },
+                    })}
+                >
+                  ${option.name}
+                </button>
+              `,
+            )}
+          </div>
+        </div>
+
+        <div class="field">
+          <span class="field__label">
+            Raster
+            <span class="field__hint">
+              ${screen.layout === 'zones'
+                ? 'Gilt fuer die Screens, die als Raster angeordnet sind – und fuer die Groesse der Bloecke.'
+                : 'Gilt fuer alle Screens – sonst wuerde jeder Wechsel springen.'}
+            </span>
+          </span>
+          <div class="card__actions">
+            <button
+              ?disabled=${gridEqual(grid, preset)}
+              @click=${() => patchGrid(preset)}
+            >
+              ${preset.columns} × ${preset.rows} vorschlagen
+            </button>
+          </div>
           <div class="stepper-row">
             <button
               aria-label="Weniger Spalten"

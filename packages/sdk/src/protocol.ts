@@ -1,4 +1,5 @@
 import type { MirrorConfig } from './config.js';
+import type { Zone } from './design.js';
 import type { WidgetSize } from './layout.js';
 import type { ModuleDescriptor } from './manifest.js';
 import type { MirrorScreen } from './screens.js';
@@ -26,6 +27,8 @@ export interface LayoutPatch {
   screenId?: string;
   x?: number;
   y?: number;
+  /** Nur wirksam, wenn der Screen als Szene angeordnet ist. */
+  zone?: Zone;
   size?: WidgetSize;
   enabled?: boolean;
 }
@@ -127,11 +130,23 @@ export type ClientMessage =
   | { t: 'command'; instanceId: string; name: string; payload?: unknown }
   | { t: 'admin:setInstanceConfig'; instanceId: string; config: Record<string, unknown> }
   | { t: 'admin:setLayout'; instances: LayoutPatch[] }
-  | { t: 'admin:addInstance'; moduleId: string; screenId?: string; size?: WidgetSize; x?: number; y?: number }
+  | {
+      t: 'admin:addInstance';
+      moduleId: string;
+      screenId?: string;
+      size?: WidgetSize;
+      x?: number;
+      y?: number;
+      zone?: Zone;
+    }
   | { t: 'admin:removeInstance'; instanceId: string }
   | { t: 'admin:addScreen'; name?: string }
   | { t: 'admin:removeScreen'; screenId: string }
-  | { t: 'admin:setScreen'; screenId: string; patch: Partial<Pick<MirrorScreen, 'name' | 'durationSeconds'>> }
+  | {
+      t: 'admin:setScreen';
+      screenId: string;
+      patch: Partial<Pick<MirrorScreen, 'name' | 'durationSeconds' | 'layout'>>;
+    }
   | { t: 'admin:reorderScreens'; ids: string[] }
   /**
    * Der Spiegel soll diesen Screen zeigen und nicht weiterschalten, solange am

@@ -1,14 +1,25 @@
 {
   "id": "weather",
   "name": "Wetter",
-  "version": "0.3.0",
-  "description": "Aktuelles Wetter und Vorhersage von Open-Meteo, im grossen Block Tag fuer Tag durchgeschaltet. Ohne API-Schluessel nutzbar.",
+  "version": "0.4.0",
+  "description": "Aktuelles Wetter und Vorhersage von Open-Meteo, im grossen Block Tag fuer Tag durchgeschaltet, im breiten mit Tagesverlauf. Ohne API-Schluessel nutzbar.",
   "author": "smartmirror",
-  "sizes": ["m", "l", "xl"],
+  "sizes": [
+    "s",
+    "m",
+    "l",
+    "xl"
+  ],
   "preferredSize": "l",
-  "permissions": ["network", "commands"],
+  "permissions": [
+    "network",
+    "commands"
+  ],
   "network": {
-    "allow": ["api.open-meteo.com", "geocoding-api.open-meteo.com"]
+    "allow": [
+      "api.open-meteo.com",
+      "geocoding-api.open-meteo.com"
+    ]
   },
   "refreshInterval": "15m",
   "configSchema": {
@@ -24,8 +35,14 @@
       "units": {
         "type": "string",
         "title": "Einheiten",
-        "enum": ["metric", "imperial"],
-        "enumLabels": ["Celsius / km/h", "Fahrenheit / mph"],
+        "enum": [
+          "metric",
+          "imperial"
+        ],
+        "enumLabels": [
+          "Celsius / km/h",
+          "Fahrenheit / mph"
+        ],
         "default": "metric"
       },
       "forecastDays": {
@@ -46,8 +63,22 @@
         "minimum": 5,
         "maximum": 180,
         "default": 15
+      },
+      "showHourly": {
+        "type": "boolean",
+        "title": "Tagesverlauf zeigen",
+        "description": "Balkengrafik der Temperatur ueber den Tag. Nur im grossen und breiten Block.",
+        "default": true
+      },
+      "highlight": {
+        "type": "boolean",
+        "title": "Als Highlight zeigen",
+        "description": "Der Block traegt die eine deckende Flaeche der Anordnung. Hoechstens ein Block pro Screen – zwei summieren sich hinter dem Glas zum Leuchtfeld.",
+        "default": false
       }
     },
-    "required": ["location"]
+    "required": [
+      "location"
+    ]
   }
 }

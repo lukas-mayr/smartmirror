@@ -3,6 +3,14 @@ export interface SpotifyConfig {
   hideWhenIdle: boolean;
   /** Hoeren mehrere gleichzeitig, so lange zeigt der Block jeden. */
   switchSeconds: number;
+  /**
+   * Der Block traegt die eine deckende Flaeche der Anordnung – in Sand.
+   *
+   * Eine Einstellung und keine Automatik: das Design-System erlaubt genau eine
+   * deckende Flaeche pro Anordnung, und welcher Block sie bekommt, kann nur
+   * entscheiden, wer die Anordnung kennt.
+   */
+  highlight: boolean;
 }
 
 /**

@@ -1,5 +1,6 @@
 export * from './backend.js';
 export * from './config.js';
+export * from './design.js';
 export * from './duration.js';
 export * from './fonts.js';
 export * from './frontend.js';
