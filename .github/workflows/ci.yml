@@ -30,6 +30,7 @@ jobs:
           npx tsc --noEmit -p packages/shell
           npx tsc --noEmit -p packages/remote
           npx tsc --noEmit -p packages/icons
+          npx tsc --noEmit -p modules/calendar
           npx tsc --noEmit -p modules/clock
           npx tsc --noEmit -p modules/weather
           npx tsc --noEmit -p modules/spotify

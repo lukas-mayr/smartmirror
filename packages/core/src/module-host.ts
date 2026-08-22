@@ -382,7 +382,10 @@ export class ModuleHost extends EventEmitter {
         if (url.protocol !== 'https:' && url.hostname !== 'localhost' && url.hostname !== '127.0.0.1') {
           throw new Error(`Nur HTTPS erlaubt (angefragt: ${url.protocol}//${url.host})`);
         }
-        if (!hostAllowed(manifest, url.hostname)) {
+        // Die Konfiguration kommt mit: Module, deren Quelle niemand vorher
+        // kennen kann, duerfen die Adressen nutzen, die der Nutzer selbst
+        // eingetragen hat — und nur die.
+        if (!hostAllowed(manifest, url.hostname, config)) {
           throw new Error(
             `Host "${url.hostname}" steht nicht in network.allow von "${manifest.id}"`,
           );
