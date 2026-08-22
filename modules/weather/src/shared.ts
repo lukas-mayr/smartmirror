@@ -89,8 +89,8 @@ export function describeWeather(code: number, isDay = true): { label: string; ic
 /* --------------------------------- Akzent --------------------------------- */
 
 /** Kuehl und warm, zwischen denen der Ton wandert. */
-const COLD = [0x6f, 0x9a, 0xd6] as const;
-const WARM = [0xd9, 0x9a, 0x4e] as const;
+const COLD = { red: 0x6f, green: 0x9a, blue: 0xd6 } as const;
+const WARM = { red: 0xd9, green: 0x9a, blue: 0x4e } as const;
 
 /** Ohne brauchbare Temperatur bleibt es beim neutralen Grau der Anzeige. */
 const NEUTRAL = '#9a9aa3';
@@ -113,11 +113,11 @@ const NEUTRAL = '#9a9aa3';
 export function accentForTemperature(celsius: number): string {
   if (!Number.isFinite(celsius)) return NEUTRAL;
   const position = Math.min(1, Math.max(0, (celsius + 5) / 33));
-  const hex = [0, 1, 2]
-    .map((channel) => Math.round(COLD[channel] + (WARM[channel] - COLD[channel]) * position))
-    .map((value) => value.toString(16).padStart(2, '0'))
-    .join('');
-  return `#${hex}`;
+  const channel = (from: number, to: number): string =>
+    Math.round(from + (to - from) * position)
+      .toString(16)
+      .padStart(2, '0');
+  return `#${channel(COLD.red, WARM.red)}${channel(COLD.green, WARM.green)}${channel(COLD.blue, WARM.blue)}`;
 }
 
 /** Grad Celsius, egal in welcher Einheit die Anzeige gerade rechnet. */
