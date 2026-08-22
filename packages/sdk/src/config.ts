@@ -116,6 +116,42 @@ export function isNightNow(settings: NightModeSettings, now: Date = new Date()):
   return to < from ? minutes >= from || minutes < to : minutes >= from && minutes < to;
 }
 
+/**
+ * Laeuft die Nachtabsenkung gerade – nach der Uhr des Spiegels?
+ *
+ * `isNightNow` rechnet mit der Ortszeit dessen, der fragt. Auf dem Spiegel ist
+ * das richtig; in der Handy-App nicht zwingend, denn wer aus einer anderen
+ * Zeitzone auf seinen Spiegel schaut, bekaeme sonst eine Auskunft ueber sein
+ * eigenes Fenster statt ueber das, was zu Hause an der Wand passiert.
+ *
+ * Gerechnet wird nur mit Stunde und Minute: die Absenkung kennt keine Tage,
+ * und ein Datum ueber Zeitzonen hinweg zu schieben waere eine Fehlerquelle
+ * ohne Gegenwert.
+ */
+export function isNightIn(
+  settings: NightModeSettings,
+  timeZone: string,
+  now: Date = new Date(),
+): boolean {
+  let wall: string;
+  try {
+    wall = new Intl.DateTimeFormat('en-GB', {
+      timeZone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(now);
+  } catch {
+    // Eine unbekannte Zeitzone ist kein Grund, gar nichts zu sagen.
+    return isNightNow(settings, now);
+  }
+  const minutes = parseClock(wall);
+  if (minutes === null) return isNightNow(settings, now);
+  const atMirror = new Date(now);
+  atMirror.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
+  return isNightNow(settings, atMirror);
+}
+
 export interface DisplaySettings {
   /** 0..100. Wird per ddcutil gesetzt, sonst per CSS-Overlay abgedunkelt. */
   brightness: number;
