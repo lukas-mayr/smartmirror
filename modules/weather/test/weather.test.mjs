@@ -12,6 +12,7 @@ import {
   peakIndex,
   pickHourly,
   toCelsius,
+  weatherForm,
 } from '../dist/shared.js';
 
 test('faerbt kalt blau und warm bernstein', () => {
@@ -227,4 +228,44 @@ test('rechnet die Balkenhoehe gegen die Spanne des Tages', () => {
   assert.equal(barHeight(21, 12, 21), 100);
   // Ohne Spanne gibt es nichts zu vergleichen: alle Balken gleich hoch.
   assert.equal(barHeight(18, 18, 18), 100);
+});
+
+/* ---------------------------------- Form ---------------------------------- */
+
+const place = (patch = {}) => ({
+  zone: null,
+  size: 'l',
+  stale: false,
+  error: false,
+  night: false,
+  ...patch,
+});
+
+test('zeigt im Kopfband einen Wert, egal welche Groesse eingestellt ist', () => {
+  // Der Slot im Kopf ist 30 % breit. Was dort nach L gerechnet wird, landet
+  // unter der Lesbarkeitsgrenze – also gilt dort der Platz und nicht die
+  // Groesse, und zwar fuer jede der vier.
+  for (const size of ['s', 'm', 'l', 'xl']) {
+    assert.equal(weatherForm(place({ zone: 'head', size })), 'head');
+  }
+  // Auch dann, wenn die Werte alt sind: die Form haengt am Platz.
+  assert.equal(weatherForm(place({ zone: 'head', stale: true })), 'head');
+});
+
+test('laesst die anderen Baender bei der Groesse', () => {
+  assert.equal(weatherForm(place({ zone: 'main', size: 'l' })), 'deck');
+  assert.equal(weatherForm(place({ zone: 'foot', size: 's' })), 'badge');
+  assert.equal(weatherForm(place({ zone: null, size: 'xl' })), 'full');
+});
+
+test('schaltet nur im grossen Block durch, und nur mit frischen Werten', () => {
+  assert.equal(weatherForm(place({ size: 'l' })), 'deck');
+  assert.equal(weatherForm(place({ size: 'l', stale: true })), 'full');
+  assert.equal(weatherForm(place({ size: 'l', error: true })), 'full');
+  // Nachts bewegt sich nichts – im dunklen Raum zieht jede Bewegung den Blick.
+  assert.equal(weatherForm(place({ size: 'l', night: true })), 'full');
+});
+
+test('faellt bei einer unbekannten Groesse auf die feste Ansicht zurueck', () => {
+  assert.equal(weatherForm(place({ size: 'xxl' })), 'full');
 });

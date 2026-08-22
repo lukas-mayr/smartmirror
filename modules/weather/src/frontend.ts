@@ -10,6 +10,7 @@ import {
   peakIndex,
   pickHourly,
   toCelsius,
+  weatherForm,
   type HourlyPoint,
   type WeatherConfig,
   type WeatherSlide,
@@ -149,12 +150,40 @@ export default defineFrontend<WeatherState, WeatherConfig>({
         Date.now() - Date.parse(state.fetchedAt) > STALE_AFTER_MS;
 
       /*
+       * Welche Form der Block zeigt, entscheidet sein Platz und nicht nur
+       * seine Groesse: im Kopfband ist ein "grosser" Block 300 px breit, und
+       * was dort nach L gerechnet wird, steht am Ende unter der
+       * Lesbarkeitsgrenze. Die Regel selbst steht in shared.ts, damit sie
+       * pruefbar ist und nicht als Kette von && mitten im Zeichnen.
+       */
+      const night = document.documentElement.dataset.night === '1';
+      const form = weatherForm({
+        zone: host.dataset.zone ?? null,
+        size,
+        stale,
+        error: error !== null,
+        night,
+      });
+
+      /*
        * Die deckende Flaeche ist eine Einstellung und keine Automatik – und
        * sie gilt nur, solange die Zahl darauf auch stimmt. Ein veralteter Wert
        * bekommt kein Highlight: eine Flaeche in Salbei behauptet Frische, die
        * die Zahl nicht mehr hat.
+       *
+       * Im Kopfband gibt es sie ueberhaupt nicht. Der Slot ist dort so hoch
+       * wie das ganze Band; eine deckende Flaeche darin waere ein Rechteck von
+       * 300 x 350 px in vollem Salbei, oben rechts, und damit genau die grosse
+       * helle Flaeche, vor der die erste Regel des Stylesheets warnt. Die
+       * Aussage der Szene traegt die Hauptzone, nicht das Kopfband.
        */
-      const solid = config.highlight && !stale && !error && current !== null && current !== undefined;
+      const solid =
+        config.highlight &&
+        form !== 'head' &&
+        !stale &&
+        !error &&
+        current !== null &&
+        current !== undefined;
       const shell = (body: TemplateResult, extra = ''): void => {
         render(
           html`<div class="weather ${extra} ${solid ? 'box box--solid' : ''}">${body}</div>`,
@@ -200,6 +229,92 @@ export default defineFrontend<WeatherState, WeatherConfig>({
           ? null
           : accentForTemperature(toCelsius(current.temperature, config.units));
 
+      const stamp = state.fetchedAt
+        ? new Intl.DateTimeFormat(ctx.locale, {
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: ctx.timezone,
+          }).format(new Date(state.fetchedAt))
+        : null;
+
+      /**
+       * Warum die Zahl nicht mehr stimmt.
+       *
+       * Steht in jeder Form an derselben Stelle – ganz unten, in der
+       * gedaempften Stufe. Ein Fehler ohne diese Zeile waere eine Anzeige, die
+       * einfach eine alte Temperatur behauptet.
+       *
+       * Die Kurzfassung ist fuer den Kopf-Slot. Dort ersetzt der Hinweis den
+       * Kurztext, statt eine dritte Zeile anzufangen: eine dritte Zeile
+       * schoebe den Wert gegen die Uhrzeit daneben aus der Linie, und die
+       * Ausrichtung ist in diesem Band mehr wert als der ganze Satz. Der
+       * Kurztext geht dabei nicht verloren – er *ist* veraltet.
+       */
+      const hint = (short = false): TemplateResult | typeof nothing => {
+        if (!error && !stale) return nothing;
+        const reason = error ?? 'Keine aktuellen Daten';
+        const text = short
+          ? (error ?? (stamp ? `Stand ${stamp}` : reason))
+          : stamp
+            ? `${reason} · Stand ${stamp}`
+            : reason;
+        return html`<div class="weather__hint">${text}</div>`;
+      };
+
+      /**
+       * Die Zeile unter der Zahl: was fuer ein Wetter, und auf Wunsch der Wind.
+       *
+       * Sie steht als Baustein hier und nicht zweimal ausgeschrieben, weil der
+       * Kopf-Slot und die feste Ansicht dieselbe Zeile zeigen – sie sind
+       * derselbe Satz in zwei Groessen, und zwei Fassungen davon liefen mit der
+       * Zeit auseinander.
+       */
+      const metaRow = (): TemplateResult => html`
+        <div class="weather__meta" style=${accent ? `color:${accent}` : nothing}>
+          <span>${now.label}</span>
+          ${config.showWind
+            ? html`<span class="weather__sep">·</span>
+                <span>${current.windSpeed} ${state.windUnit ?? 'km/h'}</span>`
+            : nothing}
+        </div>
+      `;
+
+      /**
+       * Symbol und Zahl – die eine Zeile, die jede Form gemeinsam hat.
+       */
+      const nowRow = (): TemplateResult => html`
+        <div class="weather__now">
+          <span class="weather__icon">${icon(now.icon, { size: '1em', strokeWidth: 1.5 })}</span>
+          <span class="weather__temp"
+            >${current.temperature}<span class="weather__unit">${unit}</span></span
+          >
+        </div>
+      `;
+
+      /**
+       * Der Slot im Kopfband: ein Wert und eine Zeile darunter.
+       *
+       * Neben der Uhr ist kein Platz fuer eine zweite Erzaehlung. Der Ort faellt
+       * weg (er steht in jeder Karte gleich und beantwortet nichts, was man im
+       * Vorbeigehen wissen will), die Durchschaltung faellt weg (sie braucht
+       * eine grosse Beschriftung ueber der Zahl und eine Punktreihe darunter –
+       * fuenf Ebenen auf 300 px Breite), Tagesverlauf und Vorhersage fallen weg.
+       *
+       * Uebrig bleibt genau das, was das Design-System fuer dieses Band
+       * vorsieht: ein Wert. Wie hoch er steht und wie er sich mit der Uhrzeit
+       * daneben auf eine Linie legt, entscheidet das Stylesheet – die Hoehe des
+       * Bandes ist fuer beide Bloecke dieselbe, also kann sie beide ausrichten.
+       */
+      if (form === 'head') {
+        stopCycle();
+        const outdated = stale || error !== null;
+        shell(
+          html`${nowRow()}${outdated ? hint(true) : metaRow()}`,
+          `weather--head ${outdated ? 'weather--stale' : ''}`,
+        );
+        return;
+      }
+
       /**
        * Der kleinste Block zeigt Symbol und Zahl, sonst nichts.
        *
@@ -207,19 +322,9 @@ export default defineFrontend<WeatherState, WeatherConfig>({
        * 3 m nicht mehr lesbar. Lieber ein Wert, den man liest, als drei, die
        * man erraet.
        */
-      if (size === 's') {
+      if (form === 'badge') {
         stopCycle();
-        shell(
-          html`
-            <div class="weather__now">
-              <span class="weather__icon">${icon(now.icon, { size: '1em', strokeWidth: 1.5 })}</span>
-              <span class="weather__temp"
-                >${current.temperature}<span class="weather__unit">${unit}</span></span
-              >
-            </div>
-          `,
-          `weather--s ${stale || error ? 'weather--stale' : ''}`,
-        );
+        shell(nowRow(), `weather--s ${stale || error ? 'weather--stale' : ''}`);
         return;
       }
 
@@ -236,11 +341,10 @@ export default defineFrontend<WeatherState, WeatherConfig>({
        * alte Tage durchblaettert, sieht lebendiger aus, als die Daten sind.
        * Nachts ebenso – dort wird ueberhaupt nicht weitergeschaltet.
        */
-      const night = document.documentElement.dataset.night === '1';
-      const cycling = size === 'l' && !stale && !error && !night;
-      const slides = cycling
-        ? buildSlides(state, config, { locale: ctx.locale, timeZone: ctx.timezone })
-        : [];
+      const slides =
+        form === 'deck'
+          ? buildSlides(state, config, { locale: ctx.locale, timeZone: ctx.timezone })
+          : [];
 
       if (slides.length > 1) startCycle();
       else stopCycle();
@@ -283,19 +387,7 @@ export default defineFrontend<WeatherState, WeatherConfig>({
           ${state.resolvedLocation
             ? html`<div class="weather__place">${state.resolvedLocation}</div>`
             : nothing}
-          <div class="weather__now">
-            <span class="weather__icon">${icon(now.icon, { size: '1em', strokeWidth: 1.5 })}</span>
-            <span class="weather__temp"
-              >${current.temperature}<span class="weather__unit">${unit}</span></span
-            >
-          </div>
-          <div class="weather__meta" style=${accent ? `color:${accent}` : nothing}>
-            <span>${now.label}</span>
-            ${config.showWind
-              ? html`<span class="weather__sep">·</span>
-                  <span>${current.windSpeed} ${state.windUnit ?? 'km/h'}</span>`
-              : nothing}
-          </div>
+          ${nowRow()}${metaRow()}
           ${hourly.length > 1 ? hourlyChart(hourly, unit, solid) : nothing}
           ${hourly.length < 2 && state.forecast && state.forecast.length > 0
             ? html`
@@ -319,18 +411,7 @@ export default defineFrontend<WeatherState, WeatherConfig>({
                 </div>
               `
             : nothing}
-          ${error || stale
-            ? html`<div class="weather__hint">
-                ${error ?? 'Keine aktuellen Daten'}${state.fetchedAt
-                  ? html` · Stand
-                      ${new Intl.DateTimeFormat(ctx.locale, {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        timeZone: ctx.timezone,
-                      }).format(new Date(state.fetchedAt))}`
-                  : nothing}
-              </div>`
-            : nothing}
+          ${hint()}
         `,
         stale || error ? 'weather--stale' : '',
       );

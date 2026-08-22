@@ -261,6 +261,24 @@ als viertes nur, wenn es etwas Laufendes zeigt. Wo kein vierter Platz ist,
 landet auch kein vierter Block — das ist der Unterschied zu einer Regel, an die
 man sich halten muss.
 
+**Im Kopfband gilt der Platz und nicht die Blockgröße.** Eine Größe beschreibt
+ein Rechteck im Raster — L sind zwei mal zwei Zellen, also 448 x 328 px. Im Kopf
+gibt es dieses Raster nicht: links steht die Uhr, rechts ein Slot über 30 % der
+Breite, keine 300 px. Ein Modul, das dort weiter nach L rechnet, legt fünf Ebenen
+übereinander und schiebt dabei die halbe Größenleiter unter die 32 px, ab denen
+aus 3 m überhaupt noch etwas lesbar ist. Der Slot zeigt deshalb einen Wert und
+eine Zeile darunter, gleich welche Größe eingestellt ist — das Wetter also Symbol,
+Temperatur und Wetterlage, ohne Ort, ohne Durchschaltung, ohne Vorschau.
+
+Beide Blöcke des Kopfbands teilen sich außerdem **eine Linie**: die Wertzeile ist
+in Uhr und Slot gleich hoch, also liegen die Uhrzeit und die Temperatur auf einer
+Mittelachse und die beiden kleinen Zeilen darunter auf derselben Grundlinie. Ohne
+das säße die Zahl rechts irgendwo neben der Uhrzeit — man sieht sofort, dass
+etwas fehlt, auch wenn man nicht benennen kann, was. Die deckende Fläche gibt es
+im Kopf nicht: der Slot ist so hoch wie das Band, und eine volle Salbeifläche von
+300 x 350 px oben rechts wäre genau die große helle Fläche, die hinter dem Glas
+blendet.
+
 Ein Block behält seinen Rasterplatz, auch während sein Screen eine Szene ist.
 Beim Zurückschalten liegt er wieder dort, wo er lag.
 
@@ -418,7 +436,9 @@ Weiterschalten auf: eine Durchschaltung, die alte Tage durchblättert, sieht
 lebendiger aus, als die Daten sind. Eine Punktreihe kündigt den Wechsel an —
 ohne sie liest man im Vorbeigehen „Heute 18°" und weiß nicht, dass gleich
 „Morgen 19°" dasteht. Im XL-Block bleibt der Tagesverlauf stehen, weil dort
-alles gleichzeitig lesbar groß ist.
+alles gleichzeitig lesbar groß ist. Im Kopfband einer Szene schaltet das Wetter
+gar nicht durch — dort ist es der Slot neben der Uhr und zeigt einen Wert (siehe
+[Szene](#szene)).
 
 ### Bewegung
 
