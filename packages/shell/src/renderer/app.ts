@@ -255,7 +255,15 @@ export class MirrorApp {
     this.#applySetup(config);
     this.#syncScreens(config.screens);
 
-    const desired = config.instances.filter((instance) => instance.enabled);
+    /*
+     * Angezeigt wird, was laeuft und was einen Platz belegt.
+     *
+     * Zwei Bedingungen, weil es zwei Fragen sind: `enabled` heisst, dass die
+     * Instanz ueberhaupt laeuft, `visible`, dass man sie sieht. Eine Quelle,
+     * die nur Mitteilungen liefert, laeuft im Core weiter und wird hier
+     * einfach nicht aufgehaengt — der Mitteilungsblock zeigt, was sie meldet.
+     */
+    const desired = config.instances.filter((instance) => instance.enabled && instance.visible !== false);
     const desiredIds = new Set(desired.map((instance) => instance.id));
 
     for (const [id, mounted] of [...this.#mounted]) {
@@ -404,7 +412,9 @@ export class MirrorApp {
     const config = this.#config;
     if (!config) return [];
     return config.screens.filter((screen) =>
-      config.instances.some((instance) => instance.enabled && instance.screenId === screen.id),
+      config.instances.some(
+        (instance) => instance.enabled && instance.visible !== false && instance.screenId === screen.id,
+      ),
     );
   }
 

@@ -245,6 +245,15 @@ es kann — `"sizes": ["m", "l", "xl"]` —, und am Handy sind die übrigen Grö
 nicht erst antippbar. Ohne Angabe kann ein Modul alle vier; die Mitteilungen
 lassen S und M aus, weil schon ihre oberste Zeile darin unter 32 px fiele.
 
+**Ein Modul muss keinen Block belegen.** Beim Hinzufügen gibt es zwei Wege:
+„Als Block" legt es ins Raster, „Nur melden" lässt es laufen, ohne dass es auf
+dem Spiegel erscheint. Ein Kalender, der bloß die nächsten Termine in den
+Mitteilungsblock schieben soll, braucht keine Fläche — und weil er keine
+belegt, lässt er sich auch auf einem vollen Screen hinzufügen. Umstellen geht
+jederzeit im Einstellungsblatt; Platz, Größe und Band bleiben dabei stehen, so
+dass ein wieder eingeblendeter Block dorthin zurückkehrt, wo er lag. Was so
+läuft, steht am Handy unter dem Brett als „Nur als Mitteilung".
+
 Als Faustregel gilt: **höchstens zwei Boxen nebeneinander** und **höchstens
 sechs der zehn Zeilen belegt**. 994 px auf vier Boxen erzwingen Schrift unter
 32 px, und die liest man auf 3 m nicht mehr; ein randvolles Raster summiert

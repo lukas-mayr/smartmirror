@@ -5,14 +5,20 @@ import { isWidgetSize, WIDGET_SIZES, type WidgetSize } from './layout.js';
 /**
  * Rechte, die ein Modul im Manifest anfordern muss. Was nicht angefordert
  * wurde, ist im Backend-Kontext schlicht nicht vorhanden bzw. wirft.
+ *
+ * Eine Liste und keine Aufzaehlung von Typen, weil die Pruefung beim Laden
+ * dieselbe Quelle braucht: stuende die erlaubte Menge zweimal da — einmal als
+ * Typ und einmal als Bedingung im Validator —, dann faellt beim naechsten
+ * neuen Recht die zweite Stelle durch, und zwar nicht beim Uebersetzen,
+ * sondern erst auf dem Spiegel.
  */
-export type ModulePermission =
+export const MODULE_PERMISSIONS = [
   /** Darf `ctx.fetch` nutzen – begrenzt auf die Hosts in `network.allow`. */
-  | 'network'
+  'network',
   /** Darf `ctx.secret(...)` lesen. */
-  | 'secrets'
+  'secrets',
   /** Darf Kommandos von der Fernbedienung empfangen. */
-  | 'commands'
+  'commands',
   /**
    * Darf mit `ctx.notify(...)` in den Mitteilungsfeed melden.
    *
@@ -20,9 +26,12 @@ export type ModulePermission =
    * Modul hat gelegentlich etwas zu melden, aber den gesammelten Strom aller
    * Quellen soll nur bekommen, wer ihn anzeigt.
    */
-  | 'notify'
+  'notify',
   /** Darf mit `ctx.onNotifications(...)` den gesammelten Feed hoeren. */
-  | 'notifications';
+  'notifications',
+] as const;
+
+export type ModulePermission = (typeof MODULE_PERMISSIONS)[number];
 
 export interface ModuleSecretDeclaration {
   key: string;
@@ -161,14 +170,23 @@ export function assertValidManifest(input: unknown, source: string): asserts inp
   if (permissions !== undefined) {
     if (!Array.isArray(permissions)) fail('"permissions" muss eine Liste sein');
     for (const p of permissions) {
-      if (p !== 'network' && p !== 'secrets' && p !== 'commands') {
+      if (!(MODULE_PERMISSIONS as readonly unknown[]).includes(p)) {
         fail(`unbekannte Permission "${String(p)}"`);
       }
     }
     if (permissions.includes('network')) {
-      const allow = (m.network as { allow?: unknown } | undefined)?.allow;
-      if (!Array.isArray(allow) || allow.length === 0) {
-        fail('Permission "network" ohne "network.allow" – die Host-Allowlist ist Pflicht');
+      const net = m.network as { allow?: unknown; allowFromConfig?: unknown } | undefined;
+      const allow = Array.isArray(net?.allow) ? net.allow : [];
+      const fromConfig = Array.isArray(net?.allowFromConfig) ? net.allowFromConfig : [];
+      // Eine der beiden Quellen muss etwas hergeben. Ein Modul, dessen Adressen
+      // erst der Nutzer eintraegt, hat eine leere feste Liste – aber es hat
+      // benannt, aus welchem Feld die Freigabe kommt, und das ist die Angabe,
+      // um die es hier geht.
+      if (allow.length === 0 && fromConfig.length === 0) {
+        fail(
+          'Permission "network" ohne "network.allow" und ohne "network.allowFromConfig" –' +
+            ' eine der beiden Quellen fuer die Host-Allowlist ist Pflicht',
+        );
       }
     }
   }

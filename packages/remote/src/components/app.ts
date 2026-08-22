@@ -672,6 +672,8 @@ export class MirrorRemote extends LitElement {
         />
       </label>
 
+      ${this.#renderSilent(config, screen)}
+
       ${instance
         ? this.#renderInstance(instance, byId.get(instance.moduleId), config)
         : html`<p class="muted small board__hint">
@@ -693,13 +695,39 @@ export class MirrorRemote extends LitElement {
                   ? html`<span class="banner banner--error small">${descriptor.loadError}</span>`
                   : nothing}
               </div>
-              <button
-                ?disabled=${Boolean(descriptor.loadError) ||
-                (descriptor.singleton && config.instances.some((i) => i.moduleId === descriptor.id))}
-                @click=${() => store.send({ t: 'admin:addInstance', moduleId: descriptor.id, screenId: screen.id })}
-              >
-                Hinzufuegen
-              </button>
+              <!--
+                Zwei Knoepfe, weil es zwei Absichten gibt.
+                
+                "Als Block" braucht Platz im Raster und scheitert, wenn keiner
+                frei ist. "Nur melden" braucht keinen — und muss deshalb auch
+                dann gehen, wenn der Screen voll ist. Das ist der haeufigere
+                Fall, als man denkt: ein Kalender, der bloss die naechsten
+                Termine in den Mitteilungsblock schiebt, will gar keine Flaeche.
+              -->
+              <div class="card__actions">
+                <button
+                  ?disabled=${Boolean(descriptor.loadError) ||
+                  (descriptor.singleton && config.instances.some((i) => i.moduleId === descriptor.id))}
+                  @click=${() =>
+                    store.send({ t: 'admin:addInstance', moduleId: descriptor.id, screenId: screen.id })}
+                >
+                  Als Block
+                </button>
+                <button
+                  class="ghost"
+                  ?disabled=${Boolean(descriptor.loadError) ||
+                  (descriptor.singleton && config.instances.some((i) => i.moduleId === descriptor.id))}
+                  @click=${() =>
+                    store.send({
+                      t: 'admin:addInstance',
+                      moduleId: descriptor.id,
+                      screenId: screen.id,
+                      visible: false,
+                    })}
+                >
+                  Nur melden
+                </button>
+              </div>
             </div>
           `,
         )}
@@ -716,12 +744,57 @@ export class MirrorRemote extends LitElement {
    * eingestellten Raendern und dem Raster darin. Was hier passt, passt an der
    * Wand – und was hier ueber die Kante ragt, ragt auch dort darueber.
    */
+  /**
+   * Was laeuft, ohne auf dem Screen zu stehen.
+   *
+   * Diese Instanzen stehen auf keinem Brett – ohne diese Liste waeren sie
+   * angelegt und danach nicht mehr erreichbar. Sie sieht bewusst nicht aus wie
+   * ein Block: was hier steht, hat keinen Platz und keine Groesse, sondern nur
+   * einen Namen und Einstellungen.
+   */
+  #renderSilent(config: MirrorConfig, screen: MirrorScreen): TemplateResult | typeof nothing {
+    const silent = config.instances.filter(
+      (entry) => entry.screenId === screen.id && entry.visible === false,
+    );
+    if (silent.length === 0) return nothing;
+
+    return html`
+      <div class="silent">
+        <span class="silent__label">Nur als Mitteilung</span>
+        ${silent.map(
+          (entry) => html`
+            <button
+              class="silent__item ${this.selected === entry.id ? 'is-active' : ''} ${entry.enabled
+                ? ''
+                : 'is-off'}"
+              @click=${() => (this.selected = this.selected === entry.id ? null : entry.id)}
+            >
+              ${this.#moduleName(entry.moduleId)}
+              ${this.snapshot.state[entry.id]?.error
+                ? html`<span class="dot dot--error"></span>`
+                : nothing}
+            </button>
+          `,
+        )}
+      </div>
+    `;
+  }
+
   #renderBoard(config: MirrorConfig, screen: MirrorScreen): TemplateResult {
     const viewport = this.snapshot.viewport;
     const aspect = viewport ? viewport.width / viewport.height : FALLBACK_ASPECT;
     const grid = config.display.grid;
     const insets = config.display.insets;
-    const instances = config.instances.filter((entry) => entry.screenId === screen.id);
+    /*
+     * Aufs Brett kommt nur, was einen Platz belegt.
+     *
+     * Eine Quelle, die bloss Mitteilungen liefert, hat im Raster nichts
+     * verloren – sie stuende dort als Block, den es auf dem Spiegel nicht
+     * gibt. Erreichbar bleibt sie ueber die Liste unter dem Brett.
+     */
+    const instances = config.instances.filter(
+      (entry) => entry.screenId === screen.id && entry.visible !== false,
+    );
     const overlapping = this.#overlapping(instances, grid);
     const drag = this.drag;
 
@@ -1049,56 +1122,94 @@ export class MirrorRemote extends LitElement {
               `
             : nothing}
 
+          <!--
+            Zuerst die Frage, ob der Block ueberhaupt einen Platz belegt. Sie
+            steht vor Groesse und Band, weil sie die beiden erledigt: wer nur
+            meldet, braucht keinen Platz und keine Groesse.
+          -->
           <div class="field">
             <span class="field__label">
-              Groesse
+              Auf dem Spiegel
               <span class="field__hint">
-                ${sizes.length < WIDGET_SIZE_OPTIONS.length
-                  ? `Dieses Modul gibt es in ${formatWidgetSizes(sizes)} – kleiner bliebe vom Inhalt nichts uebrig.`
-                  : 'Wie viele Rasterfelder der Block belegt.'}
+                ${
+                  instance.visible === false
+                    ? 'Laeuft und meldet an den Mitteilungsblock – auf jedem Screen, egal wo dieser hier steht.'
+                    : 'Der Block steht als Flaeche auf diesem Screen.'
+                }
               </span>
             </span>
-            <div class="sizes">
-              ${WIDGET_SIZE_OPTIONS.map(
-                (option) => html`
-                  <button
-                    class=${option.id === instance.size ? 'is-active' : ''}
-                    title=${`${option.name} · ${option.columns}×${option.rows}`}
-                    ?disabled=${!sizes.includes(option.id)}
-                    @click=${() => this.#resize(instance, option.id)}
-                  >
-                    ${option.label}
-                  </button>
-                `,
-              )}
+            <div class="segmented">
+              <button
+                class=${instance.visible !== false ? 'is-active' : ''}
+                @click=${() => this.#setVisible(instance, true)}
+              >
+                Als Block
+              </button>
+              <button
+                class=${instance.visible === false ? 'is-active' : ''}
+                @click=${() => this.#setVisible(instance, false)}
+              >
+                Nur als Mitteilung
+              </button>
             </div>
           </div>
 
-          ${zones
-            ? html`
-                <div class="field">
-                  <span class="field__label">
-                    Band
-                    <span class="field__hint">
-                      ${ZONE_SPECS[instance.zone].note}
-                    </span>
+          ${
+            instance.visible === false
+              ? nothing
+              : html`
+              <div class="field">
+                <span class="field__label">
+                  Groesse
+                  <span class="field__hint">
+                    ${sizes.length < WIDGET_SIZE_OPTIONS.length
+                      ? `Dieses Modul gibt es in ${formatWidgetSizes(sizes)} – kleiner bliebe vom Inhalt nichts uebrig.`
+                      : 'Wie viele Rasterfelder der Block belegt.'}
                   </span>
-                  <div class="segmented">
-                    ${ZONE_OPTIONS.map(
-                      (zone) => html`
-                        <button
-                          class=${zone.id === instance.zone ? 'is-active' : ''}
-                          title=${`${zone.name} · ${zone.share} %`}
-                          @click=${() => this.#moveToZone(instance, zone.id)}
-                        >
-                          ${zone.name}
-                        </button>
-                      `,
-                    )}
-                  </div>
+                </span>
+                <div class="sizes">
+                  ${WIDGET_SIZE_OPTIONS.map(
+                    (option) => html`
+                      <button
+                        class=${option.id === instance.size ? 'is-active' : ''}
+                        title=${`${option.name} · ${option.columns}×${option.rows}`}
+                        ?disabled=${!sizes.includes(option.id)}
+                        @click=${() => this.#resize(instance, option.id)}
+                      >
+                        ${option.label}
+                      </button>
+                    `,
+                  )}
                 </div>
-              `
-            : nothing}
+              </div>
+
+              ${zones
+                ? html`
+                    <div class="field">
+                      <span class="field__label">
+                        Band
+                        <span class="field__hint">
+                          ${ZONE_SPECS[instance.zone].note}
+                        </span>
+                      </span>
+                      <div class="segmented">
+                        ${ZONE_OPTIONS.map(
+                          (zone) => html`
+                            <button
+                              class=${zone.id === instance.zone ? 'is-active' : ''}
+                              title=${`${zone.name} · ${zone.share} %`}
+                              @click=${() => this.#moveToZone(instance, zone.id)}
+                            >
+                              ${zone.name}
+                            </button>
+                          `,
+                        )}
+                      </div>
+                    </div>
+                  `
+                : nothing}
+                `
+          }
 
           ${config.screens.length > 1
             ? html`
@@ -1201,6 +1312,20 @@ export class MirrorRemote extends LitElement {
       label: 'Rueckgaengig',
       run: () => store.send({ t: 'admin:setLayout', instances: [{ id: instance.id, zone: previous }] }),
     });
+  }
+
+  /**
+   * Blendet einen Block ein oder aus, ohne ihn zu stoppen.
+   *
+   * Beim Einblenden wird nichts gesucht und nichts gerueckt: der Block kehrt
+   * an seine alten Koordinaten zurueck. Liegt dort inzwischen ein anderer,
+   * sieht man das auf dem Brett sofort als Ueberlappung und schiebt ihn weg –
+   * besser als ein Block, der beim Einblenden woanders auftaucht, als man ihn
+   * verlassen hat.
+   */
+  #setVisible(instance: ModuleInstance, visible: boolean): void {
+    if (instance.visible === visible) return;
+    store.send({ t: 'admin:setLayout', instances: [{ id: instance.id, visible }] });
   }
 
   #resize(instance: ModuleInstance, size: WidgetSize): void {

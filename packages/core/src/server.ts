@@ -581,6 +581,7 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
               instance.size = sizes ? nearestWidgetSize(requested, sizes) : requested;
             }
             if (typeof update.enabled === 'boolean') instance.enabled = update.enabled;
+            if (typeof update.visible === 'boolean') instance.visible = update.visible;
           }
         });
         return;
@@ -598,7 +599,17 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
             normalizeWidgetSize(message.size, descriptor.preferredSize),
             descriptor.sizes,
           );
-          const siblings = draft.instances.filter((entry) => entry.screenId === screen.id);
+          const visible = message.visible !== false;
+          /*
+           * Nur sichtbare Nachbarn belegen Platz.
+           *
+           * Ein Block, den niemand sieht, darf keinen Rasterplatz besetzt
+           * halten – sonst waere ein Kalender, der bloss Mitteilungen liefert,
+           * ein unsichtbares Hindernis beim Anordnen.
+           */
+          const siblings = draft.instances.filter(
+            (entry) => entry.screenId === screen.id && entry.visible !== false,
+          );
           const occupied = siblings.map((entry) => rectFor(entry, draft.display.grid));
           const preferred =
             Number.isFinite(message.x) && Number.isFinite(message.y)
@@ -618,7 +629,9 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
           if (screen.layout === 'zones') {
             const zone = normalizeZone(message.zone, defaultZoneFor(descriptor.id));
             const taken = siblings.filter((entry) => entry.zone === zone).length;
-            if (taken >= ZONE_CAPACITY[zone]) {
+            // Ein unsichtbarer Block steht in keinem Band und fuellt deshalb
+            // auch keines.
+            if (visible && taken >= ZONE_CAPACITY[zone]) {
               throw new Error(
                 `Im Band "${ZONE_SPECS[zone].name}" ist kein Platz mehr – dort passen ${ZONE_CAPACITY[zone]} Bloecke.`,
               );
@@ -632,24 +645,35 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
               zone,
               size,
               enabled: true,
+              visible,
               config: {},
             });
             return;
           }
 
-          // Lieber eine klare Absage als ein Block, der unter einem anderen
-          // liegt: auf dem Spiegel waere davon nichts zu sehen.
-          if (!spot) throw new Error(`Auf "${screen.name}" ist kein Platz frei fuer diese Groesse`);
+          /*
+           * Lieber eine klare Absage als ein Block, der unter einem anderen
+           * liegt: auf dem Spiegel waere davon nichts zu sehen.
+           *
+           * Wer nichts belegt, kann daran nicht scheitern: eine Quelle, die
+           * nur melden soll, laesst sich auch auf einem vollen Screen
+           * hinzufuegen. Sie bekommt einen Platz, sobald einer frei ist, und
+           * bis dahin steht sie auf 0,0 – zu sehen ist sie ohnehin nicht.
+           */
+          if (!spot && visible) {
+            throw new Error(`Auf "${screen.name}" ist kein Platz frei fuer diese Groesse`);
+          }
 
           draft.instances.push({
             id: nextInstanceId(draft.instances.map((entry) => entry.id), descriptor.id),
             moduleId: descriptor.id,
             screenId: screen.id,
-            x: spot.x,
-            y: spot.y,
+            x: spot?.x ?? 0,
+            y: spot?.y ?? 0,
             zone: normalizeZone(message.zone, defaultZoneFor(descriptor.id)),
             size,
             enabled: true,
+            visible,
             config: {},
           });
         });

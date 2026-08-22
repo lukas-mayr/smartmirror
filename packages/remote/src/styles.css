@@ -272,6 +272,30 @@ h2 {
   margin-top: 0.5rem;
 }
 
+/* In der Hinzufuegen-Karte stehen die Knoepfe rechts neben dem Text und
+   brauchen deshalb keinen Abstand nach oben. */
+.card--add .card__actions {
+  flex: none;
+  margin-top: 0;
+}
+
+/*
+ * Der zurueckhaltende Zweitknopf.
+ *
+ * Gleich gross und gleich antippbar wie sein Nachbar, aber ohne Rahmen: er ist
+ * die zweite Absicht und nicht die zweite Wahl. Ein kleinerer Knopf waere auf
+ * einem Telefon schwerer zu treffen, und getroffen werden soll er.
+ */
+button.ghost {
+  border-color: transparent;
+  color: var(--text-dim);
+  padding: 0 0.7rem;
+}
+
+button.ghost:not(:disabled):active {
+  color: var(--text);
+}
+
 .form {
   display: flex;
   flex-direction: column;
@@ -661,6 +685,53 @@ button.danger {
 
 .board__hint {
   margin: 0.75rem 0 0;
+}
+
+/* ---------------------------- Stille Quellen ------------------------------ */
+
+/*
+ * Module, die laufen, ohne einen Block zu belegen.
+ *
+ * Sie stehen unter dem Brett und nicht darauf: auf dem Brett waeren sie ein
+ * Platz, den es auf dem Spiegel nicht gibt. Deshalb auch keine Kachel, sondern
+ * eine Zeile aus Namen – was hier steht, hat keine Groesse und keine Lage,
+ * sondern nur Einstellungen.
+ */
+.silent {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.silent__label {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.silent__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.85rem;
+}
+
+.silent__item.is-active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Abgeschaltet heisst hier dasselbe wie ueberall: es laeuft nicht. */
+.silent__item.is-off {
+  opacity: 0.5;
 }
 
 /* ------------------------------ Brett: Szene ------------------------------ */
