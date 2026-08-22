@@ -1,7 +1,7 @@
 {
   "id": "weather",
   "name": "Wetter",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Aktuelles Wetter und Vorhersage von Open-Meteo, im grossen Block Tag fuer Tag durchgeschaltet, im breiten mit Tagesverlauf. Ohne API-Schluessel nutzbar.",
   "author": "smartmirror",
   "sizes": [
@@ -56,6 +56,15 @@
         "type": "boolean",
         "title": "Wind anzeigen",
         "default": true
+      },
+      "dwellSeconds": {
+        "type": "number",
+        "title": "Standzeit einer Karte",
+        "description": "Sekunden, bis der naechste Tag kommt. Nur im grossen Block, der durchschaltet.",
+        "minimum": 2,
+        "maximum": 60,
+        "step": 0.2,
+        "default": 2.6
       },
       "refreshMinutes": {
         "type": "integer",

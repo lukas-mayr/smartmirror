@@ -7,6 +7,8 @@ import {
   dayLabel,
   daysBetween,
   describeWeather,
+  dwellMs,
+  DWELL_SECONDS,
   HOURLY_POINTS,
   isoDay,
   peakIndex,
@@ -14,6 +16,7 @@ import {
   toCelsius,
   weatherForm,
 } from '../dist/shared.js';
+import { MOTION } from '@mirror/sdk';
 
 test('faerbt kalt blau und warm bernstein', () => {
   assert.equal(accentForTemperature(-5), '#6f9ad6');
@@ -254,4 +257,31 @@ test('schaltet nur im grossen Block durch, und nur mit frischen Werten', () => {
 
 test('faellt bei einer unbekannten Groesse auf die feste Ansicht zurueck', () => {
   assert.equal(weatherForm(place({ size: 'xxl' })), 'full');
+});
+
+/* ------------------------------- Standzeit -------------------------------- */
+
+test('nimmt ohne eigene Angabe den Takt des Design-Systems', () => {
+  // Aeltere Konfigurationen kennen das Feld nicht und sollen sich nicht
+  // ploetzlich anders bewegen.
+  assert.equal(dwellMs(undefined), MOTION.dwell);
+  assert.equal(dwellMs(null), MOTION.dwell);
+  assert.equal(dwellMs('acht'), MOTION.dwell);
+  // Nicht als "null Sekunden" lesen: Number(null) und Number('') sind beide 0.
+  assert.equal(dwellMs(''), MOTION.dwell);
+  assert.equal(dwellMs('8'), MOTION.dwell);
+});
+
+test('rechnet Sekunden in Millisekunden', () => {
+  assert.equal(dwellMs(2.6), 2600);
+  assert.equal(dwellMs(8), 8000);
+  assert.equal(dwellMs(12.4), 12400);
+});
+
+test('haelt die Standzeit in ihrer Spanne', () => {
+  // Von Hand bearbeitete Dateien koennen alles enthalten; ein Takt von einer
+  // Zehntelsekunde waere ein Flackern, einer von einer Stunde ein Stillstand.
+  assert.equal(dwellMs(0.1), DWELL_SECONDS.min * 1000);
+  assert.equal(dwellMs(-5), DWELL_SECONDS.min * 1000);
+  assert.equal(dwellMs(3600), DWELL_SECONDS.max * 1000);
 });

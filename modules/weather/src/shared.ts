@@ -1,4 +1,5 @@
 import type { IconName } from '@mirror/icons';
+import { MOTION } from '@mirror/sdk';
 
 export interface WeatherConfig {
   location: string;
@@ -16,7 +17,44 @@ export interface WeatherConfig {
    * nimmt, waere nach dem zweiten Modul mit derselben Idee ein Leuchtfeld.
    */
   highlight: boolean;
+  /**
+   * Wie lange eine Karte steht, in Sekunden.
+   *
+   * Fehlt der Wert, gilt der Takt des Design-Systems. Aeltere Konfigurationen
+   * kennen ihn nicht, und die sollen sich nicht ploetzlich anders bewegen.
+   */
+  dwellSeconds?: number;
   refreshMinutes: number;
+}
+
+/**
+ * Die Spanne, in der sich die Standzeit einstellen laesst.
+ *
+ * Unter zwei Sekunden flimmert die Durchschaltung, ueber sechzig steht sie
+ * praktisch – wer so lange einen Tag sehen will, nimmt besser den breiten
+ * Block, in dem alle Tage nebeneinander stehen.
+ */
+export const DWELL_SECONDS = { min: 2, max: 60 } as const;
+
+/**
+ * Die Standzeit in Millisekunden.
+ *
+ * Das Design-System gibt mit MOTION.dwell einen Takt fuer alles vor, was
+ * durchschaltet – auch fuer den Mitteilungsfeed. Dass das Wetter davon
+ * abweichen darf, ist eine bewusste Ausnahme und kein Versehen: es ist der
+ * einzige Block, bei dem man den Takt tatsaechlich spuert, weil man auf eine
+ * bestimmte Karte wartet. Ohne eigene Angabe bleibt es beim Systemtakt.
+ */
+export function dwellMs(seconds: unknown): number {
+  /*
+   * Nur eine echte Zahl zaehlt. `Number(null)` und `Number('')` sind beide
+   * null, und die rutschten sonst als "null Sekunden" in die Spanne statt als
+   * "keine Angabe" – aus einer fehlenden Einstellung wuerde der schnellste
+   * erlaubte Takt.
+   */
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds)) return MOTION.dwell;
+  const clamped = Math.min(DWELL_SECONDS.max, Math.max(DWELL_SECONDS.min, seconds));
+  return Math.round(clamped * 1000);
 }
 
 export interface CurrentWeather {
