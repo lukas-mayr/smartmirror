@@ -1481,6 +1481,111 @@ body {
   display: none;
 }
 
+/* ---------------------------- Uhr und Wetter im Kopf ----------------------- */
+
+/*
+ * Das Kopfband ist kein Rasterfeld, und deshalb gelten hier zwei eigene Regeln.
+ *
+ * Die erste betrifft die Groesse. Alle Schriftgroessen der Bloecke rechnen
+ * gegen ihren Block – auch gegen dessen *Breite*, damit ein flacher Block
+ * nichts abschneidet. Im Kopf hat der rechte Slot aber nur 30 % der Breite,
+ * also knapp 300 px, und damit faellt die ganze Leiter in sich zusammen: der
+ * Kurztext landete bei 10 px, die Herkunft bei 8. Der Slot rechnet deshalb
+ * gegen die Bandhoehe, und die Temperatur landet bei den 84 px, die das
+ * Design-System fuer einen grossen Wert vorsieht (--mirror-text-xl).
+ *
+ * Die zweite betrifft die Hoehe, und sie ist der Grund, warum Uhr und Wetter
+ * nebeneinander ueberhaupt zusammen aussehen. Die Uhrzeit ist gut doppelt so
+ * gross wie die Temperatur. Stuenden beide Bloecke einfach fuer sich zentriert,
+ * saesse die Zahl rechts irgendwo neben der Uhrzeit und die kleine Zeile
+ * darunter irgendwo anders – zwei Bloecke ohne gemeinsame Linie, und genau das
+ * sieht man sofort, auch wenn man nicht benennen kann, was fehlt.
+ *
+ * Also bekommen beide Bloecke dieselbe Wertzeile: eine Zeile fester Hoehe, in
+ * der die Zahl mittig sitzt. Weil beide Bloecke das Band in voller Hoehe
+ * fuellen, bedeutet `cqh` in beiden dasselbe – die Zahlen liegen auf einer
+ * Mittelachse, und die beiden kleinen Zeilen darunter bilden eine Linie.
+ */
+.zone--head .clock,
+.zone--head .weather--head {
+  /*
+   * Hoehe der Wertzeile, in Prozent der Bandhoehe. 46 % ist die Uhrzeit
+   * selbst (siehe .clock__time), der Rest ist ihr Zeilenabstand.
+   */
+  --head-value: 49cqh;
+  gap: 4cqh;
+}
+
+.zone--head .clock__time,
+.zone--head .weather--head .weather__now {
+  height: var(--head-value);
+  flex: none;
+}
+
+/*
+ * Die Uhrzeit sitzt in der Mitte ihrer Zeile statt sie auszufuellen. Sonst
+ * haengt die gemeinsame Linie daran, ob gerade Sekunden mitlaufen: mit
+ * Sekunden wird die Uhrzeit schmaler gerechnet, und die Zeile darunter
+ * rutschte mit ihr nach oben.
+ */
+.zone--head .clock__time {
+  display: flex;
+  align-items: center;
+}
+
+.zone--head .weather--head {
+  font-size: min(9cqh, 12cqw);
+}
+
+.zone--head .weather--head .weather__icon {
+  font-size: 15cqh;
+}
+
+.zone--head .weather--head .weather__temp {
+  font-size: 22cqh;
+}
+
+/*
+ * Die Zeile unter der Zahl ist im Kopf so gross wie das Datum unter der
+ * Uhrzeit – dieselbe Stufe, damit die beiden Zeilen als eine Linie gelesen
+ * werden und nicht als zwei Zufaelle. Sie ist ausserdem die einzige Zeile im
+ * Slot, die laenger werden kann als er breit ist ("Teilweise bewoelkt · 12
+ * km/h"): sie darf deshalb schrumpfen und am Ende mit Auslassungspunkten
+ * enden, statt links aus dem Block herauszulaufen und dort abgeschnitten zu
+ * werden.
+ */
+.zone--head .weather--head .weather__meta {
+  font-size: 0.62em;
+  max-width: 100%;
+}
+
+.zone--head .weather--head .weather__meta > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/*
+ * Der Hinweis steht im Kopf anstelle des Kurztextes und damit auf derselben
+ * Zeile – also auch in derselben Groesse, und einzeilig. Ein Umbruch waere
+ * eine dritte Zeile, und die verschoebe den Wert gegen die Uhrzeit daneben.
+ */
+.zone--head .weather--head .weather__hint {
+  font-size: 0.62em;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/*
+ * Auch der Ladezustand rechnet im Kopf gegen die Hoehe – sonst blieben von den
+ * vier atmenden Punkten vier Staubkoerner.
+ */
+.zone--head .weather--empty {
+  font-size: min(9cqh, 12cqw);
+}
+
 /*
  * Steht ein Hinweis im Block, weicht ihm die Vorschau.
  *
