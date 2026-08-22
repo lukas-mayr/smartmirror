@@ -146,9 +146,14 @@ export const MIRROR_STROKE = {
  * Das Raster der Anzeige, in Pixeln auf 1080 x 1920.
  *
  * 1080 minus zweimal 43 ergibt 994 px Inhaltsbreite. Davon drei Abstaende zu
- * je 32 px abgezogen und durch vier geteilt: 224 px Spaltenbreite. Zehn Zeilen
- * zu 148 px plus neun Abstaende ergeben 1768 px, oben und unten bleiben je
- * 76 px Rand.
+ * je 32 px abgezogen bleiben 898 px fuer vier Spalten – also 224,5 px je
+ * Spalte. `cellWidth` ist die abgerundete Zahl; die zwei Pixel Rest sind der
+ * Grund, warum die Anzeige das Raster mit `1fr` rechnet und nicht mit diesem
+ * Wert: der Browser verteilt sie, eine feste Spaltenbreite liesse sie am
+ * rechten Rand liegen.
+ *
+ * In der Hoehe geht es exakt auf: zehn Zeilen zu 148 px plus neun Abstaende
+ * ergeben 1768 px, oben und unten bleiben je 76 px Rand.
  *
  * Die Zelle ist bewusst quer (3:2) und nicht quadratisch: eine Box traegt eine
  * Beschriftung und darunter einen grossen Wert, und dafuer ist Breite mehr

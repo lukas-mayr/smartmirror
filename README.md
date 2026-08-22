@@ -26,16 +26,18 @@ sich selbst unter den Füßen wegziehen.
 
 ```
 packages/
-  sdk/       Modul-Verträge, WebSocket-Protokoll, Konfigurationstypen
+  sdk/       Modul-Verträge, WebSocket-Protokoll, Konfigurationstypen,
+             Design-System als Zahlen (design.ts)
   core/      Server
   shell/     Anzeige-Anwendung (Electron)
   remote/    Handy-App (PWA)
   updater/   OTA-Agent
   icons/     Flache Strichsymbole, aus Lucide generiert
 modules/
-  clock/     Uhrzeit und Datum (rein im Frontend)
-  weather/   Open-Meteo, mit Cache und Offline-Zustand
-  spotify/   Was gerade läuft, mit eigener Spotify-App
+  clock/         Uhrzeit und Datum (rein im Frontend)
+  weather/       Open-Meteo, mit Cache, Tagesverlauf und Offline-Zustand
+  spotify/       Was gerade läuft, mit eigener Spotify-App
+  notifications/ Feed aus drei Mitteilungen, gefüttert per Kommando
 deploy/      systemd-Units, Compositor-Start, Installer, Drehung
 scripts/     Build-, Bundle- und Generator-Skripte
 ```
@@ -209,9 +211,19 @@ seit Februar 2026 keine App mehr laufen. Angefordert wird nur
 
 ## Screens, Raster und Blöcke
 
-Die Anzeige ist ein **Raster** (voreingestellt 6 × 4 Felder, quer; hochkant
-4 × 6). Jedes Modul liegt darin als **Block** in einer von vier Größen — wie die
-Widgets auf einem Telefon:
+Jeder Screen wird auf eine von zwei Arten angeordnet: als **Raster** oder als
+**Szene**. Das Raster kann alles — und lässt deshalb auch zu, dass jemand zehn
+Zeilen füllt. Die Szene macht die Obergrenze zur Form. Umgeschaltet wird je
+Screen am Handy; bestehende Screens bleiben beim Raster, weil ein Update eine
+Wand nicht ungefragt neu anordnen soll.
+
+### Raster
+
+Voreingestellt 6 × 4 Felder quer, hochkant 4 × 10 — das Raster des
+Design-Systems, mit bewusst querformatigen Zellen (224 × 148 px auf 1080 × 1920).
+Eine Box trägt eine Beschriftung und darunter einen großen Wert, und dafür ist
+Breite mehr wert als Höhe. Jedes Modul liegt darin als **Block** in einer von
+vier Größen — wie die Widgets auf einem Telefon:
 
 | Größe | Felder | gedacht für |
 |---|---|---|
@@ -228,8 +240,29 @@ niemand sie mit dem Daumen auf einem Handybildschirm trifft.
 sondern eine Aussage über den Inhalt: eine Uhrzeit passt in ein einzelnes Feld,
 eine Wochenvorhersage braucht eine Reihe. Ein Modul zählt im Manifest auf, was
 es kann — `"sizes": ["m", "l", "xl"]` —, und am Handy sind die übrigen Größen gar
-nicht erst antippbar. Ohne Angabe kann ein Modul alle vier; das Wetter lässt S
-aus, weil davon nur eine Zahl ohne Zusammenhang übrig bliebe.
+nicht erst antippbar. Ohne Angabe kann ein Modul alle vier; die Mitteilungen
+lassen S und M aus, weil drei Zeilen darin unter 32 px fielen.
+
+Als Faustregel gilt: **höchstens zwei Boxen nebeneinander** und **höchstens
+sechs der zehn Zeilen belegt**. 994 px auf vier Boxen erzwingen Schrift unter
+32 px, und die liest man auf 3 m nicht mehr; ein randvolles Raster summiert
+seine Tönungen zu einer leuchtenden Fläche, auf der nichts mehr Vorrang hat.
+Leere Zeilen gruppieren die Blöcke und lassen den Spiegel Spiegel bleiben.
+
+### Szene
+
+Drei Bänder statt eines freien Rasters: **Kopf 20 %, Hauptzone 60 %,
+Fußband 20 %**. Die Uhr sitzt fix links oben, rechts daneben genau ein Slot. Die
+Hauptzone trägt die Aussage der Szene, das Fußband nur breite, flache Elemente
+wie „Läuft gerade" oder eine Terminzeile — und darf leer bleiben.
+
+Höchstens drei Elemente: Uhr, ein Kopf-Slot, ein Hauptwidget. Das Fußband zählt
+als viertes nur, wenn es etwas Laufendes zeigt. Wo kein vierter Platz ist,
+landet auch kein vierter Block — das ist der Unterschied zu einer Regel, an die
+man sich halten muss.
+
+Ein Block behält seinen Rasterplatz, auch während sein Screen eine Szene ist.
+Beim Zurückschalten liegt er wieder dort, wo er lag.
 
 **Mehrere Screens.** Ein Screen ist eine vollständige Anordnung. Der Spiegel
 schaltet sie im Kreis weiter; die Standzeit steht am Screen und nicht global —
@@ -242,7 +275,11 @@ Wechsel neu.
 **Angeordnet wird am Handy**, auf einem Brett, das den Spiegel im Kleinen zeigt
 — gleiches Seitenverhältnis, gleiche Ränder, gleiches Raster. Ein Block wird mit
 dem Finger gezogen und rastet ein; ein Umriss zeigt dabei, wo er landet, und
-färbt sich rot, wenn dort schon etwas liegt. Solange die Modulseite offen ist,
+färbt sich rot, wenn dort schon etwas liegt. Bei einer Szene zeigt dasselbe
+Brett die drei Bänder in denselben Anteilen; gezogen wird dort nichts, weil es
+je Band nur „drin" oder „nicht drin" gibt — das Band wählt man am Block aus.
+Jede Änderung wird unten bestätigt und lässt sich zurücknehmen, solange die
+Bestätigung steht. Solange die Modulseite offen ist,
 kann der Spiegel den bearbeiteten Screen mitzeigen und hält dafür das
 Weiterschalten an — der Schalter dafür steht unter dem Brett. Er löst sich nach
 fünf Minuten von selbst, damit ein Handy in der Hosentasche den Spiegel nicht
@@ -286,8 +323,18 @@ Die Regeln im Basis-Stylesheet sind keine Geschmacksfrage, sondern Physik:
   halbdurchlässigem Glas Lichthöfe.
 - Keine großen hellen Flächen: sie blenden und zeichnen den Displayrahmen nach.
 - Schriftschnitt nicht unter 300. Sehr dünne Schnitte wirken durch die Folie
-  ausgewaschen. Nach oben ist die Regel offen: fett ist unkritisch, solange die
-  helle Fläche klein bleibt — eine Zeile ist klein, ein gefülltes Rechteck nicht.
+  ausgewaschen. Nach oben ist die Regel offen — genutzt wird sie aber kaum:
+  **Werte stehen im Schnitt 300, Beschriftungen in 600–700.** Ein fetter Wert in
+  240 px ist genau die große helle Fläche, vor der die Regel darüber warnt.
+- Getönte Flächen höchstens bei **12 % Deckkraft**, und **höchstens eine deckende
+  Farbfläche pro Anordnung**, mit dunklem Text darauf. Zwei summieren sich zum
+  Leuchtfeld und lassen die Displaykante sichtbar werden. Welcher Block sie
+  trägt, ist eine Einstellung am Modul (`highlight`) und keine Automatik: das
+  kann nur entscheiden, wer die Anordnung kennt.
+- **Zwei Akzente, kein dritter Ton.** Salbei `#93b1a6` trägt Normalwerte —
+  Beschriftungen, Balken, Ringe, Konturen —, Sand `#d4b483` die Spitzen und
+  alles, was Aufmerksamkeit verlangt. Sobald Farbe nur noch hübsch ist und nichts
+  mehr bedeutet, liest man sie nicht mehr mit.
 - Gedämpfte Grautöne nicht unter `#707070` — darunter verschwindet alles.
 - Alle Symbole flach, einfarbig, in `currentColor` ([Lucide](https://lucide.dev),
   ISC). Keine Emoji: die sehen je nach System anders aus und sind teils farbig.
@@ -313,18 +360,35 @@ dazunimmt, hängt seine Klassen ein, statt die Werte abzuschreiben.
    tatsächlich an derselben Linie. Der Abstand zum Nachbarn kommt aus dem
    Raster und muss nicht doppelt vorkommen.
 2. **Eyebrow**: woher der Wert kommt — Wochentag, Ort, Kontoname. Klein,
-   gesperrt, gedimmt.
+   gesperrt, in Versalien, und **die Zeile, die den Akzent trägt**.
 3. **Titel**: der eine Wert, für den der Block da ist. Uhrzeit, Temperatur,
-   Songtitel.
-4. **Zweitzeile**: Versalien, gesperrt — und die einzige Zeile, die Farbe trägt.
-5. **Balken**: 8 px, Spur 10 % Weiß. Eine Linie, keine Fläche.
+   Songtitel. Schnitt 300.
+4. **Zweitzeile**: gedimmt, ohne Sperrung.
+5. **Balken**: 4 px, Spur 14 % Weiß, abgerundet. Eine Linie, keine Fläche.
 6. **Ziffern** in `tabular-nums`, damit beim Weiterzählen nichts zappelt.
+
+Punkt 2 und 3 haben mit dem Design-System die Rollen getauscht: bis 0.8 war der
+Wert fett und die Beschriftung grau. Jetzt ist der Wert dünn und die
+Beschriftung farbig — **240 gegen 26** liest man aus 3 m in einer Sekunde, ganz
+ohne Fettung, und die helle Fläche bleibt klein.
+
+Die Uhr weicht in einem Punkt ab: bei ihr steht die Herkunftszeile *unter* der
+Uhrzeit statt darüber. Das folgt daraus, was die Zeile beantwortet — „wo" und
+„welches Konto" gehen dem Wert voraus, „welcher Tag" folgt der Uhrzeit. Gesetzt
+ist sie in beiden Fällen gleich.
 
 **Farbe braucht eine Quelle.** Spotify zieht seinen Ton aus dem Cover, das
 Wetter aus der Temperatur (kühles Blau nach warmem Bernstein) — dadurch ist die
 Farbe eine Eigenschaft des Inhalts und keine Dekoration. Die Uhr bleibt weiß:
 sie hat keine Eigenschaft, aus der sich ehrlich ein Ton ableiten ließe, und ein
 Block ohne Farbe hält den Spiegel ruhig.
+
+Das ist die eine **bewusste Abweichung vom Design-System**, das genau zwei
+Akzente und keinen dritten Ton vorsieht. Die beiden Rollen gelten hier trotzdem:
+Salbei für Beschriftungen und Normalwerte, Sand für Spitzen. Nur dort, wo ein
+Modul eine echte Quelle für seinen Ton hat, darf er von dort kommen. Auf einer
+deckenden Fläche entfällt er ganz — dort *ist* die Fläche der Akzent, und ein
+zweiter Ton darauf wäre Farbe auf Farbe.
 
 **Der Inhalt füllt den Block.** Feste Größentabellen je Blockgröße führen dazu,
 dass ein Modul im großen Block als kleiner Klumpen in der Mitte steht. Deshalb
@@ -343,15 +407,48 @@ Tabelle: jeder Tag bekommt ein Viertel der Breite, also ein Symbol in
 Fußnotengröße und zwei Zahlen, die man aus zwei Metern nicht mehr liest. Ein
 Spiegel wird aber im Vorbeigehen gelesen. Deshalb zeigt das Wetter im L-Block
 immer nur einen Tag — groß, mit Beschriftung, Symbol, Zahl und Kurztext — und
-schaltet alle fünf Sekunden zum nächsten: *Heute*, *Morgen*, *Übermorgen*,
+schaltet im Takt des Design-Systems (`--motion-dwell`, 2,6 s) zum nächsten:
+*Heute*, *Morgen*, *Übermorgen*,
 danach der Wochentag. Der Aufbau der Karte bleibt dabei bei jedem Tag derselbe;
 nur der Inhalt wechselt, damit aus dem Weiterschalten eine ruhige Bewegung wird
 und kein Umbau. Auch die Schriftgröße der Beschriftung richtet sich nach dem
 längsten Wort des ganzen Stapels und nicht nach der sichtbaren Karte — sonst
-spränge sie im Fünfsekundentakt. Sind die Werte veraltet, hört das
+spränge sie bei jedem Wechsel. Sind die Werte veraltet, hört das
 Weiterschalten auf: eine Durchschaltung, die alte Tage durchblättert, sieht
-lebendiger aus, als die Daten sind. Im XL-Block bleibt die Reihe, weil dort
+lebendiger aus, als die Daten sind. Eine Punktreihe kündigt den Wechsel an —
+ohne sie liest man im Vorbeigehen „Heute 18°" und weiß nicht, dass gleich
+„Morgen 19°" dasteht. Im XL-Block bleibt der Tagesverlauf stehen, weil dort
 alles gleichzeitig lesbar groß ist.
+
+### Bewegung
+
+Bewegt wird nur, was sich inhaltlich ändert: ein Wechsel steigt kurz auf und
+blendet über (`--motion-swap`, 500 ms), Fortschritt wächst als Breite
+(`--motion-tick`, 900 ms), Laden atmet (`--motion-breathe`, 1,4 s). Nie
+gleichzeitig zwei Elemente, nie Position und Größe zusammen. Im dunklen Raum
+zieht jede Animation den Blick auf sich, und ein Spiegel, der den Blick zieht,
+ist kaputt. `prefers-reduced-motion` schaltet alles ab.
+
+### Nachts eine Stufe dunkler
+
+Nicht dasselbe wie der Zeitplan, der den Bildschirm abschaltet: der Spiegel
+bleibt an und nimmt zurück. Keine deckende Fläche, kein Akzent, kein
+Weiterschalten, alle Werte auf Grau. Wer um drei Uhr aufsteht, soll eine Uhrzeit
+lesen können und nicht geblendet werden — und eine Animation, die im dunklen
+Zimmer im Augenwinkel läuft, weckt zuverlässig auf.
+
+Technisch ist es ein Attribut am Wurzelelement (`data-night`), und das
+Stylesheet setzt dieselben Tokens eine Stufe dunkler. So muss kein Modul von der
+Nacht wissen, und keines kann sie vergessen. Eingestellt wird das Fenster unter
+*Anzeige*; voreingestellt ist 22:30 bis 06:00.
+
+### Wo die Werte stehen
+
+Das Design-System steht doppelt: als Konstanten in `packages/sdk/src/design.ts`
+und als Custom Properties in den beiden Stylesheets. Das ist Absicht — ein Modul
+kann kein CSS lesen, und das Wetter muss wissen, wie lange eine Karte steht.
+Doppelt heißt aber, dass beide auseinanderlaufen können; `packages/sdk/test/design.test.mjs`
+liest die Stylesheets als Text und vergleicht sie mit den Konstanten.
 
 ---
 
