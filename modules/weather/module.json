@@ -1,8 +1,8 @@
 {
   "id": "weather",
   "name": "Wetter",
-  "version": "0.2.0",
-  "description": "Aktuelles Wetter und Vorhersage von Open-Meteo. Ohne API-Schluessel nutzbar.",
+  "version": "0.3.0",
+  "description": "Aktuelles Wetter und Vorhersage von Open-Meteo, im grossen Block Tag fuer Tag durchgeschaltet. Ohne API-Schluessel nutzbar.",
   "author": "smartmirror",
   "sizes": ["m", "l", "xl"],
   "preferredSize": "l",
