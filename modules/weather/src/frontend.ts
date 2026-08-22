@@ -39,7 +39,7 @@ export default defineFrontend<WeatherState, WeatherConfig>({
     };
 
     /** Der Takt, mit dem der Zaehler gerade laeuft. */
-    let dwell = MOTION.dwell;
+    let dwell: number = MOTION.dwell;
 
     /*
      * Neu gestartet wird nur, wenn sich der Takt geaendert hat.
