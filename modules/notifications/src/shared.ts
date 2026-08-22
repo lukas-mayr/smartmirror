@@ -1,4 +1,4 @@
-import { FEED } from '@mirror/sdk';
+import { FEED, type FeedNotification } from '@mirror/sdk';
 
 /**
  * Der Mitteilungsfeed.
@@ -8,15 +8,30 @@ import { FEED } from '@mirror/sdk';
  * Zeile und weiss trotzdem, dass mehr wartet — der Rest ist kein Text, den man
  * lesen soll, sondern die Auskunft "da kommt noch was".
  *
+ * Dieses Modul ist eine Flaeche und keine Quelle. Es holt nichts: was eine
+ * Mitteilung ist, weiss der Kalender, das Wetter oder die Abfahrtstafel, und
+ * jedes dieser Module hat den Zustand ohnehin schon. Sie melden ihn mit
+ * `ctx.notify(...)`, der Host legt die Meldungen zusammen, und hier kommt der
+ * fertige Stand an. Dazu die festen Zeilen aus der Konfiguration und was per
+ * Kommando hereingereicht wird — mehr Wege gibt es nicht hinein.
+ *
  * Wieviele Positionen es sind, entscheidet die Blockhoehe und nicht eine feste
  * Zahl: durchgeschaltet wird ohnehin, und ob dabei drei oder sieben Eintraege
  * gleichzeitig stehen, ist keine Frage der Gestaltung, sondern des Platzes.
- * Eine feste Drei war in einem hohen Block eine halbleere Liste.
  *
  * Ein leerer Feed heisst leere Hauptzone. Kein "Keine Mitteilungen": eine
  * leere Flaeche auf einem Spiegel ist ein Spiegel, ein Satz darueber ist eine
  * Meldung, dass nichts zu melden ist.
  */
+
+/**
+ * Der Eintragstyp kommt aus dem SDK.
+ *
+ * Er ist die gemeinsame Sprache zwischen Quelle und Anzeige und gehoert
+ * deshalb keiner der beiden Seiten. Hier liegt nur, was die Anzeige damit
+ * macht — und das Lesen der festen Zeilen aus der Konfiguration.
+ */
+export type { FeedNotification };
 
 export interface NotificationsConfig {
   /**
@@ -44,30 +59,8 @@ export interface NotificationsConfig {
   visibleCount: number;
 }
 
-export interface Notification {
-  /** Stabil ueber die Lebensdauer – die Anzeige haengt die Einblendung daran. */
-  id: string;
-  /** Woher die Mitteilung kommt: "Termin · in 18 min", "Paket", "Bus 142". */
-  label: string;
-  /** Die Aussage in wenigen Woertern: "Standup", "Regen ab 16 Uhr". */
-  title: string;
-  /** Zweitzeile mit Zeit, Ort oder Wahrscheinlichkeit. */
-  meta: string;
-  /**
-   * Dringendes rueckt sofort auf Position 1 und bekommt Sand statt Salbei.
-   *
-   * Bewusst ein Schalter und keine Prioritaetszahl: eine Skala von 1 bis 5
-   * beantwortet die Frage nicht, die auf einem Spiegel zaehlt — steht es ganz
-   * oben oder nicht. Und wer drei Stufen hat, vergibt irgendwann nur noch die
-   * hoechste.
-   */
-  urgent: boolean;
-  /** ISO-Zeitstempel, ab dem die Mitteilung nicht mehr gezeigt wird. */
-  expiresAt: string | null;
-}
-
 export interface NotificationsState {
-  items: Notification[];
+  items: FeedNotification[];
 }
 
 /**
@@ -92,7 +85,7 @@ export const ADVANCE_SECONDS = FEED.advance / 1000;
  *
  * Ein "!" am Zeilenanfang macht die Mitteilung dringend.
  */
-export function parseEntry(line: string, index: number): Notification | null {
+export function parseEntry(line: string, index: number): FeedNotification | null {
   const trimmed = line.trim();
   if (trimmed.length === 0) return null;
 
@@ -101,45 +94,26 @@ export function parseEntry(line: string, index: number): Notification | null {
 
   // Ein Teil heisst Titel, zwei heissen Label und Titel, drei heissen alles.
   const [first = '', second = '', third = ''] = parts;
-  const notification: Notification = {
+  const notification: FeedNotification = {
     id: `entry-${index}`,
     label: parts.length >= 2 ? first : '',
     title: parts.length >= 2 ? second : first,
     meta: parts.length >= 3 ? third : '',
     urgent,
+    at: null,
     expiresAt: null,
+    // Feste Zeilen sind die Ausnahme von der Regel "der Inhalt kommt aus den
+    // Modulen": ein Zettel an die Familie hat keine Datenquelle.
+    source: 'notifications',
   };
   return notification.title.length > 0 ? notification : null;
 }
 
-export function parseEntries(entries: string): Notification[] {
+export function parseEntries(entries: string): FeedNotification[] {
   return entries
     .split('\n')
     .map((line, index) => parseEntry(line, index))
-    .filter((entry): entry is Notification => entry !== null);
-}
-
-/**
- * Was gerade noch gilt, in der Reihenfolge, in der es gezeigt wird.
- *
- * Dringendes zuerst, sonst die Reihenfolge, in der es hereinkam. Abgelaufenes
- * faellt heraus: eine Mitteilung "Bus in 7 min" von vor einer Stunde ist keine
- * veraltete Information, sondern eine falsche.
- */
-export function activeNotifications(
-  items: readonly Notification[],
-  now: Date = new Date(),
-): Notification[] {
-  const stamp = now.getTime();
-  const alive = items.filter((item) => {
-    if (!item.expiresAt) return true;
-    const expires = Date.parse(item.expiresAt);
-    return !Number.isFinite(expires) || expires > stamp;
-  });
-
-  // Ein stabiler Sortierlauf: gleich dringende behalten ihre Reihenfolge, und
-  // die Liste springt nicht bei jedem Zeichnen um.
-  return [...alive].sort((a, b) => Number(b.urgent) - Number(a.urgent));
+    .filter((entry): entry is FeedNotification => entry !== null);
 }
 
 /**
@@ -216,12 +190,12 @@ export function restOpacity(step: number, total: number): number {
  * ueberhaupt.
  */
 export function visibleWindow(
-  items: readonly Notification[],
+  items: readonly FeedNotification[],
   offset: number,
   slots: number,
-): Notification[] {
+): FeedNotification[] {
   if (items.length === 0 || slots <= 0) return [];
   const count = Math.min(slots, items.length);
   const start = items.length > slots ? ((offset % items.length) + items.length) % items.length : 0;
-  return Array.from({ length: count }, (_, step) => items[(start + step) % items.length] as Notification);
+  return Array.from({ length: count }, (_, step) => items[(start + step) % items.length] as FeedNotification);
 }

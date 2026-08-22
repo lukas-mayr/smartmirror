@@ -12,7 +12,17 @@ export type ModulePermission =
   /** Darf `ctx.secret(...)` lesen. */
   | 'secrets'
   /** Darf Kommandos von der Fernbedienung empfangen. */
-  | 'commands';
+  | 'commands'
+  /**
+   * Darf mit `ctx.notify(...)` in den Mitteilungsfeed melden.
+   *
+   * Getrennt vom Lesen, weil es zwei verschiedene Rollen sind: fast jedes
+   * Modul hat gelegentlich etwas zu melden, aber den gesammelten Strom aller
+   * Quellen soll nur bekommen, wer ihn anzeigt.
+   */
+  | 'notify'
+  /** Darf mit `ctx.onNotifications(...)` den gesammelten Feed hoeren. */
+  | 'notifications';
 
 export interface ModuleSecretDeclaration {
   key: string;

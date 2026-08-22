@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  activeNotifications,
   fitCount,
   parseEntries,
   parseEntry,
@@ -22,7 +21,9 @@ test('liest Woher, Was und Zusatz aus einer Zeile', () => {
     title: 'Standup',
     meta: '09:30 · Kueche',
     urgent: false,
+    at: null,
     expiresAt: null,
+    source: 'notifications',
   });
 });
 
@@ -56,9 +57,7 @@ test('verwirft eine Zeile ohne Titel', () => {
   assert.equal(parseEntry('   ', 0), null);
 });
 
-/* -------------------------------- Auswahl --------------------------------- */
-
-const NOW = new Date('2026-08-22T10:00:00.000Z');
+/* ------------------------------ Hilfsgeruest ------------------------------ */
 
 const item = (id, extra = {}) => ({
   id,
@@ -66,36 +65,10 @@ const item = (id, extra = {}) => ({
   title: id,
   meta: '',
   urgent: false,
+  at: null,
   expiresAt: null,
+  source: 'test',
   ...extra,
-});
-
-test('laesst Abgelaufenes heraus', () => {
-  // "Bus in 7 min" von vor einer Stunde ist keine veraltete Information,
-  // sondern eine falsche.
-  const items = [
-    item('alt', { expiresAt: '2026-08-22T09:00:00.000Z' }),
-    item('gilt', { expiresAt: '2026-08-22T11:00:00.000Z' }),
-    item('ohne Ende'),
-  ];
-  assert.deepEqual(
-    activeNotifications(items, NOW).map((entry) => entry.id),
-    ['gilt', 'ohne Ende'],
-  );
-});
-
-test('zieht Dringendes nach oben und laesst den Rest in Ruhe', () => {
-  const items = [item('a'), item('b'), item('dringend', { urgent: true }), item('c')];
-  assert.deepEqual(
-    activeNotifications(items, NOW).map((entry) => entry.id),
-    ['dringend', 'a', 'b', 'c'],
-  );
-});
-
-test('behandelt einen unlesbaren Zeitstempel als "gilt weiter"', () => {
-  // Lieber eine Mitteilung zu lang als eine, die wegen eines Tippfehlers in
-  // einem Kommando nie erscheint.
-  assert.equal(activeNotifications([item('x', { expiresAt: 'unsinn' })], NOW).length, 1);
 });
 
 /* ------------------------------- Positionen ------------------------------- */

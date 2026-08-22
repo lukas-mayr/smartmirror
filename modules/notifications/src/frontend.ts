@@ -1,8 +1,7 @@
 import { html, render, nothing } from 'lit';
 import { keyed } from 'lit/directives/keyed.js';
-import { defineFrontend, type ModuleView } from '@mirror/sdk';
+import { activeNotifications, defineFrontend, type ModuleView } from '@mirror/sdk';
 import {
-  activeNotifications,
   ADVANCE_SECONDS,
   fitCount,
   restOpacity,

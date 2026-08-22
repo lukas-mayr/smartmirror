@@ -1,4 +1,5 @@
 import type { Duration } from './duration.js';
+import type { FeedNotification, NotificationInput } from './notify.js';
 import type { ModuleAction } from './protocol.js';
 
 export interface Logger {
@@ -61,6 +62,29 @@ export interface BackendContext<TConfig = Record<string, unknown>, TState = Reco
   setSecret(key: string, value: string | null): Promise<void>;
   /** Nur mit Permission "commands". */
   onCommand(name: string, handler: (payload: unknown) => void | Promise<void>): Disposer;
+
+  /**
+   * Meldet, was diese Instanz gerade mitzuteilen hat. Nur mit Permission "notify".
+   *
+   * Immer der vollstaendige Stand und nie ein Zuwachs: was in der neuen
+   * Meldung fehlt, ist zurueckgezogen. Ein leeres Array meldet "nichts mehr",
+   * und genau das ist der Normalfall — die meisten Module haben die meiste
+   * Zeit nichts zu melden.
+   *
+   * Ein Modul muss dafuer nichts zusaetzlich abrufen: es meldet, was es fuer
+   * seinen eigenen Block ohnehin schon geholt hat.
+   */
+  notify(items: readonly NotificationInput[]): void;
+
+  /**
+   * Hoert den gesammelten Feed aller meldenden Instanzen. Nur mit Permission
+   * "notifications".
+   *
+   * Der Handler laeuft sofort mit dem aktuellen Stand und danach bei jeder
+   * Aenderung. Sortiert ist der Strom schon – Dringendes zuerst, dann das,
+   * was als naechstes ansteht.
+   */
+  onNotifications(handler: (items: readonly FeedNotification[]) => void): Disposer;
 }
 
 export interface ModuleBackend<TConfig = Record<string, unknown>, TState = Record<string, unknown>> {

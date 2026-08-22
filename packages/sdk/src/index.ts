@@ -7,6 +7,7 @@ export * from './frontend.js';
 export * from './insets.js';
 export * from './layout.js';
 export * from './manifest.js';
+export * from './notify.js';
 export * from './protocol.js';
 export * from './rotation.js';
 export * from './schema.js';
