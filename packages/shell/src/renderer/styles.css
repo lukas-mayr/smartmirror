@@ -372,198 +372,56 @@ body {
  * die seitlich hinauslaeuft.
  */
 
-.clock {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 0;
-}
-
-.clock__time {
-  font-size: min(30cqh, 18cqw);
-  font-weight: 300;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-  /* Eine umgebrochene Uhrzeit ist keine Uhrzeit mehr. */
-  white-space: nowrap;
-}
-
-.clock__date {
-  margin-top: 0.4em;
-  font-size: min(9cqh, 5.5cqw);
-  font-weight: 300;
-  color: var(--mirror-fg-muted);
-}
-
-/* Im kleinsten Block bleibt neben der Uhrzeit nichts uebrig. */
-@container (max-height: 160px) {
-  .clock__date {
-    display: none;
-  }
-}
-
-.weather {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4em;
-  align-items: center;
-  min-width: 0;
-}
-
-.weather--stale {
-  color: var(--mirror-fg-muted);
-}
-
-.weather__now {
-  display: flex;
-  align-items: center;
-  gap: 0.4em;
-}
-
-.weather__icon {
-  font-size: min(20cqh, 12cqw);
-  line-height: 0;
-  display: inline-flex;
-}
-
-.weather__temp {
-  font-size: min(22cqh, 13cqw);
-  font-weight: 300;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.weather__meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: center;
-  gap: 0.4em;
-  font-size: min(8cqh, 4.6cqw);
-  color: var(--mirror-fg-muted);
-}
-
-.weather__sep {
-  color: var(--mirror-fg-dim);
-}
-
-.weather__place {
-  font-size: min(7cqh, 4cqw);
-  color: var(--mirror-fg-dim);
-}
-
-.weather__forecast {
-  display: flex;
-  /* Ein schmaler Block bricht die Vorschau lieber um, als aus dem Bild zu laufen. */
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 1.2em;
-  margin-top: 0.2em;
-  font-size: min(7cqh, 4cqw);
-}
-
-.weather__day {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.25em;
-  color: var(--mirror-fg-muted);
-}
-
-.weather__day-icon {
-  font-size: 1.6em;
-  line-height: 0;
-  display: inline-flex;
-  color: var(--mirror-fg);
-}
-
-.weather__day-range {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.35;
-}
-
-.weather__day-range i {
-  font-style: normal;
-  color: var(--mirror-fg-muted);
-}
-
 /*
- * Was in einen flachen Block nicht mehr hineinpasst, faellt weg statt sich zu
- * quetschen. Ein Modul im S-Block zeigt die eine Zahl, auf die es ankommt.
- */
-@container (max-height: 260px) {
-  .weather__forecast {
-    display: none;
-  }
-}
-
-@container (max-height: 180px) {
-  .weather__place,
-  .weather__meta {
-    display: none;
-  }
-}
-
-.weather__hint,
-.weather__error {
-  font-size: min(7cqh, 4cqw);
-  color: var(--mirror-fg-dim);
-}
-
-.weather--empty {
-  font-size: min(9cqh, 5cqw);
-  color: var(--mirror-fg-dim);
-}
-
-/*
- * Was gerade laeuft – Richtung "Kante": grafisch und hart. Fette Titel,
- * flache Farbflaechen, der Fortschritt als dicker Balken. Die Farbe kommt aus
- * dem Cover (das Backend liefert es als data-URI, die Anzeige zieht den Ton
- * heraus) und bleibt auf Interpret und Balken beschraenkt – Flaechen leuchten
- * hinter der Folie, Linien nicht.
+ * Eine Handschrift fuer alle Bloecke.
  *
- * Was zu sehen ist, entscheidet die Blockgroesse: S nur das Cover, M dazu
- * Titel und Interpret, L den Fortschritt, XL alles in voller Breite.
+ * Bis 0.7 sprachen die Module zwei Sprachen: Spotify stand links an einer
+ * Kante und schrieb fett, Uhr und Wetter schwebten mittig und schrieben duenn.
+ * Einzeln faellt das niemandem auf, nebeneinander wirkt der Spiegel dadurch
+ * nicht ruhig, sondern unfertig.
+ *
+ * Seither gilt fuer alle dasselbe Geruest. Die Regeln stehen bewusst als
+ * gemeinsame Selektorlisten da und nicht dreimal abgeschrieben: wer ein Modul
+ * dazunimmt, haengt seine Klassen hier ein und hat die Handschrift, statt sie
+ * nachzubauen.
+ *
+ *  1. Linke Kante, ohne Innenabstand. Der Inhalt beginnt an der Blockkante,
+ *     also an einer Rasterlinie – nur so stehen zwei Bloecke untereinander
+ *     tatsaechlich an derselben Linie. Der Abstand zum Nachbarn kommt aus
+ *     --mirror-gap und muss nicht doppelt vorkommen.
+ *  2. Eyebrow: woher der Wert kommt (Wochentag, Ort, Konto). Klein, gesperrt,
+ *     gedimmt – gelesen wird er erst im zweiten Blick.
+ *  3. Titel: der eine Wert, fuer den der Block da ist. Schnitt 800.
+ *  4. Zweitzeile: Versalien, gesperrt, und als einzige Zeile farbig.
+ *  5. Balken: 8 px, Spur 10 % Weiss. Eine Linie, keine Flaeche – Flaechen
+ *     leuchten hinter der Folie.
+ *  6. Ziffern: tabular-nums, damit beim Weiterzaehlen nichts zappelt.
+ *
+ * Fette Schnitte sind kein Widerspruch zur Regel "300 bis 400" ganz oben: die
+ * gilt duennen Schnitten, die durch die Folie auswaschen. Nach oben ist sie
+ * offen, solange die helle Flaeche klein bleibt – eine Zeile ist klein.
  */
+
+/* 1 – die Kante */
+.clock,
+.weather,
 .spotify {
   width: 100%;
   height: 100%;
-  display: flex;
-  align-items: center;
-  box-sizing: border-box;
   min-width: 0;
-}
-
-.spotify--paused {
-  color: var(--mirror-fg-muted);
-}
-
-.spotify__cover {
-  flex: none;
-  border-radius: 4px;
-  background-size: cover;
-  background-position: center;
-  background-color: #131316;
-}
-
-.spotify__cover--empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.spotify__text {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5em;
-  min-width: 0;
-  font-size: min(8cqh, 4.4cqw);
-  /* Die Grundregel der Bloecke zentriert – "Kante" ist linksbuendig: eine
-   * harte linke Kante gehoert zum Charakter dieser Richtung. */
   text-align: left;
 }
 
+.clock,
+.weather {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* 2 – die Herkunft */
+.clock__weekday,
+.weather__place,
 .spotify__eyebrow {
   font-size: 0.62em;
   font-weight: 700;
@@ -575,21 +433,314 @@ body {
   text-overflow: ellipsis;
 }
 
+/* 3 – der Wert, fuer den der Block da ist */
+.clock__time,
+.weather__temp,
 .spotify__title {
-  font-size: 1.7em;
   font-weight: 800;
-  line-height: 1.08;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.06;
+  letter-spacing: -0.02em;
 }
 
+.clock__time,
+.weather__temp {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 4 – die Zweitzeile */
+.clock__date,
+.weather__meta,
 .spotify__artist {
   font-size: 0.78em;
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 6 – Zahlen, die nicht zappeln */
+.weather__day-range,
+.spotify__times {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------- Uhr ---------------------------------- */
+
+.clock {
+  font-size: min(9cqh, 5cqw);
+  gap: 0.55em;
+}
+
+/*
+ * Die Uhrzeit fuellt die Blockbreite – und wie breit sie wird, haengt daran,
+ * was in ihr steht. "21:04" sind fuenf Zeichen, "9:04:33 PM" sind zehn. Das
+ * Frontend gibt die Zahl als --clock-chars herein, und die Breite ergibt sich
+ * daraus statt aus einer festen Groesse, die immer den schlimmsten Fall
+ * annehmen muesste.
+ *
+ * 150 ist der Erfahrungswert: eine Ziffer im Schnitt 800 ist gut 0.62 em
+ * breit, Doppelpunkte und Leerzeichen sind schmaler. Die Rechnung schaetzt
+ * also nach oben – lieber ein Finger Luft rechts als eine abgeschnittene
+ * Uhrzeit. Nach oben begrenzt die Blockhoehe.
+ */
+.clock__time {
+  font-size: min(46cqh, calc(150cqw / var(--clock-chars, 5)));
+}
+
+.clock__date {
+  color: var(--mirror-fg-muted);
+}
+
+/* Im kleinsten Block bleibt neben der Uhrzeit nichts uebrig. */
+.module[data-size='s'] .clock__weekday,
+.module[data-size='s'] .clock__date {
+  display: none;
+}
+
+/* --------------------------------- Wetter --------------------------------- */
+
+.weather {
+  font-size: min(8.5cqh, 4.4cqw);
+  gap: 0.45em;
+}
+
+.weather--stale {
+  color: var(--mirror-fg-muted);
+}
+
+.weather__now {
+  display: flex;
+  align-items: center;
+  gap: 0.3em;
+}
+
+/*
+ * Nichts im Block gibt nach.
+ *
+ * Sonst staucht Flexbox die Zeilen, sobald der Inhalt einmal hoeher ist als
+ * der Block – und weil sie ueberstehenden Text abschneiden, endet das nicht in
+ * einer engeren Zeile, sondern in Buchstaben, denen oben und unten die Haelfte
+ * fehlt. Lieber eine Zeile ganz weglassen als alle halb zeigen; welche das
+ * ist, entscheiden die Regeln weiter unten.
+ */
+.weather > * {
+  flex: 0 0 auto;
+}
+
+.weather__icon {
+  font-size: min(20cqh, 11cqw);
+  line-height: 0;
+  display: inline-flex;
+}
+
+.weather__temp {
+  font-size: min(26cqh, 16cqw);
+}
+
+/*
+ * Im mittleren Block steht die Zahl allein – die Vorschau ist dort ausgeblendet,
+ * und was frei wird, gehoert dem, was ohnehin die Hauptsache ist.
+ */
+.module[data-size='m'] .weather__icon {
+  font-size: min(30cqh, 13cqw);
+}
+
+.module[data-size='m'] .weather__temp {
+  font-size: min(44cqh, 20cqw);
+}
+
+/* Die Einheit ist eine Fussnote an der Zahl, nicht Teil von ihr. */
+.weather__unit {
+  font-size: 0.38em;
+  letter-spacing: 0;
+  vertical-align: 0.8em;
+  color: var(--mirror-fg-muted);
+}
+
+.weather__meta {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4em;
+}
+
+.weather__sep {
+  opacity: 0.5;
+}
+
+/*
+ * Die Vorschau als Reihe harter Spalten: Trennlinien statt Abstaenden, jede
+ * Spalte an ihrer eigenen Kante. Kein Umbruch mehr – was nicht mehr hineinpasst,
+ * blendet die Groessenregel weiter unten aus, statt eine zweite Zeile
+ * anzufangen, die den Block sprengt.
+ */
+.weather__forecast {
+  display: flex;
+  margin-top: 0.35em;
+  border-top: 1px solid color-mix(in srgb, var(--mirror-fg) 14%, transparent);
+  padding-top: 0.6em;
+  font-size: 0.78em;
+  min-width: 0;
+}
+
+.weather__day {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+  padding-left: 0.7em;
+  border-left: 1px solid color-mix(in srgb, var(--mirror-fg) 14%, transparent);
+}
+
+.weather__day:first-child {
+  padding-left: 0;
+  border-left: none;
+}
+
+.weather__day-name {
+  font-size: 0.72em;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--mirror-fg-dim);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.weather__day-icon {
+  font-size: 1.3em;
+  line-height: 0;
+  display: inline-flex;
+  color: var(--mirror-fg);
+}
+
+.weather__day-range {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.weather__day-range i {
+  font-style: normal;
+  font-weight: 600;
+  color: var(--mirror-fg-dim);
+}
+
+/*
+ * Was in einen flachen Block nicht mehr hineinpasst, faellt weg statt sich zu
+ * quetschen. Gehaengt an die Blockgroesse und nicht an eine Pixelhoehe: eine
+ * Rasterzeile ist auf 1080p gut 200 px hoch und auf einem 4K-Spiegel knapp
+ * 500 – eine Schwelle in Pixeln wuerde also je nach Bildschirm etwas anderes
+ * bedeuten, die Blockgroesse bedeutet ueberall dasselbe.
+ */
+.module[data-size='m'] .weather__forecast {
+  display: none;
+}
+
+/*
+ * Steht ein Hinweis im Block, weicht ihm die Vorschau.
+ *
+ * Zwei Gruende, und beide zaehlen: der Hinweis kommt nur, wenn die Werte
+ * veraltet sind oder die Abfrage fehlgeschlagen ist – dann ist auch die
+ * Vorschau nicht mehr aktuell und hat kein Recht, so auszusehen, als waere sie
+ * es. Und sie ist die einzige Zeile, deren Platz reicht, um dem Satz Raum zu
+ * machen, ohne dass etwas anderes an die Blockkante stoesst.
+ */
+.weather:has(.weather__hint) .weather__forecast {
+  display: none;
+}
+
+.weather__hint,
+.weather__error {
+  font-size: 0.8em;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--mirror-fg-dim);
+}
+
+.weather--empty {
+  font-size: min(9cqh, 5cqw);
+  font-weight: 400;
+  color: var(--mirror-fg-dim);
+  display: flex;
+  align-items: center;
+}
+
+/* --------------------------------- Spotify --------------------------------- */
+
+/*
+ * Was gerade laeuft – grafisch und hart: fette Titel, das Cover als Flaeche,
+ * der Fortschritt als dicker Balken. Die Farbe kommt aus dem Cover (das
+ * Backend liefert es als data-URI, die Anzeige zieht den Ton heraus) und
+ * bleibt auf Interpret und Balken beschraenkt.
+ *
+ * Was zu sehen ist, entscheidet die Blockgroesse: S nur das Cover, M dazu
+ * Titel und Interpret, L den Fortschritt, XL alles in voller Breite.
+ */
+.spotify {
+  display: flex;
+  align-items: stretch;
+  gap: min(4cqw, 1.6em);
+  box-sizing: border-box;
+}
+
+.spotify--paused {
+  color: var(--mirror-fg-muted);
+}
+
+/*
+ * Das Cover ist so hoch wie der Platz, den es hat, und quadratisch – daraus
+ * ergibt sich seine Breite. Das ist der Unterschied zu einer Tabelle fester
+ * Werte je Blockgroesse: der Block bestimmt das Cover, nicht eine Zahl im
+ * Stylesheet, und der Inhalt fuellt jede Blockform von selbst aus.
+ *
+ * Abgedunkelt, weil ein grosses Cover genau das ist, wovor die Regeln ganz
+ * oben warnen: eine helle Flaeche, die hinter halbdurchlaessigem Glas leuchtet
+ * und den Rand des Bildschirms nachzeichnet. Ein Achtel weniger Helligkeit
+ * nimmt dem Bild nichts und dem Spiegel das Leuchten.
+ */
+.spotify__cover {
+  flex: 0 0 auto;
+  align-self: stretch;
+  aspect-ratio: 1;
+  border-radius: 4px;
+  background-size: cover;
+  background-position: center;
+  background-color: #131316;
+  filter: brightness(0.88);
+}
+
+/*
+ * Ohne Cover bleibt die Flaeche schwarz und nur das Symbol steht darin. Ein
+ * gefuelltes Rechteck waere hier am teuersten: im kleinsten Block deckt das
+ * Cover die ganze Flaeche, und ein Grauwert ueber einen ganzen Block ist genau
+ * der Leuchtkasten, den die Regeln ganz oben ausschliessen.
+ */
+.spotify__cover--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: transparent;
+  filter: none;
+}
+
+.spotify__text {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.4em;
+  min-width: 0;
+  font-size: min(9cqh, 4.6cqw);
+}
+
+.spotify__title {
+  font-size: 1.7em;
+  line-height: 1.08;
+  letter-spacing: -0.01em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -628,105 +779,100 @@ body {
   margin-top: 0.5em;
   font-size: min(6cqh, 3.2cqw);
   font-weight: 600;
-  font-variant-numeric: tabular-nums;
   color: var(--mirror-fg-muted);
 }
 
 /* ------------------------------ S: nur das Cover ------------------------------ */
 
+/*
+ * Randlos: im kleinsten Block ist das Cover der ganze Inhalt, und ein
+ * schwebendes Quadrat mit Rand ringsum waere genau die halbe Sache, die dieser
+ * Block nicht sein soll.
+ */
 .spotify--s {
-  justify-content: center;
+  gap: 0;
 }
 
 .spotify--s .spotify__cover {
-  width: min(78cqh, 78cqw);
-  height: min(78cqh, 78cqw);
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  border-radius: 0;
 }
 
 /* ------------------------- M: Cover, Titel, Interpret ------------------------- */
 
-.spotify--m {
-  gap: min(5cqw, 2.2em);
-  padding: 0 5cqw;
-}
-
-.spotify--m .spotify__cover {
-  width: min(68cqh, 30cqw);
-  height: min(68cqh, 30cqw);
+.spotify--m .spotify__text {
+  font-size: min(11cqh, 5cqw);
 }
 
 /* ------------------------- L: dazu der Fortschritt ------------------------- */
 
+/*
+ * Der Fortschritt sitzt an der Unterkante, die Zeile darueber nimmt sich den
+ * Rest. Deshalb waechst .spotify__row: sonst stuenden Cover und Titel mittig
+ * im Block und der Balken irgendwo darunter, mit Leerraum ueber und unter dem
+ * Ganzen – der Klumpen in der Mitte, den dieser Block bis 0.7 war.
+ */
 .spotify--l {
   flex-direction: column;
-  align-items: stretch;
-  justify-content: center;
-  gap: 2em;
-  padding: 0 7cqw;
-  font-size: min(4cqh, 2.2cqw);
+  gap: min(3cqh, 1.2em);
 }
 
 .spotify--l .spotify__row {
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
-  align-items: flex-end;
-  gap: min(4.5cqw, 2em);
-  min-width: 0;
+  align-items: center;
+  gap: min(4cqw, 1.6em);
 }
 
 .spotify--l .spotify__cover {
-  width: min(40cqh, 34cqw);
-  height: min(40cqh, 34cqw);
+  align-self: center;
+  /*
+   * Nach der Breite gedeckelt und nicht nur nach der Hoehe: neben dem Cover
+   * muss die Titelzeile noch etwas werden. Ein Cover, das sich die Haelfte des
+   * Blocks nimmt, laesst "Weightless" als "Weightle..." zurueck – und ein
+   * abgeschnittener Titel ist teurer als ein Fingerbreit Cover.
+   */
+  height: min(64cqh, 47cqw);
+  width: auto;
 }
 
 .spotify--l .spotify__text {
-  padding-bottom: 0.2em;
-  font-size: min(7.5cqh, 4.4cqw);
+  font-size: min(9cqh, 5cqw);
 }
 
 /*
- * Im grossen Block darf der Titel zweizeilig werden – neben dem Cover ist die
+ * Im grossen Block darf der Titel mehrzeilig werden – neben dem Cover ist die
  * Zeile schmal, und ein frueh abgeschnittener Titel verschenkt die Flaeche,
- * die dieser Block gerade bietet. Mehr als zwei Zeilen kippen ins Unruhige.
+ * die dieser Block gerade bietet. Mehr als drei Zeilen kippen ins Unruhige.
  */
 .spotify--l .spotify__title {
   white-space: normal;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
 }
 
 /* -------------------------- XL: alles, volle Breite -------------------------- */
 
-.spotify--xl {
-  gap: min(4.5cqw, 3.4em);
-  padding: 0 4cqw;
-}
-
-.spotify--xl .spotify__cover {
-  width: min(60cqh, 26cqw);
-  height: min(60cqh, 26cqw);
-}
-
 .spotify--xl .spotify__text {
-  flex: 1 1 auto;
-  font-size: min(9cqh, 3cqw);
-  gap: 0.45em;
+  justify-content: space-between;
+  font-size: min(11cqh, 3.4cqw);
+  padding: 1cqh 0;
 }
 
 .spotify--xl .spotify__title {
-  font-size: 1.9em;
-}
-
-.spotify--xl .spotify__progress {
-  margin-top: 0.6em;
+  font-size: 1.8em;
 }
 
 /* Sehr flache Bloecke: die Zeitzeile faellt zuerst weg. */
-@container (max-height: 200px) {
-  .spotify__times,
-  .spotify__album {
-    display: none;
-  }
+.module[data-size='s'] .spotify__times,
+.module[data-size='m'] .spotify__times,
+.module[data-size='s'] .spotify__album,
+.module[data-size='m'] .spotify__album {
+  display: none;
 }
 
 .spotify__hint,
@@ -738,5 +884,7 @@ body {
 }
 
 .spotify--hint {
+  display: flex;
+  align-items: center;
   justify-content: center;
 }

@@ -285,8 +285,9 @@ Die Regeln im Basis-Stylesheet sind keine Geschmacksfrage, sondern Physik:
 - Keine `box-shadow`, `text-shadow`, `filter: blur()` — daraus werden hinter
   halbdurchlässigem Glas Lichthöfe.
 - Keine großen hellen Flächen: sie blenden und zeichnen den Displayrahmen nach.
-- Schriftschnitt 300–400. Sehr dünne Schnitte wirken durch die Folie
-  ausgewaschen.
+- Schriftschnitt nicht unter 300. Sehr dünne Schnitte wirken durch die Folie
+  ausgewaschen. Nach oben ist die Regel offen: fett ist unkritisch, solange die
+  helle Fläche klein bleibt — eine Zeile ist klein, ein gefülltes Rechteck nicht.
 - Gedämpfte Grautöne nicht unter `#707070` — darunter verschwindet alles.
 - Alle Symbole flach, einfarbig, in `currentColor` ([Lucide](https://lucide.dev),
   ISC). Keine Emoji: die sehen je nach System anders aus und sind teils farbig.
@@ -298,6 +299,44 @@ Die Regeln im Basis-Stylesheet sind keine Geschmacksfrage, sondern Physik:
   Kernel. Bei Vielfachen von 90° ist das pixelgenau — es wird nichts skaliert
   und nichts interpoliert, und hinter halbdurchlässigem Glas fällt jede weiche
   Kante als Schleier auf.
+
+### Eine Handschrift für alle Blöcke
+
+Die Physik sagt, was nicht geht. Wie ein Block aussieht, sagt sie nicht — und
+weil jedes Modul das für sich beantwortet hat, standen zuletzt zwei Sprachen
+nebeneinander auf einer Wand. Inzwischen gilt für alle dasselbe Gerüst, und die
+Regeln stehen im Stylesheet als gemeinsame Selektorlisten: wer ein Modul
+dazunimmt, hängt seine Klassen ein, statt die Werte abzuschreiben.
+
+1. **Linke Kante, kein Innenabstand.** Der Inhalt beginnt an der Blockkante,
+   also an einer Rasterlinie — nur so stehen zwei Blöcke untereinander
+   tatsächlich an derselben Linie. Der Abstand zum Nachbarn kommt aus dem
+   Raster und muss nicht doppelt vorkommen.
+2. **Eyebrow**: woher der Wert kommt — Wochentag, Ort, Kontoname. Klein,
+   gesperrt, gedimmt.
+3. **Titel**: der eine Wert, für den der Block da ist. Uhrzeit, Temperatur,
+   Songtitel.
+4. **Zweitzeile**: Versalien, gesperrt — und die einzige Zeile, die Farbe trägt.
+5. **Balken**: 8 px, Spur 10 % Weiß. Eine Linie, keine Fläche.
+6. **Ziffern** in `tabular-nums`, damit beim Weiterzählen nichts zappelt.
+
+**Farbe braucht eine Quelle.** Spotify zieht seinen Ton aus dem Cover, das
+Wetter aus der Temperatur (kühles Blau nach warmem Bernstein) — dadurch ist die
+Farbe eine Eigenschaft des Inhalts und keine Dekoration. Die Uhr bleibt weiß:
+sie hat keine Eigenschaft, aus der sich ehrlich ein Ton ableiten ließe, und ein
+Block ohne Farbe hält den Spiegel ruhig.
+
+**Der Inhalt füllt den Block.** Feste Größentabellen je Blockgröße führen dazu,
+dass ein Modul im großen Block als kleiner Klumpen in der Mitte steht. Deshalb
+leiten sich Maße aus dem Block ab: das Cover ist so hoch wie der Platz, den es
+hat, und quadratisch; die Uhrzeit rechnet ihre Größe aus der Zeichenzahl, damit
+`21:04` und `9:04:33 PM` beide die Breite ausfüllen.
+
+**Was nicht hineinpasst, fällt weg — es staucht sich nicht.** Die Vorschau des
+Wetters verschwindet im M-Block, die Zeitzeile von Spotify in S und M. Gehängt
+ist das an die Blockgröße und nicht an eine Pixelhöhe: eine Rasterzeile ist auf
+1080p gut 200 px hoch und auf einem 4K-Spiegel knapp 500 — eine Schwelle in
+Pixeln bedeutete auf jedem Bildschirm etwas anderes.
 
 ---
 

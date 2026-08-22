@@ -1,7 +1,7 @@
 {
   "id": "clock",
   "name": "Uhr",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Uhrzeit, Wochentag und Datum. Laeuft vollstaendig in der Anzeige und braucht kein Netzwerk.",
   "author": "smartmirror",
   "preferredSize": "l",

@@ -85,3 +85,42 @@ export function describeWeather(code: number, isDay = true): { label: string; ic
   if (!entry) return { label: 'Unbekannt', icon: 'cloud' };
   return { label: entry.label, icon: !isDay && entry.night ? entry.night : entry.icon };
 }
+
+/* --------------------------------- Akzent --------------------------------- */
+
+/** Kuehl und warm, zwischen denen der Ton wandert. */
+const COLD = [0x6f, 0x9a, 0xd6] as const;
+const WARM = [0xd9, 0x9a, 0x4e] as const;
+
+/** Ohne brauchbare Temperatur bleibt es beim neutralen Grau der Anzeige. */
+const NEUTRAL = '#9a9aa3';
+
+/**
+ * Farbton aus der Temperatur.
+ *
+ * Der Spotify-Block zieht seinen Akzent aus dem Cover – dadurch wirkt die
+ * Farbe dort nie dekorativ, sondern wie eine Eigenschaft dessen, was gerade zu
+ * sehen ist. Damit das Wetter in derselben Handschrift sprechen kann, ohne
+ * bunt zu werden, braucht es ebenfalls eine Quelle statt eines Lieblingstons.
+ * Hier ist es die Temperatur: ein Verlauf von kuehlem Blau nach warmem
+ * Bernstein ueber die Spanne, in der sich Wetter fuer einen Menschen
+ * spuerbar aendert.
+ *
+ * Beide Endpunkte sind gedaempft. Hinter halbdurchlaessigem Glas frisst die
+ * Folie Saettigung: ein kraeftiges Blau kaeme als Grau an, ein kraeftiges Rot
+ * als Braun. Was hier steht, ist bereits der Ton *nach* der Scheibe.
+ */
+export function accentForTemperature(celsius: number): string {
+  if (!Number.isFinite(celsius)) return NEUTRAL;
+  const position = Math.min(1, Math.max(0, (celsius + 5) / 33));
+  const hex = [0, 1, 2]
+    .map((channel) => Math.round(COLD[channel] + (WARM[channel] - COLD[channel]) * position))
+    .map((value) => value.toString(16).padStart(2, '0'))
+    .join('');
+  return `#${hex}`;
+}
+
+/** Grad Celsius, egal in welcher Einheit die Anzeige gerade rechnet. */
+export function toCelsius(value: number, units: WeatherConfig['units']): number {
+  return units === 'imperial' ? ((value - 32) * 5) / 9 : value;
+}

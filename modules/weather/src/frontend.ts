@@ -1,7 +1,13 @@
 import { html, render, nothing } from 'lit';
 import { defineFrontend, type ModuleView } from '@mirror/sdk';
 import { icon } from '@mirror/icons';
-import { describeWeather, type WeatherConfig, type WeatherState } from './shared.js';
+import {
+  accentForTemperature,
+  describeWeather,
+  toCelsius,
+  type WeatherConfig,
+  type WeatherState,
+} from './shared.js';
 
 /** Ab wann ein Wert als veraltet gilt und dezent abgedunkelt wird. */
 const STALE_AFTER_MS = 90 * 60_000;
@@ -32,23 +38,33 @@ export default defineFrontend<WeatherState, WeatherConfig>({
       const now = describeWeather(current.weatherCode, current.isDay);
       const unit = state.temperatureUnit ?? '°';
 
+      /**
+       * Der Ton kommt aus der Temperatur – und nur, solange die Zahl auch
+       * stimmt. Ein veralteter Wert faerbt nichts mehr ein, sonst behauptete
+       * die Farbe eine Frische, die die Zahl nicht mehr hat.
+       */
+      const accent =
+        stale || error ? null : accentForTemperature(toCelsius(current.temperature, config.units));
+
       render(
         html`
           <div class="weather ${stale || error ? 'weather--stale' : ''}">
+            ${state.resolvedLocation
+              ? html`<div class="weather__place">${state.resolvedLocation}</div>`
+              : nothing}
             <div class="weather__now">
               <span class="weather__icon">${icon(now.icon, { size: '1em', strokeWidth: 1.5 })}</span>
-              <span class="weather__temp">${current.temperature}${unit}</span>
+              <span class="weather__temp"
+                >${current.temperature}<span class="weather__unit">${unit}</span></span
+              >
             </div>
-            <div class="weather__meta">
+            <div class="weather__meta" style=${accent ? `color:${accent}` : nothing}>
               <span>${now.label}</span>
               ${config.showWind
                 ? html`<span class="weather__sep">·</span>
                     <span>${current.windSpeed} ${state.windUnit ?? 'km/h'}</span>`
                 : nothing}
             </div>
-            ${state.resolvedLocation
-              ? html`<div class="weather__place">${state.resolvedLocation}</div>`
-              : nothing}
             ${state.forecast && state.forecast.length > 0
               ? html`
                   <div class="weather__forecast">
