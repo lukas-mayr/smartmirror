@@ -217,7 +217,7 @@ Widgets auf einem Telefon:
 |---|---|---|
 | **S** | 1 × 1 | eine Zahl, ein Symbol |
 | **M** | 2 × 1 | Uhrzeit, ein Wert mit Beschriftung |
-| **L** | 2 × 2 | Wetter mit Vorhersage, Terminliste |
+| **L** | 2 × 2 | Wetter, das die Tage durchschaltet, Terminliste |
 | **XL** | 4 × 2 | eine Zeile, die über die halbe Wand geht |
 
 Ein Block rastet ein: Abstände stimmen von selbst, und eine Anordnung lässt sich
@@ -337,6 +337,21 @@ Wetters verschwindet im M-Block, die Zeitzeile von Spotify in S und M. Gehängt
 ist das an die Blockgröße und nicht an eine Pixelhöhe: eine Rasterzeile ist auf
 1080p gut 200 px hoch und auf einem 4K-Spiegel knapp 500 — eine Schwelle in
 Pixeln bedeutete auf jedem Bildschirm etwas anderes.
+
+**Nacheinander statt nebeneinander.** Vier Tage in einer Reihe sind eine
+Tabelle: jeder Tag bekommt ein Viertel der Breite, also ein Symbol in
+Fußnotengröße und zwei Zahlen, die man aus zwei Metern nicht mehr liest. Ein
+Spiegel wird aber im Vorbeigehen gelesen. Deshalb zeigt das Wetter im L-Block
+immer nur einen Tag — groß, mit Beschriftung, Symbol, Zahl und Kurztext — und
+schaltet alle fünf Sekunden zum nächsten: *Heute*, *Morgen*, *Übermorgen*,
+danach der Wochentag. Der Aufbau der Karte bleibt dabei bei jedem Tag derselbe;
+nur der Inhalt wechselt, damit aus dem Weiterschalten eine ruhige Bewegung wird
+und kein Umbau. Auch die Schriftgröße der Beschriftung richtet sich nach dem
+längsten Wort des ganzen Stapels und nicht nach der sichtbaren Karte — sonst
+spränge sie im Fünfsekundentakt. Sind die Werte veraltet, hört das
+Weiterschalten auf: eine Durchschaltung, die alte Tage durchblättert, sieht
+lebendiger aus, als die Daten sind. Im XL-Block bleibt die Reihe, weil dort
+alles gleichzeitig lesbar groß ist.
 
 ---
 

@@ -571,6 +571,99 @@ body {
 }
 
 /*
+ * Der grosse Block als Durchschaltung.
+ *
+ * Vier Tage nebeneinander sind eine Tabelle: jeder Tag bekommt ein Viertel der
+ * Breite, also ein Symbol in Fussnotengroesse und zwei Zahlen, die man aus zwei
+ * Metern Entfernung nicht mehr liest. Ein Spiegel wird aber im Vorbeigehen
+ * gelesen, nicht studiert. Also steht immer nur ein Tag da – dafuer so gross,
+ * dass er quer durchs Zimmer trifft – und die anderen kommen nach.
+ *
+ * Die Form bleibt dabei bei jedem Tag dieselbe: Beschriftung, Symbol und Zahl,
+ * Kurztext. Nur so wird aus dem Wechsel eine ruhige Bewegung und kein Umbau –
+ * das Auge bleibt an derselben Stelle stehen und liest dort den naechsten Tag.
+ */
+.weather__deck {
+  min-width: 0;
+  /*
+   * Die neue Karte steigt von unten herein; was dabei noch ausserhalb liegt,
+   * bleibt draussen. Ohne das schoebe sie den Block auseinander, und die halbe
+   * Anzeige zappelte im Fuenfsekundentakt mit.
+   */
+  overflow: hidden;
+}
+
+.weather__slide {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3em;
+  min-width: 0;
+  animation: weather-slide-in 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/*
+ * Eintritt: von unten und aus dem Nichts. Kein Wischen zur Seite – seitliche
+ * Bewegung im Augenwinkel liest sich als "da laeuft etwas", und genau das soll
+ * ein Spiegel nicht tun.
+ */
+@keyframes weather-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.55em);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .weather__slide {
+    animation: none;
+  }
+}
+
+/*
+ * Der Tag steht oben und gross – er ist hier die Herkunft der Zahl darunter,
+ * so wie der Ort es fuer den Block als Ganzes ist. Versalien und Sperrung wie
+ * bei den anderen Beschriftungen, aber im Gewicht der Hauptzeilen: es ist
+ * keine Fussnote, sondern die Frage, die die Karte beantwortet.
+ */
+.weather__label {
+  /*
+   * Die Breite entscheidet mit, wie gross der Tag stehen darf – "Uebermorgen"
+   * ist doppelt so lang wie "Heute". Massgeblich ist dabei das laengste Wort
+   * des *ganzen* Stapels, nicht das der gerade sichtbaren Karte: sonst
+   * spraenge die Beschriftung alle fuenf Sekunden in eine andere Groesse, und
+   * aus dem ruhigen Weiterschalten wuerde ein Zappeln. Die Anzeige gibt die
+   * Laenge als --weather-label-chars herein; 110 ist der Erfahrungswert fuer
+   * Versalien im Schnitt 800 samt Sperrung, mit einem Finger Luft rechts.
+   */
+  font-size: min(17cqh, calc(110cqw / var(--weather-label-chars, 8)));
+  font-weight: 800;
+  line-height: 1.06;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/*
+ * Symbol und Zahl duerfen hier deutlich groesser werden als in der festen
+ * Ansicht: die Vorhersagereihe, die sonst das untere Drittel belegt, ist weg,
+ * und der Platz gehoert dem, wofuer der Block da ist. Nach oben begrenzt
+ * weiterhin die Blockhoehe, damit ein flach gezogener Block nichts abschneidet.
+ */
+.weather--deck .weather__icon {
+  font-size: min(28cqh, 16cqw);
+}
+
+.weather--deck .weather__temp {
+  font-size: min(36cqh, 22cqw);
+}
+
+/*
  * Die Vorschau als Reihe harter Spalten: Trennlinien statt Abstaenden, jede
  * Spalte an ihrer eigenen Kante. Kein Umbruch mehr – was nicht mehr hineinpasst,
  * blendet die Groessenregel weiter unten aus, statt eine zweite Zeile

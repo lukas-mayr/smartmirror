@@ -124,3 +124,125 @@ export function accentForTemperature(celsius: number): string {
 export function toCelsius(value: number, units: WeatherConfig['units']): number {
   return units === 'imperial' ? ((value - 32) * 5) / 9 : value;
 }
+
+/* --------------------------------- Karten --------------------------------- */
+
+/**
+ * Eine Karte der Durchschaltung: ein Tag, so weit heruntergebrochen, dass die
+ * Anzeige ihn nur noch hinstellen muss.
+ *
+ * Heute und ein Vorhersagetag sind im Block nicht zu unterscheiden – dieselbe
+ * Beschriftung, dasselbe Symbol, dieselbe Zahl, derselbe Kurztext. Genau das
+ * ist der Sinn: wer vorbeigeht, liest immer an derselben Stelle dasselbe, und
+ * nur der Inhalt wechselt. Deshalb entsteht die Form hier und nicht in zwei
+ * Zweigen der Anzeige, die mit der Zeit auseinanderlaufen wuerden.
+ */
+export interface WeatherSlide {
+  /** Stabil je Tag – die Anzeige haengt die Einblendung daran. */
+  key: string;
+  label: string;
+  icon: IconName;
+  temperature: number;
+  /** Kurztext unter der Zahl: Wetterlage und ein zweiter Wert. */
+  note: string;
+  /** Fuer den Farbton – der rechnet in Celsius, die Anzeige nicht zwingend. */
+  celsius: number;
+}
+
+/**
+ * Der Kalendertag, an dem der Spiegel steht – nicht der des Rechners, der die
+ * Anzeige zeichnet. In der Regel dasselbe, aber die Vorhersage kommt in der
+ * Zeitzone des Spiegels, und "heute" muss dieselbe Zeitzone meinen wie sie.
+ */
+export function isoDay(date: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const part = (type: string): string => parts.find((entry) => entry.type === type)?.value ?? '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
+/** Ganze Tage von einem ISO-Tag zum naechsten. */
+export function daysBetween(from: string, to: string): number {
+  const start = Date.parse(`${from}T00:00:00Z`);
+  const end = Date.parse(`${to}T00:00:00Z`);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return Number.NaN;
+  return Math.round((end - start) / 86_400_000);
+}
+
+/**
+ * Beschriftung einer Karte.
+ *
+ * Die naechsten beiden Tage haben Namen, die naeher sind als ihr Wochentag:
+ * "Morgen" versteht man ohne nachzurechnen, "Freitag" erst, wenn man weiss,
+ * welcher Tag heute ist. Weiter draussen kippt es – dort ist der Wochentag die
+ * kuerzere Auskunft, weil "in vier Tagen" niemand mitzaehlt.
+ */
+export function dayLabel(iso: string, todayIso: string, locale: string, timeZone: string): string {
+  switch (daysBetween(todayIso, iso)) {
+    case 0:
+      return 'Heute';
+    case 1:
+      return 'Morgen';
+    case 2:
+      return 'Uebermorgen';
+    default:
+      // Mittag in UTC: der Tag bleibt damit in jeder Zeitzone derselbe, waehrend
+      // Mitternacht je nach Verschiebung schon der Vortag waere.
+      return new Intl.DateTimeFormat(locale, { weekday: 'long', timeZone }).format(
+        new Date(`${iso}T12:00:00Z`),
+      );
+  }
+}
+
+/**
+ * Der Stapel, durch den der grosse Block schaltet: heute zuerst, danach die
+ * Vorhersage in ihrer Reihenfolge.
+ *
+ * Ohne aktuellen Wert bleibt der Stapel leer statt mit der Vorhersage zu
+ * beginnen – ein Block, der bei "Morgen" anfaengt, sieht aus, als waere heute
+ * nichts zu erwarten.
+ */
+export function buildSlides(
+  state: Partial<WeatherState>,
+  config: WeatherConfig,
+  options: { locale: string; timeZone: string; now?: Date },
+): WeatherSlide[] {
+  const current = state.current;
+  if (!current) return [];
+
+  const today = isoDay(options.now ?? new Date(), options.timeZone);
+  const appearance = describeWeather(current.weatherCode, current.isDay);
+  const slides: WeatherSlide[] = [
+    {
+      key: today,
+      label: 'Heute',
+      icon: appearance.icon,
+      temperature: current.temperature,
+      note: config.showWind
+        ? `${appearance.label} · ${current.windSpeed} ${state.windUnit ?? 'km/h'}`
+        : appearance.label,
+      celsius: toCelsius(current.temperature, config.units),
+    },
+  ];
+
+  for (const day of state.forecast ?? []) {
+    const look = describeWeather(day.weatherCode);
+    slides.push({
+      key: day.date,
+      label: dayLabel(day.date, today, options.locale, options.timeZone),
+      icon: look.icon,
+      temperature: day.max,
+      // Die grosse Zahl ist der Tageshoechstwert; das Tief gehoert dazu, aber
+      // nicht in dieselbe Groesse – sonst stuenden zwei Zahlen gleichberechtigt
+      // da und man muesste erst herausfinden, welche gemeint ist.
+      note: `${look.label} · Tief ${day.min}°`,
+      celsius: toCelsius(day.max, config.units),
+    });
+  }
+
+  return slides;
+}
