@@ -2,7 +2,7 @@
   "id": "weather",
   "name": "Wetter",
   "version": "0.5.0",
-  "description": "Aktuelles Wetter und Vorhersage von Open-Meteo, im grossen Block Tag fuer Tag durchgeschaltet, im breiten mit Tagesverlauf. Dazu die Warnungen des nationalen Wetterdienstes ueber MeteoAlarm. Ohne API-Schluessel nutzbar.",
+  "description": "Aktuelles Wetter und Vorhersage von Open-Meteo, im großen Block Tag für Tag durchgeschaltet, im breiten mit Tagesverlauf. Dazu die Warnungen des nationalen Wetterdienstes über MeteoAlarm. Ohne API-Schlüssel nutzbar.",
   "author": "smartmirror",
   "sizes": [
     "s",
@@ -59,6 +59,15 @@
         "title": "Wind anzeigen",
         "default": true
       },
+      "dwellSeconds": {
+        "type": "number",
+        "title": "Standzeit einer Karte",
+        "description": "Sekunden, bis der nächste Tag kommt. Nur im großen Block, der durchschaltet.",
+        "minimum": 2,
+        "maximum": 60,
+        "step": 0.2,
+        "default": 2.6
+      },
       "refreshMinutes": {
         "type": "integer",
         "title": "Aktualisierung (Minuten)",
@@ -69,31 +78,31 @@
       "showHourly": {
         "type": "boolean",
         "title": "Tagesverlauf zeigen",
-        "description": "Balkengrafik der Temperatur ueber den Tag. Nur im grossen und breiten Block.",
+        "description": "Balkengrafik der Temperatur über den Tag. Nur im großen und breiten Block.",
         "default": true
       },
       "highlight": {
         "type": "boolean",
         "title": "Als Highlight zeigen",
-        "description": "Der Block traegt die eine deckende Flaeche der Anordnung. Hoechstens ein Block pro Screen – zwei summieren sich hinter dem Glas zum Leuchtfeld.",
+        "description": "Der Block trägt die eine deckende Fläche der Anordnung. Höchstens ein Block pro Screen – zwei summieren sich hinter dem Glas zum Leuchtfeld.",
         "default": false
       },
       "warnings": {
         "type": "boolean",
         "title": "Wetterwarnungen",
-        "description": "Warnungen des nationalen Wetterdienstes ueber MeteoAlarm. Das Land ergibt sich aus dem Ort.",
+        "description": "Warnungen des nationalen Wetterdienstes über MeteoAlarm. Das Land ergibt sich aus dem Ort.",
         "default": true
       },
       "warningRegion": {
         "type": "string",
         "title": "Nur Warnregion",
-        "description": "Zeigt nur Warnungen, deren Region diesen Text enthaelt, z.B. \"Bern\". Leer heisst: alle Warnungen des Landes.",
+        "description": "Zeigt nur Warnungen, deren Region diesen Text enthält, z.B. \"Bern\". Leer heißt: alle Warnungen des Landes.",
         "default": ""
       },
       "warningsNotify": {
         "type": "boolean",
         "title": "Warnungen als Mitteilung",
-        "description": "Gibt Warnungen zusaetzlich an den Mitteilungsblock weiter. Im Wetterblock stehen sie ohnehin.",
+        "description": "Gibt Warnungen zusätzlich an den Mitteilungsblock weiter. Im Wetterblock stehen sie ohnehin.",
         "default": true
       }
     },

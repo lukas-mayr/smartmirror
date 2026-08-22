@@ -90,13 +90,13 @@ const TYPES: Record<number, string> = {
   3: 'Gewitter',
   4: 'Nebel',
   5: 'Hitze',
-  6: 'Kaelte',
-  7: 'Kuestenwetter',
+  6: 'Kälte',
+  7: 'Küstenwetter',
   8: 'Waldbrand',
   9: 'Lawinen',
   10: 'Regen',
   11: 'Hochwasser',
-  12: 'Ueberschwemmung',
+  12: 'Überschwemmung',
   13: 'Hochwasser',
 };
 

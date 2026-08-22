@@ -9,6 +9,7 @@ import {
   barHeight,
   buildSlides,
   describeWeather,
+  dwellMs,
   peakIndex,
   pickHourly,
   toCelsius,
@@ -38,12 +39,24 @@ export default defineFrontend<WeatherState, WeatherConfig>({
       timer = null;
     };
 
+    /** Der Takt, mit dem der Zaehler gerade laeuft. */
+    let dwell: number = MOTION.dwell;
+
+    /*
+     * Neu gestartet wird nur, wenn sich der Takt geaendert hat.
+     *
+     * Sonst setzte jeder Zeichenvorgang den Zaehler zurueck – und weil auch
+     * jeder Kartenwechsel zeichnet, stuende die Durchschaltung still.
+     */
     const startCycle = (): void => {
-      if (timer !== null) return;
+      const wanted = dwellMs(config.dwellSeconds);
+      if (timer !== null && wanted === dwell) return;
+      stopCycle();
+      dwell = wanted;
       timer = setInterval(() => {
         position += 1;
         draw();
-      }, MOTION.dwell);
+      }, dwell);
     };
 
     /**

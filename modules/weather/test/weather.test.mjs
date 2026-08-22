@@ -7,6 +7,8 @@ import {
   dayLabel,
   daysBetween,
   describeWeather,
+  dwellMs,
+  DWELL_SECONDS,
   HOURLY_POINTS,
   isoDay,
   peakIndex,
@@ -14,6 +16,7 @@ import {
   toCelsius,
   weatherForm,
 } from '../dist/shared.js';
+import { MOTION } from '@mirror/sdk';
 
 test('faerbt kalt blau und warm bernstein', () => {
   assert.equal(accentForTemperature(-5), '#6f9ad6');
@@ -95,11 +98,13 @@ test('zaehlt Tage ueber Monatsgrenzen hinweg', () => {
   assert.ok(Number.isNaN(daysBetween('unsinn', '2026-08-22')));
 });
 
-test('nennt die naechsten Tage beim Namen und danach beim Wochentag', () => {
+test('nennt zwei Tage beim Namen und danach den Wochentag', () => {
   const label = (iso) => dayLabel(iso, '2026-08-22', 'de-DE', 'Europe/Vienna');
   assert.equal(label('2026-08-22'), 'Heute');
   assert.equal(label('2026-08-23'), 'Morgen');
-  assert.equal(label('2026-08-24'), 'Uebermorgen');
+  // Und dann sofort der Wochentag: "Uebermorgen" ist zwar ein Wort, aber keine
+  // Auskunft – man muss erst zwei Tage weiterzaehlen.
+  assert.equal(label('2026-08-24'), 'Montag');
   assert.equal(label('2026-08-25'), 'Dienstag');
 });
 
@@ -111,7 +116,7 @@ test('stellt heute vor die Vorhersage', () => {
   });
   assert.deepEqual(
     slides.map((slide) => slide.label),
-    ['Heute', 'Morgen', 'Uebermorgen', 'Dienstag'],
+    ['Heute', 'Morgen', 'Montag', 'Dienstag'],
   );
   // Heute die gemessene Temperatur, spaeter der Tageshoechstwert.
   assert.deepEqual(
@@ -126,7 +131,7 @@ test('gibt jeder Karte denselben Kurztext-Aufbau', () => {
     timeZone: 'Europe/Vienna',
     now: NOW,
   });
-  assert.equal(slides[0].note, 'Teilweise bewoelkt \u00b7 9 km/h');
+  assert.equal(slides[0].note, 'Teilweise bewölkt \u00b7 9 km/h');
   assert.equal(slides[1].note, 'Klar \u00b7 Tief 12\u00b0');
 });
 
@@ -136,7 +141,7 @@ test('laesst den Wind weg, wenn er abgeschaltet ist', () => {
     timeZone: 'Europe/Vienna',
     now: NOW,
   });
-  assert.equal(slides[0].note, 'Teilweise bewoelkt');
+  assert.equal(slides[0].note, 'Teilweise bewölkt');
 });
 
 test('faerbt jede Karte nach ihrer eigenen Temperatur', () => {
@@ -254,4 +259,31 @@ test('schaltet nur im grossen Block durch, und nur mit frischen Werten', () => {
 
 test('faellt bei einer unbekannten Groesse auf die feste Ansicht zurueck', () => {
   assert.equal(weatherForm(place({ size: 'xxl' })), 'full');
+});
+
+/* ------------------------------- Standzeit -------------------------------- */
+
+test('nimmt ohne eigene Angabe den Takt des Design-Systems', () => {
+  // Aeltere Konfigurationen kennen das Feld nicht und sollen sich nicht
+  // ploetzlich anders bewegen.
+  assert.equal(dwellMs(undefined), MOTION.dwell);
+  assert.equal(dwellMs(null), MOTION.dwell);
+  assert.equal(dwellMs('acht'), MOTION.dwell);
+  // Nicht als "null Sekunden" lesen: Number(null) und Number('') sind beide 0.
+  assert.equal(dwellMs(''), MOTION.dwell);
+  assert.equal(dwellMs('8'), MOTION.dwell);
+});
+
+test('rechnet Sekunden in Millisekunden', () => {
+  assert.equal(dwellMs(2.6), 2600);
+  assert.equal(dwellMs(8), 8000);
+  assert.equal(dwellMs(12.4), 12400);
+});
+
+test('haelt die Standzeit in ihrer Spanne', () => {
+  // Von Hand bearbeitete Dateien koennen alles enthalten; ein Takt von einer
+  // Zehntelsekunde waere ein Flackern, einer von einer Stunde ein Stillstand.
+  assert.equal(dwellMs(0.1), DWELL_SECONDS.min * 1000);
+  assert.equal(dwellMs(-5), DWELL_SECONDS.min * 1000);
+  assert.equal(dwellMs(3600), DWELL_SECONDS.max * 1000);
 });
