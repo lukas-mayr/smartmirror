@@ -653,7 +653,15 @@ keinem Dateinamen. Dafür gibt es den Knopf.
 
 Die Tags sind die Quelle der Wahrheit, nicht `package.json` – die
 Versionsfelder werden aus dem Tag nachgezogen, können also nicht auseinander
-laufen. Der Versions-Commit wird mit dem `GITHUB_TOKEN` gepusht und löst
+laufen.
+
+**Die Versionsnummer wird deshalb nie von Hand gesetzt.** `set-version.mjs` ist
+das Werkzeug des Ablaufs und nicht eins für den Arbeitsplatz: Ein Zweig, der
+seine Nummer schon selbst hochzählt, nimmt dem Ablauf genau die Änderung weg,
+die er als Versions-Commit ablegen will. Bis 0.9.0 brach der Lauf daran ab —
+die Prüfungen waren durch, der Stand lag auf `main`, nur getaggt und
+veröffentlicht wurde er nie. Der Ablauf verträgt diesen Fall inzwischen und
+setzt dann nur den Tag; von Hand hochzuzählen bleibt trotzdem überflüssig. Der Versions-Commit wird mit dem `GITHUB_TOKEN` gepusht und löst
 deshalb keinen weiteren Lauf aus; auf `main` darf der Push allerdings nicht
 durch einen Branch-Schutz verboten sein.
 

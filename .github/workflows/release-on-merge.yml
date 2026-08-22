@@ -172,7 +172,22 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add package.json package-lock.json packages/*/package.json modules/*/package.json
-          git commit -m "Version ${VERSION}"
+
+          # Steht die Nummer schon in den Dateien, gibt es nichts zu committen –
+          # etwa weil jemand sie im Merge von Hand gesetzt hat. Das ist kein
+          # Grund abzubrechen: was ein Release ausmacht, ist der Tag, und der
+          # fehlt in diesem Fall trotzdem noch.
+          #
+          # Vorher brach der Lauf hier ab ("nothing to commit" plus `set -e`),
+          # und zwar nachdem die Pruefungen schon durch waren: der Stand auf
+          # main war also fertig und blieb nur unveroeffentlicht liegen. Ein
+          # zweiter Anlauf half nicht, weil er auf denselben leeren Commit lief.
+          if git diff --cached --quiet; then
+            echo "::notice::Version ${VERSION} steht schon in den Dateien – es fehlt nur der Tag."
+          else
+            git commit -m "Version ${VERSION}"
+          fi
+
           git tag -a "v${VERSION}" -m "smartmirror ${VERSION}"
 
           # Erst der Commit, dann der Tag: sonst zeigt der Tag auf einen Stand,
