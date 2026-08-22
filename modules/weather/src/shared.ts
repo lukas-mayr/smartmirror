@@ -5,6 +5,17 @@ export interface WeatherConfig {
   units: 'metric' | 'imperial';
   forecastDays: number;
   showWind: boolean;
+  /** Tagesverlauf als Balkengrafik zeigen (nur im grossen und breiten Block). */
+  showHourly: boolean;
+  /**
+   * Der Block traegt die eine deckende Flaeche der Szene.
+   *
+   * Eine Einstellung und keine Automatik: das Design-System erlaubt genau eine
+   * deckende Flaeche pro Anordnung, und welcher Block sie bekommt, kann nur
+   * entscheiden, wer die Anordnung kennt. Ein Modul, das sie sich selbst
+   * nimmt, waere nach dem zweiten Modul mit derselben Idee ein Leuchtfeld.
+   */
+  highlight: boolean;
   refreshMinutes: number;
 }
 
@@ -23,10 +34,25 @@ export interface ForecastDay {
   weatherCode: number;
 }
 
+/**
+ * Ein Stuetzpunkt des Tagesverlaufs.
+ *
+ * Nicht jede Stunde, sondern eine Handvoll ueber den Tag verteilt: sechs
+ * Balken auf 480 px sind 70 px breit und tragen eine Beschriftung, die man aus
+ * 3 m liest. Vierundzwanzig waeren 18 px breit und damit eine Textur.
+ */
+export interface HourlyPoint {
+  /** "08", "11", … – Stunde in der Zeitzone des Spiegels. */
+  hour: string;
+  temperature: number;
+}
+
 export interface WeatherState {
   resolvedLocation: string;
   current: CurrentWeather | null;
   forecast: ForecastDay[];
+  /** Tagesverlauf von heute. Leer, wenn die Einstellung aus ist. */
+  hourly: HourlyPoint[];
   temperatureUnit: string;
   windUnit: string;
   /** Zeitpunkt der letzten erfolgreichen Abfrage – die Anzeige braucht ihn,
@@ -245,4 +271,82 @@ export function buildSlides(
   }
 
   return slides;
+}
+
+/* ------------------------------ Tagesverlauf ------------------------------ */
+
+/**
+ * Wieviele Stuetzpunkte der Tagesverlauf zeigt.
+ *
+ * Sechs, weil das die Zahl ist, bei der ein Balken auf der Breite eines
+ * grossen Blocks noch eine lesbare Beschriftung traegt. Die Auswahl liegt hier
+ * und nicht im Backend: was ein Balken sein darf, entscheidet die Breite der
+ * Anzeige, nicht die Datenquelle.
+ */
+export const HOURLY_POINTS = 6;
+
+/**
+ * Der Verlauf, auf die Stunden reduziert, die tatsaechlich Balken werden.
+ *
+ * Gespannt wird gleichmaessig von der aktuellen Stunde bis zum Tagesende: ein
+ * Verlauf, der um Mitternacht anfaengt, waere um 18 Uhr zu drei Vierteln
+ * Vergangenheit, und Vergangenheit ist auf einem Spiegel kein Wetter, sondern
+ * Statistik.
+ *
+ * Reicht der Rest des Tages nicht mehr fuer sechs Punkte, ruecken die
+ * fehlenden nach hinten in die Vergangenheit — lieber der Abend im Rueckblick
+ * als zwei Balken um 23 Uhr. Das ist die einzige Stelle, an der ueberhaupt
+ * zurueckgeschaut wird.
+ */
+export function pickHourly(points: readonly HourlyPoint[], nowHour: number): HourlyPoint[] {
+  if (points.length <= HOURLY_POINTS) return [...points];
+
+  const upcoming = points.findIndex((point) => Number(point.hour) >= nowHour);
+  // Nach hinten so weit zurueck, dass wieder sechs Punkte uebrig bleiben.
+  const first = Math.min(
+    Math.max(0, upcoming === -1 ? 0 : upcoming),
+    points.length - HOURLY_POINTS,
+  );
+  const last = points.length - 1;
+
+  /*
+   * Gleichmaessig ueber die Spanne verteilt und nicht in festen Schritten:
+   * eine feste Schrittweite muesste nach oben passen (dann liegen die Punkte
+   * am Abend zu dicht) oder nach unten (dann endet der Verlauf am Nachmittag).
+   * Ueber die Spanne gerechnet sitzt der erste Punkt immer auf jetzt und der
+   * letzte immer auf der letzten Stunde des Tages.
+   */
+  const picked: HourlyPoint[] = [];
+  for (let step = 0; step < HOURLY_POINTS; step += 1) {
+    const index = first + Math.round((step * (last - first)) / (HOURLY_POINTS - 1));
+    picked.push(points[index] as HourlyPoint);
+  }
+  return picked;
+}
+
+/** Der waermste Punkt des Verlaufs – er traegt im Diagramm den warmen Ton. */
+export function peakIndex(points: readonly HourlyPoint[]): number {
+  let best = -1;
+  let bestValue = Number.NEGATIVE_INFINITY;
+  points.forEach((point, index) => {
+    if (point.temperature > bestValue) {
+      bestValue = point.temperature;
+      best = index;
+    }
+  });
+  return best;
+}
+
+/**
+ * Hoehe eines Balkens in Prozent.
+ *
+ * Bezogen auf die Spanne des Tages und nicht auf null: zwischen 18 und 21 Grad
+ * liegen drei Grad, und ein Diagramm ab null Grad zeigte davon sechs fast
+ * gleich hohe Balken. Die Untergrenze von 18 % sorgt dafuer, dass der kaelteste
+ * Punkt ein Balken bleibt und kein Strich.
+ */
+export function barHeight(value: number, min: number, max: number): number {
+  const span = max - min;
+  if (!Number.isFinite(span) || span <= 0) return 100;
+  return 18 + ((value - min) / span) * 82;
 }

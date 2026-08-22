@@ -730,27 +730,25 @@ body {
  * der Akzent. Beschriftungen werden dort zur abgedunkelten Variante des
  * Textes statt zu Salbei auf Salbei.
  */
-.box--solid .clock__weekday,
+.box--solid .clock__label,
 .box--solid .weather__place,
 .box--solid .spotify__eyebrow,
 .box--solid .weather__label {
   color: color-mix(in srgb, var(--mirror-on-accent) 62%, transparent);
 }
 
-.box--solid-warm .clock__weekday,
+.box--solid-warm .clock__label,
 .box--solid-warm .weather__place,
 .box--solid-warm .spotify__eyebrow,
 .box--solid-warm .weather__label {
   color: color-mix(in srgb, var(--mirror-on-accent-warm) 62%, transparent);
 }
 
-.box--solid .clock__date,
 .box--solid .weather__meta,
 .box--solid .spotify__artist {
   color: color-mix(in srgb, var(--mirror-on-accent) 70%, transparent);
 }
 
-.box--solid-warm .clock__date,
 .box--solid-warm .weather__meta,
 .box--solid-warm .spotify__artist {
   color: color-mix(in srgb, var(--mirror-on-accent-warm) 70%, transparent);
@@ -1026,8 +1024,15 @@ body {
   justify-content: center;
 }
 
-/* 2 – die Herkunft */
-.clock__weekday,
+/*
+ * 2 – die Herkunft
+ *
+ * Bei Wetter und Spotify steht sie ueber dem Wert, bei der Uhr darunter. Das
+ * ist kein Widerspruch, sondern folgt daraus, was die Zeile beantwortet: "wo"
+ * und "welches Konto" gehen dem Wert voraus, "welcher Tag" folgt der Uhrzeit.
+ * Gesetzt ist sie in beiden Faellen gleich.
+ */
+.clock__label,
 .weather__place,
 .spotify__eyebrow {
   font-size: 0.62em;
@@ -1056,7 +1061,6 @@ body {
 }
 
 /* 4 – die Zweitzeile */
-.clock__date,
 .weather__meta,
 .spotify__artist {
   font-size: 0.78em;
@@ -1098,13 +1102,8 @@ body {
   font-size: min(46cqh, calc(150cqw / var(--clock-chars, 5)));
 }
 
-.clock__date {
-  color: var(--mirror-fg-dim);
-}
-
 /* Im kleinsten Block bleibt neben der Uhrzeit nichts uebrig. */
-.module[data-size='s'] .clock__weekday,
-.module[data-size='s'] .clock__date {
+.module[data-size='s'] .clock__label {
   display: none;
 }
 
@@ -1146,6 +1145,36 @@ body {
 
 .weather__temp {
   font-size: min(26cqh, 16cqw);
+}
+
+/*
+ * Der kleinste Block: Symbol und Zahl nebeneinander, sonst nichts.
+ *
+ * Als getoente Box und nicht frei auf Schwarz – ein einzelner Wert ohne
+ * Beschriftung braucht einen Rahmen, damit man sieht, dass er zusammengehoert.
+ * Bei 9 % Deckkraft bleibt die Flaeche unter der Grenze, ab der sie durch das
+ * Glas als Rechteck sichtbar wuerde.
+ */
+.weather--s {
+  background: var(--mirror-box-accent);
+  border: 1px solid var(--mirror-box-accent-line);
+  border-radius: var(--mirror-radius-s);
+  padding: 0 min(8cqw, 1.2em);
+  justify-content: center;
+}
+
+.weather--s .weather__now {
+  justify-content: space-between;
+  width: 100%;
+}
+
+.weather--s .weather__icon {
+  font-size: min(34cqh, 20cqw);
+  color: var(--mirror-accent);
+}
+
+.weather--s .weather__temp {
+  font-size: min(46cqh, 26cqw);
 }
 
 /*
@@ -1193,6 +1222,7 @@ body {
  */
 .weather__deck {
   min-width: 0;
+  flex: 1 1 auto;
   /*
    * Die neue Karte steigt von unten herein; was dabei noch ausserhalb liegt,
    * bleibt draussen. Ohne das schoebe sie den Block auseinander, und die halbe
@@ -1341,6 +1371,103 @@ body {
   display: none;
 }
 
+/* ------------------------------ Tagesverlauf ------------------------------ */
+
+/*
+ * Sechs Balken statt vierundzwanzig.
+ *
+ * Auf der Breite eines grossen Blocks sind sechs Balken je gut 70 px breit und
+ * tragen eine Stundenzahl, die man aus 3 m liest. Vierundzwanzig waeren 18 px
+ * breit – das ist keine Grafik mehr, sondern eine Textur.
+ *
+ * Die Hoehe rechnet gegen die Spanne des Tages und nicht gegen null: zwischen
+ * 18 und 21 Grad liegen drei Grad, und ein Diagramm ab null Grad zeigte davon
+ * sechs fast gleich hohe Balken.
+ */
+.weather__hourly {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+  min-width: 0;
+  margin-top: 0.4em;
+}
+
+.weather__hourly-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6em;
+  font-size: 0.72em;
+}
+
+.weather__hourly-label {
+  font-weight: var(--mirror-weight-label-soft);
+  letter-spacing: var(--mirror-track-label);
+  text-transform: uppercase;
+  color: var(--mirror-fg-dim);
+  white-space: nowrap;
+}
+
+/* Die Spitze ist der eine Wert, fuer den man auf ein Diagramm ueberhaupt schaut. */
+.weather__hourly-peak {
+  font-weight: var(--mirror-weight-label-soft);
+  color: var(--mirror-accent-warm);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.weather__bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5em;
+  height: min(22cqh, 6em);
+  min-width: 0;
+}
+
+.weather__bar {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.35em;
+}
+
+.weather__bar i {
+  display: block;
+  width: 100%;
+  border-radius: 6px;
+  /* Der Balken waechst von unten, wenn sich die Werte aendern – die Grafik
+     soll sich nachziehen und nicht neu aufgebaut wirken. */
+  transition: height var(--motion-tick);
+}
+
+.weather__bar-hour {
+  font-size: 0.62em;
+  font-weight: var(--mirror-weight-value);
+  color: var(--mirror-fg-mute);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* Auf einer deckenden Flaeche traegt der Text die Farbe der Flaeche. */
+.weather.box--solid .weather__hourly-label,
+.weather.box--solid .weather__bar-hour {
+  color: color-mix(in srgb, var(--mirror-on-accent) 62%, transparent);
+}
+
+.weather.box--solid .weather__hourly-peak {
+  color: var(--mirror-on-accent);
+}
+
+/* Im flachen Block ist fuer eine Grafik unter der Zahl kein Platz mehr. */
+.module[data-size='m'] .weather__hourly,
+.module[data-size='s'] .weather__hourly {
+  display: none;
+}
+
 /*
  * Steht ein Hinweis im Block, weicht ihm die Vorschau.
  *
@@ -1350,7 +1477,8 @@ body {
  * es. Und sie ist die einzige Zeile, deren Platz reicht, um dem Satz Raum zu
  * machen, ohne dass etwas anderes an die Blockkante stoesst.
  */
-.weather:has(.weather__hint) .weather__forecast {
+.weather:has(.weather__hint) .weather__forecast,
+.weather:has(.weather__hint) .weather__hourly {
   display: none;
 }
 
@@ -1461,19 +1589,17 @@ body {
   width: 100%;
 }
 
+/*
+ * Der Balken ist ab 0.9 die gemeinsame Fortschrittskomponente (.progress) und
+ * kein eigenes Stueck mehr: 4 px statt 8, Spur 14 % statt 10, abgerundet.
+ * Zwei verschiedene Fortschrittsbalken auf einer Wand fallen sofort auf, und
+ * der Spiegel bekommt bald einen zweiten (Feed, Timer).
+ *
+ * Was hier bleibt, ist die Farbe: sie kommt aus dem Cover und wird vom Modul
+ * am Element gesetzt.
+ */
 .spotify__bar {
-  height: 8px;
-  background: color-mix(in srgb, var(--mirror-fg) 10%, transparent);
-  overflow: hidden;
-}
-
-.spotify__bar i {
-  display: block;
-  height: 100%;
-  /* Der Takt aus dem Design-System: 900 ms lineare Bewegung, also etwa die
-   * Spanne bis zum naechsten Zeichnen. Damit waechst der Balken gleichmaessig
-   * statt zu springen. */
-  transition: width var(--motion-tick);
+  width: 100%;
 }
 
 .spotify__times {

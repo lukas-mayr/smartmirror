@@ -2,11 +2,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   accentForTemperature,
+  barHeight,
   buildSlides,
   dayLabel,
   daysBetween,
   describeWeather,
+  HOURLY_POINTS,
   isoDay,
+  peakIndex,
+  pickHourly,
   toCelsius,
 } from '../dist/shared.js';
 
@@ -152,4 +156,75 @@ test('faengt ohne aktuellen Wert gar nicht erst an', () => {
     now: NOW,
   });
   assert.deepEqual(slides, []);
+});
+
+/* ------------------------------ Tagesverlauf ------------------------------ */
+
+test('nimmt den Tagesverlauf ab der aktuellen Stunde', () => {
+  const points = Array.from({ length: 24 }, (_, hour) => ({
+    hour: String(hour).padStart(2, '0'),
+    temperature: hour,
+  }));
+  const picked = pickHourly(points, 8);
+  // Was schon vorbei ist, gehoert nicht in einen Verlauf, den man jetzt liest:
+  // der erste Punkt sitzt auf jetzt, der letzte auf der letzten Stunde des Tages.
+  assert.deepEqual(
+    picked.map((point) => point.hour),
+    ['08', '11', '14', '17', '20', '23'],
+  );
+});
+
+test('rutscht zurueck, wenn der Rest des Tages nicht mehr reicht', () => {
+  const points = Array.from({ length: 24 }, (_, hour) => ({
+    hour: String(hour).padStart(2, '0'),
+    temperature: hour,
+  }));
+  // Um 23 Uhr bliebe nach vorn genau ein Punkt uebrig. Lieber der ganze Tag
+  // als ein einzelner Balken am Abend.
+  const picked = pickHourly(points, 23);
+  assert.deepEqual(
+    picked.map((point) => point.hour),
+    ['18', '19', '20', '21', '22', '23'],
+  );
+});
+
+test('liefert immer genau so viele Punkte, wie das Diagramm traegt', () => {
+  const points = Array.from({ length: 24 }, (_, hour) => ({
+    hour: String(hour).padStart(2, '0'),
+    temperature: hour,
+  }));
+  // Egal zu welcher Stunde gefragt wird: die Zahl der Balken bleibt dieselbe,
+  // sonst spraenge die Breite der Grafik im Lauf des Tages.
+  for (let nowHour = 0; nowHour < 24; nowHour += 1) {
+    assert.equal(pickHourly(points, nowHour).length, HOURLY_POINTS);
+  }
+});
+
+test('gibt einen kurzen Verlauf unveraendert zurueck', () => {
+  const points = [
+    { hour: '08', temperature: 12 },
+    { hour: '14', temperature: 21 },
+  ];
+  assert.deepEqual(pickHourly(points, 8), points);
+  assert.deepEqual(pickHourly([], 8), []);
+});
+
+test('findet die Spitze des Verlaufs', () => {
+  assert.equal(
+    peakIndex([
+      { hour: '08', temperature: 12 },
+      { hour: '14', temperature: 21 },
+      { hour: '20', temperature: 17 },
+    ]),
+    1,
+  );
+  assert.equal(peakIndex([]), -1);
+});
+
+test('rechnet die Balkenhoehe gegen die Spanne des Tages', () => {
+  // Der kaelteste Punkt bleibt ein Balken und wird kein Strich.
+  assert.equal(barHeight(12, 12, 21), 18);
+  assert.equal(barHeight(21, 12, 21), 100);
+  // Ohne Spanne gibt es nichts zu vergleichen: alle Balken gleich hoch.
+  assert.equal(barHeight(18, 18, 18), 100);
 });
