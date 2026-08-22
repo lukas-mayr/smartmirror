@@ -3,6 +3,8 @@ import type {
   MirrorConfig,
   ModuleDescriptor,
   ModuleStateEnvelope,
+  PairedDevice,
+  PairingState,
   ServerMessage,
   UpdateStatus,
   Viewport,
@@ -10,6 +12,44 @@ import type {
 
 const TOKEN_KEY = 'mirror.token';
 const NAME_KEY = 'mirror.clientName';
+const DEVICE_KEY = 'mirror.deviceId';
+
+/**
+ * Zugriff auf den lokalen Speicher, der nicht ueber seine eigenen Fuesse faellt.
+ *
+ * Safari im privaten Modus wirft beim Schreiben, und in einem iframe ist der
+ * Speicher je nach Einstellung ganz gesperrt. Frueher riss das die ganze App
+ * mit: ein Fehler im Konstruktor, weisse Seite, kein Hinweis. Jetzt merkt sich
+ * die App das Token notfalls nur fuer diese Sitzung – koppeln laesst sie sich
+ * dann bei jedem Start neu, aber sie laeuft.
+ */
+const memory = new Map<string, string>();
+
+function readStored(key: string): string | null {
+  try {
+    return localStorage.getItem(key) ?? memory.get(key) ?? null;
+  } catch {
+    return memory.get(key) ?? null;
+  }
+}
+
+function writeStored(key: string, value: string): void {
+  memory.set(key, value);
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Nur diese Sitzung – besser als gar keine Kopplung.
+  }
+}
+
+function clearStored(key: string): void {
+  memory.delete(key);
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // Nichts zu tun: gespeichert war ohnehin nichts.
+  }
+}
 
 /** Abstand der Lebenszeichen. Wie in der Anzeige, damit beide gleich schnell auffallen. */
 const KEEPALIVE_MS = 20_000;
@@ -38,6 +78,17 @@ export interface StoreSnapshot {
    * `null` heisst: der Spiegel schaltet selbst weiter.
    */
   previewScreenId: string | null;
+  /**
+   * Haengt am Spiegel schon ein Geraet? Entscheidet, ob dieses hier die erste
+   * Einrichtung vor sich hat oder nur dazukommt.
+   */
+  mirrorPaired: boolean;
+  /** Laeuft gerade eine Kopplung – steht also ein Code auf dem Spiegel? */
+  pairing: PairingState;
+  /** Alle gekoppelten Geraete, wie der Spiegel sie kennt. */
+  devices: PairedDevice[];
+  /** Eigene Geraete-Id, um sich in der Liste selbst zu erkennen. */
+  deviceId: string | null;
   lastError: string | null;
 }
 
@@ -63,6 +114,10 @@ export class Store extends EventTarget {
     update: null,
     viewport: null,
     previewScreenId: null,
+    mirrorPaired: false,
+    pairing: { open: false, expiresAt: null },
+    devices: [],
+    deviceId: null,
     lastError: null,
   };
 
@@ -71,15 +126,14 @@ export class Store extends EventTarget {
   }
 
   get token(): string | null {
-    return localStorage.getItem(TOKEN_KEY);
+    return readStored(TOKEN_KEY);
   }
 
   get clientName(): string {
-    let name = localStorage.getItem(NAME_KEY);
+    let name = readStored(NAME_KEY);
     if (!name) {
-      // Damit man in der Geraeteliste erkennt, welches Handy welches ist.
-      name = `${navigator.platform || 'Handy'} · ${new Date().toLocaleDateString('de-DE')}`;
-      localStorage.setItem(NAME_KEY, name);
+      name = defaultClientName();
+      writeStored(NAME_KEY, name);
     }
     return name;
   }
@@ -139,9 +193,27 @@ export class Store extends EventTarget {
     this.send({ t: 'pair:request', code, clientName: this.clientName });
   }
 
+  /** Bittet den Spiegel, einen Kopplungscode anzuzeigen. */
+  requestPairing(): void {
+    this.send({ t: 'pair:start' });
+  }
+
+  cancelPairing(): void {
+    this.send({ t: 'pair:cancel' });
+  }
+
+  /**
+   * Kopplung dieses Geraets loeschen.
+   *
+   * Erst am Spiegel, dann hier: sonst bliebe in dessen Liste ein Geraet
+   * stehen, das nie wieder auftaucht und das niemand mehr zuordnen kann.
+   */
   forgetToken(): void {
-    localStorage.removeItem(TOKEN_KEY);
-    window.location.reload();
+    const own = this.#snapshot.deviceId;
+    if (own) this.send({ t: 'admin:revokeDevice', deviceId: own });
+    clearStored(TOKEN_KEY);
+    clearStored(DEVICE_KEY);
+    window.setTimeout(() => window.location.reload(), 150);
   }
 
   /**
@@ -200,14 +272,34 @@ export class Store extends EventTarget {
   #handle(message: ServerMessage): void {
     switch (message.t) {
       case 'welcome':
+        if (message.deviceId) writeStored(DEVICE_KEY, message.deviceId);
         this.#patch({
           status: message.authenticated ? 'connecting' : 'pairing',
+          mirrorPaired: message.mirrorPaired,
+          deviceId: message.deviceId ?? (message.authenticated ? readStored(DEVICE_KEY) : null),
+          pairing: message.pairing ?? this.#snapshot.pairing,
+          // Ein ungekoppeltes Geraet hat keine Liste – und soll auch keine
+          // alte aus einer frueheren Sitzung zeigen.
+          devices: message.authenticated ? this.#snapshot.devices : [],
           lastError: null,
         });
         return;
       case 'pair:result':
-        localStorage.setItem(TOKEN_KEY, message.token);
-        this.#patch({ status: 'ready', lastError: null });
+        writeStored(TOKEN_KEY, message.token);
+        writeStored(DEVICE_KEY, message.deviceId);
+        this.#patch({
+          status: 'ready',
+          deviceId: message.deviceId,
+          mirrorPaired: true,
+          pairing: { open: false, expiresAt: null },
+          lastError: null,
+        });
+        return;
+      case 'pair:state':
+        this.#patch({ pairing: message.pairing });
+        return;
+      case 'devices:update':
+        this.#patch({ devices: message.devices });
         return;
       case 'snapshot':
         this.#patch({
@@ -256,8 +348,9 @@ export class Store extends EventTarget {
         // Ein abgelaufenes Token muss zur Kopplung fuehren, nicht zu einer
         // App, die stumm nichts mehr tut.
         if (message.code === 'unauthorized') {
-          localStorage.removeItem(TOKEN_KEY);
-          this.#patch({ status: 'pairing', lastError: message.message });
+          clearStored(TOKEN_KEY);
+          clearStored(DEVICE_KEY);
+          this.#patch({ status: 'pairing', deviceId: null, devices: [], lastError: message.message });
           return;
         }
         this.#patch({ lastError: message.message });
@@ -271,6 +364,21 @@ export class Store extends EventTarget {
     this.#snapshot = { ...this.#snapshot, ...patch };
     this.dispatchEvent(new CustomEvent('change'));
   }
+}
+
+/**
+ * Vorschlag fuer den Geraetenamen.
+ *
+ * Auf dem iPhone sind Safari und die zum Startbildschirm hinzugefuegte App zwei
+ * getrennte Speicher – also zwei Kopplungen. In der Liste am Handy muss man sie
+ * auseinanderhalten koennen, deshalb steht die Betriebsart im Namen.
+ */
+function defaultClientName(): string {
+  const standalone =
+    window.matchMedia?.('(display-mode: standalone)').matches ||
+    (navigator as unknown as { standalone?: boolean }).standalone === true;
+  const platform = navigator.platform || 'Handy';
+  return `${platform} · ${standalone ? 'App' : 'Browser'}`;
 }
 
 export const store = new Store();
