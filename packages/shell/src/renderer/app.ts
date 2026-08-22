@@ -2,8 +2,10 @@ import {
   DEFAULT_FONT,
   FONT_STACKS,
   INSET_SIDES,
+  isNightNow,
   rectFor,
   validate,
+  ZONES,
   type MirrorConfig,
   type MirrorScreen,
   type ModuleDescriptor,
@@ -11,6 +13,7 @@ import {
   type ModuleStateEnvelope,
   type ModuleView,
   type ServerMessage,
+  type Zone,
 } from '@mirror/sdk';
 import type { CoreConnection, ConnectionState } from './connection.js';
 import { loadModuleFrontend } from './module-loader.js';
@@ -28,6 +31,16 @@ interface MountedInstance {
    */
   config: Record<string, unknown>;
 }
+
+/**
+ * Wie oft geprueft wird, ob die Nachtabsenkung greifen muss.
+ *
+ * Eine Minute reicht: die Grenze steht in "HH:MM", feiner laesst sie sich gar
+ * nicht einstellen. Ein Timer auf genau den Umschaltzeitpunkt waere praeziser
+ * und zugleich zerbrechlicher — er muesste bei jeder Konfigurationsaenderung,
+ * bei jedem Neustart und bei jeder Zeitumstellung neu gestellt werden.
+ */
+const NIGHT_CHECK_INTERVAL_MS = 60_000;
 
 const BURN_IN_INTERVAL_MS = 15 * 60_000;
 /** Wanderpfad des Einbrennschutzes in Pixeln. Klein genug, um nicht aufzufallen. */
@@ -82,6 +95,7 @@ export class MirrorApp {
     this.#buildFrame();
     this.#watchViewport();
     this.#startBurnInProtection();
+    this.#startNightWatch();
   }
 
   handle(message: ServerMessage): void {
@@ -193,6 +207,34 @@ export class MirrorApp {
     return (window as unknown as { mirror?: { version: string } }).mirror?.version ?? '0.0.0';
   }
 
+  /**
+   * Schaltet die Nachtabsenkung.
+   *
+   * Ein einziges Attribut am Wurzelelement, und das Stylesheet setzt dieselben
+   * Tokens eine Stufe dunkler. Der Vorteil gegenueber einer zweiten Variante
+   * je Block: kein Modul muss von der Nacht wissen, und keines kann sie
+   * vergessen.
+   */
+  #applyNight(): void {
+    const settings = this.#config?.display.nightMode;
+    const night = settings ? isNightNow(settings) : false;
+    if (night) document.documentElement.dataset.night = '1';
+    else delete document.documentElement.dataset.night;
+  }
+
+  /**
+   * Prueft im Minutentakt, ob die Absenkung greifen muss.
+   *
+   * Kein Timer auf genau den Umschaltzeitpunkt: der waere praeziser und
+   * zugleich zerbrechlicher – er muesste bei jeder Konfigurationsaenderung,
+   * bei jedem Neustart und bei jeder Zeitumstellung neu gestellt werden. Eine
+   * Minute Ungenauigkeit ist bei einer Grenze in "HH:MM" ohnehin die
+   * Aufloesung der Einstellung selbst.
+   */
+  #startNightWatch(): void {
+    window.setInterval(() => this.#applyNight(), NIGHT_CHECK_INTERVAL_MS);
+  }
+
   #applyConfig(config: MirrorConfig): void {
     this.#config = config;
     // Die Drehung greift damit auch fuer den Kopplungscode: die Anzeige
@@ -208,6 +250,7 @@ export class MirrorApp {
     );
     document.documentElement.style.setProperty('--mirror-columns', String(config.display.grid.columns));
     document.documentElement.style.setProperty('--mirror-rows', String(config.display.grid.rows));
+    this.#applyNight();
     this.#applyPower();
     this.#applySetup(config);
     this.#syncScreens(config.screens);
@@ -263,6 +306,7 @@ export class MirrorApp {
         element.dataset.screen = screen.id;
         this.#screenElements.set(screen.id, element);
       }
+      this.#syncZones(element, screen);
       // Auch bekannte Flaechen neu anhaengen: das stellt die Reihenfolge her,
       // in der weitergeschaltet wird.
       this.#screens.append(element);
@@ -280,15 +324,73 @@ export class MirrorApp {
     if (!stillThere) this.#showScreen((visible[0] ?? screens[0])?.id ?? null);
   }
 
-  /** Setzt einen Block auf seinen Rasterplatz. */
+  /**
+   * Baut die drei Baender einer Szene auf oder raeumt sie wieder weg.
+   *
+   * Die Baender sind echte Elemente und keine Rasterzeilen, weil sie sich
+   * anders verhalten: Kopf und Fuss haben eine feste Hoehe, die Mitte nimmt
+   * den Rest, und ein leeres Fussband verschwindet. Als Raster mit drei Zeilen
+   * waere jede dieser Regeln eine Ausnahme.
+   *
+   * Beim Umschalten zwischen Raster und Szene bleiben die Baender bzw. die
+   * Bloecke im Dokument – nur ihr Elternteil wechselt. `#place` haengt jeden
+   * Block gleich danach an die richtige Stelle, und weil kein Modul dabei
+   * abgeraeumt wird, laeuft die Uhr weiter und das Wetter holt nichts neu.
+   */
+  #syncZones(element: HTMLElement, screen: MirrorScreen): void {
+    const zones = screen.layout === 'zones';
+    element.classList.toggle('screen--zones', zones);
+
+    if (!zones) {
+      for (const zone of [...element.querySelectorAll<HTMLElement>('.zone')]) zone.remove();
+      return;
+    }
+
+    for (const zone of ZONES) {
+      let band = element.querySelector<HTMLElement>(`.zone--${zone}`);
+      if (!band) {
+        band = document.createElement('div');
+        band.className = `zone zone--${zone}`;
+        band.dataset.zone = zone;
+        element.append(band);
+      }
+      // Anhaengen stellt auch hier die Reihenfolge her: Kopf, Mitte, Fuss.
+      element.append(band);
+    }
+  }
+
+  /**
+   * Setzt einen Block an seinen Platz – im Raster oder in seinem Band.
+   *
+   * Beides steht in der Instanz: Rasterkoordinaten *und* Band. Welches gilt,
+   * entscheidet der Screen. So ueberlebt ein Block das Umschalten zwischen
+   * beiden Anordnungen, ohne dass irgendwo ein Platz neu erfunden werden muss.
+   */
   #place(host: HTMLElement, instance: ModuleInstance): void {
+    host.dataset.size = instance.size;
+
+    const screen = this.#screenElements.get(instance.screenId);
+    if (!screen) return;
+
+    if (screen.classList.contains('screen--zones')) {
+      const zone: Zone = instance.zone;
+      const band = screen.querySelector<HTMLElement>(`.zone--${zone}`);
+      if (!band) return;
+      // Die Rasterangaben abraeumen: sonst gaebe der Block im Band weiterhin
+      // eine Spaltenbreite vor, die es dort gar nicht gibt.
+      host.style.gridColumn = '';
+      host.style.gridRow = '';
+      host.dataset.zone = zone;
+      if (host.parentElement !== band) band.append(host);
+      return;
+    }
+
     const grid = this.#config?.display.grid ?? { columns: 1, rows: 1 };
     const rect = rectFor(instance, grid);
-    host.dataset.size = instance.size;
     host.style.gridColumn = `${rect.x + 1} / span ${rect.columns}`;
     host.style.gridRow = `${rect.y + 1} / span ${rect.rows}`;
-    const screen = this.#screenElements.get(instance.screenId);
-    if (screen && host.parentElement !== screen) screen.append(host);
+    delete host.dataset.zone;
+    if (host.parentElement !== screen) screen.append(host);
   }
 
   /**

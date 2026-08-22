@@ -7,15 +7,106 @@
  *  - Keine Schatten, kein Blur: hinter halbdurchlaessigem Glas werden daraus
  *    Lichthoefe.
  *  - Keine grossen hellen Flaechen: sie blenden und zeichnen den Displayrand nach.
- *  - Duenne Schriftschnitte wirken durch die Folie ausgewaschen, daher 300-400.
+ *  - Getoente Flaechen hoechstens bei 12 % Deckkraft, hoechstens eine deckende
+ *    Flaeche pro Anordnung – zwei summieren sich zum Leuchtfeld.
+ *
+ * Die Werte stehen doppelt: als Custom Property hier und als Konstante in
+ * packages/sdk/src/design.ts. Ein Test vergleicht beide Seiten, damit sie
+ * nicht auseinanderlaufen — die Module und die Anzeige brauchen dieselben
+ * Zahlen, und ein Modul kann kein CSS lesen.
  */
 
 :root {
+  /* --------------------------------- Farbe --------------------------------- */
+
+  --mirror-bg: #000000;
   --mirror-fg: #ffffff;
-  --mirror-fg-muted: #9a9a9a;
-  /* Nicht dunkler: hinter halbdurchlaessigem Glas verliert man darunter
-     liegende Grauwerte fast vollstaendig. */
-  --mirror-fg-dim: #707070;
+  /* Sekundaerwerte. */
+  --mirror-fg-dim: #9a9a9a;
+  /* Untergrenze fuer Achsen und Zustaende. Nicht dunkler: hinter
+     halbdurchlaessigem Glas verliert man darunter liegende Grauwerte fast
+     vollstaendig. */
+  --mirror-fg-mute: #707070;
+
+  /*
+   * Zwei Toene und sonst Grauwerte. Salbei traegt die Normalwerte —
+   * Beschriftungen, Balken, Ringe, Konturen —, Sand die Spitzen und alles, was
+   * Aufmerksamkeit verlangt. Ein dritter Ton wuerde die Rollen aufweichen:
+   * sobald Farbe nur noch huebsch ist und nichts mehr bedeutet, liest man sie
+   * nicht mehr mit.
+   */
+  --mirror-accent: #93b1a6;
+  --mirror-accent-warm: #d4b483;
+  /* Text auf einer deckenden Akzentflaeche. Dunkel, nicht weiss: eine helle
+     Schrift auf heller Flaeche waere zweimal dieselbe Helligkeit. */
+  --mirror-on-accent: #0d1512;
+  --mirror-on-accent-warm: #1a1408;
+  --mirror-danger: #c4574a;
+  --mirror-danger-fg: #d97a6c;
+
+  /* -------------------------------- Flaechen ------------------------------- */
+
+  /*
+   * Nur Highlights bekommen eine Box: das Wetter-Modul und ein Wert, der eine
+   * Entscheidung verlangt. Alles andere steht frei auf Schwarz.
+   */
+  --mirror-box: #0a0c0f;
+  --mirror-box-line: rgba(255, 255, 255, 0.12);
+  --mirror-box-accent: rgba(147, 177, 166, 0.09);
+  --mirror-box-accent-line: rgba(147, 177, 166, 0.35);
+  --mirror-box-warm: rgba(212, 180, 131, 0.1);
+  --mirror-box-warm-line: rgba(212, 180, 131, 0.32);
+  --mirror-box-danger: rgba(196, 87, 74, 0.08);
+  --mirror-box-danger-line: rgba(196, 87, 74, 0.35);
+
+  /* --------------------------------- Typo ---------------------------------- */
+
+  /*
+   * Der Kontrast entsteht aus dem Sprung: 240 gegen 26. Mittlere Groessen
+   * sparsam — wo alles gleich gross ist, muss man jede Zeile einzeln lesen.
+   *
+   * Die Zahlen gelten auf 1080 x 1920. Module rechnen in Container-Einheiten
+   * gegen ihren Block; diese Stufen sind die Vorlage dafuer und gelten direkt
+   * fuer alles, was nicht in einem Block liegt (Zonen, Feed, Overlays).
+   */
+  --mirror-text-mega: 240px;
+  --mirror-text-hero: 112px;
+  --mirror-text-xl: 84px;
+  --mirror-text-l: 56px;
+  --mirror-text-m: 40px;
+  --mirror-text-label: 26px;
+  /* Untergrenze fuer 2 bis 3 m Leseabstand. */
+  --mirror-text-min: 32px;
+
+  /*
+   * Werte duenn, Beschriftungen halbfett.
+   *
+   * Bis 0.8 standen die Werte im Schnitt 800. Ein fetter Wert in 240 px ist
+   * aber genau die grosse helle Flaeche, vor der die Regeln oben warnen — bei
+   * 300 traegt allein die Groesse die Hierarchie, und die Flaeche bleibt klein.
+   */
+  --mirror-weight-value: 300;
+  --mirror-weight-label: 700;
+  --mirror-weight-label-soft: 600;
+
+  /* Grosse Werte ziehen optisch auseinander und werden zurueckgenommen. */
+  --mirror-track-value: -0.035em;
+  --mirror-track-label: 0.14em;
+  --mirror-track-label-wide: 0.16em;
+
+  /* ------------------------------- Geometrie ------------------------------- */
+
+  --mirror-radius-s: 24px;
+  --mirror-radius-m: 24px;
+  --mirror-radius-l: 28px;
+  --mirror-radius-xl: 32px;
+  --mirror-radius-pill: 999px;
+
+  --mirror-stroke: 1.5px;
+  --mirror-stroke-graph: 4px;
+
+  --mirror-box-pad: 28px;
+
   /* Rand der bespielbaren Flaeche je Seite. Wird aus der Konfiguration
      gesetzt; die Werte hier sind nur der Ausgangspunkt. */
   --mirror-inset-top: 4%;
@@ -29,8 +120,70 @@
   /* Raster der Bloecke. Wird aus der Konfiguration gesetzt. */
   --mirror-columns: 6;
   --mirror-rows: 4;
+
+  /* --------------------------------- Zonen --------------------------------- */
+
+  /*
+   * Kopf 20 %, Hauptzone 60 %, Fussband 20 %. Prozent und nicht Pixel: die
+   * Masse des Design-Systems gelten fuer 1920 px Hoehe, und ein Spiegel mit
+   * einem anderen Bildschirm soll dieselben Verhaeltnisse zeigen.
+   */
+  --zone-head: 20%;
+  --zone-foot: 20%;
+  --zone-gap: var(--mirror-gap);
+
+  /* -------------------------------- Bewegung ------------------------------- */
+
+  /*
+   * Bewegt wird nur, was sich inhaltlich aendert: ein Wechsel steigt kurz auf
+   * und blendet ueber, Fortschritt waechst als Breite, Laden atmet. Nie
+   * gleichzeitig zwei Elemente, nie Position und Groesse zusammen.
+   */
+  --motion-swap-duration: 500ms;
+  --motion-swap-easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --motion-swap: var(--motion-swap-duration) var(--motion-swap-easing);
+  --motion-tick: 900ms linear;
+  --motion-breathe: 1400ms ease-in-out infinite;
+  --motion-screen: 900ms;
+
+  /* ---------------------------------- Feed --------------------------------- */
+
+  --feed-item-h: 232px;
+  --feed-item-h-rest: 148px;
+  --feed-gap: var(--mirror-gap);
+  --feed-title: 72px;
+  --feed-title-rest: 56px;
+  --feed-dim-1: 0.8;
+  --feed-dim-2: 0.45;
+
   /* Wird aus der Konfiguration gesetzt; der Wert hier ist nur der Ausgangspunkt. */
   --mirror-font: 'Nunito', 'Helvetica Neue', Arial, system-ui, sans-serif;
+}
+
+/*
+ * Nachtabsenkung.
+ *
+ * Kein eigener Satz Regeln, sondern dieselben Tokens eine Stufe dunkler: was
+ * tagsueber weiss ist, wird grau, was Akzent trug, verliert ihn, und deckende
+ * Flaechen gibt es nicht mehr. So bleibt jedes Modul unveraendert und sieht
+ * nachts trotzdem richtig aus — ohne dass irgendwo eine zweite Variante des
+ * Blocks gepflegt werden muesste.
+ *
+ * Im Dunkeln bleibt der Spiegel ein Spiegel: wer um drei Uhr aufsteht, will
+ * eine Uhrzeit lesen und nicht geblendet werden.
+ */
+[data-night='1'] {
+  --mirror-fg: #9a9a9a;
+  --mirror-fg-dim: #707070;
+  --mirror-fg-mute: #4a4a4a;
+  --mirror-accent: #4d605a;
+  --mirror-accent-warm: #5c5140;
+  --mirror-box: #000000;
+  --mirror-box-line: rgba(255, 255, 255, 0.07);
+  --mirror-box-accent: transparent;
+  --mirror-box-accent-line: rgba(255, 255, 255, 0.07);
+  --mirror-box-warm: transparent;
+  --mirror-box-warm-line: rgba(255, 255, 255, 0.07);
 }
 
 * {
@@ -145,13 +298,13 @@ body {
   opacity: 0;
   /* Ausgeblendete Screens duerfen keine Klicks oder Groessen beeinflussen. */
   visibility: hidden;
-  transition: opacity 900ms ease, visibility 0s linear 900ms;
+  transition: opacity var(--motion-screen) ease, visibility 0s linear var(--motion-screen);
 }
 
 .screen--active {
   opacity: 1;
   visibility: visible;
-  transition: opacity 900ms ease, visibility 0s;
+  transition: opacity var(--motion-screen) ease, visibility 0s;
 }
 
 /*
@@ -178,7 +331,7 @@ body {
 }
 
 .module--failed {
-  color: var(--mirror-fg-dim);
+  color: var(--mirror-fg-mute);
   font-size: 0.9rem;
 }
 
@@ -230,14 +383,14 @@ body {
   padding: 1rem 1.75rem;
   /* Deckt den Block darunter ab – halbdurchsichtig waere hier ein Schleier. */
   background: #000000;
-  border: 1px solid var(--mirror-fg-dim);
+  border: 1px solid var(--mirror-fg-mute);
   border-radius: 1.25rem;
 }
 
 .overlay__title {
   font-size: 1.5rem;
   font-weight: 300;
-  color: var(--mirror-fg-muted);
+  color: var(--mirror-fg-dim);
   letter-spacing: 0.04em;
 }
 
@@ -259,7 +412,7 @@ body {
 
 .overlay__hint {
   font-size: 1rem;
-  color: var(--mirror-fg-dim);
+  color: var(--mirror-fg-mute);
   max-width: 32ch;
   line-height: 1.6;
 }
@@ -281,7 +434,7 @@ body {
  */
 .frame {
   display: none;
-  border: 1px solid var(--mirror-fg-dim);
+  border: 1px solid var(--mirror-fg-mute);
   pointer-events: none;
 }
 
@@ -332,7 +485,7 @@ body {
 /* Fadenkreuz: verraet auf einen Blick, ob die Flaeche mittig sitzt. */
 .frame__cross {
   position: absolute;
-  background: var(--mirror-fg-dim);
+  background: var(--mirror-fg-mute);
 }
 
 .frame__cross--vertical {
@@ -362,7 +515,7 @@ body {
   text-align: center;
   font-size: 1rem;
   line-height: 1.7;
-  color: var(--mirror-fg-muted);
+  color: var(--mirror-fg-dim);
   /* Deckt Module ab, die zufaellig in der Mitte stehen. Schwarz und nicht
      halbtransparent: alles andere waere hinter dem Glas ein grauer Fleck. */
   background: #000000;
@@ -387,7 +540,7 @@ body {
   bottom: 1.2rem;
   right: 1.4rem;
   font-size: 0.75rem;
-  color: var(--mirror-fg-dim);
+  color: var(--mirror-fg-mute);
   letter-spacing: 0.08em;
   opacity: 0;
   transition: opacity 800ms ease;
@@ -395,6 +548,417 @@ body {
 
 .status--visible {
   opacity: 1;
+}
+
+/* ------------------------------ Zonen & Szenen ----------------------------- */
+
+/*
+ * Eine Szene sind drei Baender statt eines freien Rasters.
+ *
+ * Kopf 20 %, Hauptzone 60 %, Fussband 20 %. Der Unterschied zum Raster ist
+ * keine Geschmacksfrage: im Raster kann jeder Block ueberall liegen, und wer
+ * zehn Zeilen hat, fuellt sie irgendwann. Die Baender machen die Obergrenze
+ * zur Form — wo kein vierter Platz ist, landet auch kein vierter Block.
+ *
+ * Die Uhr sitzt fix links oben, rechts daneben genau ein Slot. Die Hauptzone
+ * traegt die Aussage der Szene, das Fussband nur breite, flache Elemente wie
+ * "Laeuft gerade" oder eine Terminzeile — und darf leer bleiben.
+ */
+.screen--zones {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zone-gap);
+}
+
+.zone {
+  display: flex;
+  gap: var(--mirror-gap);
+  min-width: 0;
+  min-height: 0;
+}
+
+/*
+ * Feste Anteile fuer Kopf und Fuss, der Rest fuer die Mitte.
+ *
+ * `flex: none` auf den beiden Baendern und nicht `flex: 1` auf allen dreien:
+ * die Hauptzone soll sich ausdehnen, wenn Kopf und Fuss weniger brauchen, aber
+ * Kopf und Fuss duerfen nie waschsen. Sonst rutschte die Uhr nach unten, sobald
+ * die Hauptzone leer ist — und die Uhr steht in jeder Szene an derselben Stelle,
+ * das ist ihr halber Wert.
+ */
+.zone--head {
+  flex: none;
+  height: var(--zone-head);
+}
+
+.zone--main {
+  flex: 1 1 auto;
+}
+
+.zone--foot {
+  flex: none;
+  height: var(--zone-foot);
+}
+
+/*
+ * Die Bloecke fuellen ihr Band in voller Hoehe.
+ *
+ * `align-items: stretch` ist hier nicht Geschmack, sondern Voraussetzung:
+ * `.module` traegt `container-type: size`, und ein Container ohne feste Hoehe
+ * liefert fuer `cqh` null. Ein Block, dessen Hoehe sich aus seinem Inhalt
+ * ergaebe, haette also Schriftgroessen von null – er waere unsichtbar.
+ *
+ * Wo der Inhalt im Band sitzt, entscheidet deshalb die Ausrichtung *im* Block:
+ * im Kopf oben, im Fussband unten, in der Mitte mittig. Das ist ohnehin die
+ * ehrlichere Stelle – "die Uhr steht oben" ist eine Aussage ueber die Uhr.
+ */
+.zone > .module {
+  align-self: stretch;
+  height: auto;
+}
+
+.zone--head > .module {
+  justify-content: flex-start;
+}
+
+.zone--main > .module {
+  justify-content: center;
+}
+
+.zone--foot > .module {
+  justify-content: flex-end;
+}
+
+/*
+ * Im Kopf nimmt sich der erste Block den Platz und der zweite nur, was er
+ * braucht: links die Uhr, rechts ein schmaler Slot. Rechtsbuendig, weil ein
+ * Slot in der Mitte zwischen Uhr und Kante schwebte.
+ */
+.zone--head > .module:first-child {
+  flex: 1 1 auto;
+}
+
+.zone--head > .module:not(:first-child) {
+  flex: 0 1 auto;
+  align-items: flex-end;
+  text-align: right;
+}
+
+/*
+ * Der rechte Kopf-Slot ist schmal, und was darin steht, endet an der rechten
+ * Kante statt an der linken. Das ist die eine Stelle, an der die Handschrift
+ * ("linke Kante, kein Innenabstand") nicht gilt: zwei Bloecke im selben Band,
+ * die beide linksbuendig sind, haetten zwischen sich eine zufaellige Luecke
+ * statt einer Kante.
+ */
+.zone--head > .module:not(:first-child) > * {
+  text-align: right;
+  align-items: flex-end;
+}
+
+.zone--main > .module,
+.zone--foot > .module {
+  flex: 1 1 0;
+}
+
+/*
+ * Ein leeres Band nimmt keinen Platz.
+ *
+ * `:empty` und nicht eine Klasse aus der Anzeige: welche Baender belegt sind,
+ * steht schon im DOM, und ein zweiter Zustand daneben waere einer, der falsch
+ * stehen kann. Der Kopf bleibt allerdings stehen, auch wenn er leer ist —
+ * sonst rutschte die Hauptzone nach oben und die Szene saehe je nach
+ * Besetzung anders aus.
+ */
+.zone--foot:empty {
+  display: none;
+}
+
+/* ------------------------------ Boxen (1c) -------------------------------- */
+
+/*
+ * Nur Highlights bekommen eine Box.
+ *
+ * Alles andere steht frei auf Schwarz. Eine Box ist teuer: sie ist eine
+ * Flaeche, und Flaechen summieren sich hinter dem Glas zum Leuchtfeld. Deshalb
+ * hoechstens zwei pro Anordnung, und hoechstens eine davon deckend.
+ *
+ * Die Klassen sind Angebote an die Module, keine Pflicht. Ein Modul, das
+ * nichts davon setzt, steht frei — und das ist der Normalfall.
+ */
+.box {
+  background: var(--mirror-box);
+  border: 1px solid var(--mirror-box-line);
+  border-radius: var(--mirror-radius-m);
+  padding: var(--mirror-box-pad);
+}
+
+.box--accent {
+  background: var(--mirror-box-accent);
+  border-color: var(--mirror-box-accent-line);
+}
+
+.box--warm {
+  background: var(--mirror-box-warm);
+  border-color: var(--mirror-box-warm-line);
+}
+
+/*
+ * Die eine deckende Flaeche.
+ *
+ * Sie ist das Highlight der Szene und wandert mit der Tageszeit: morgens das
+ * Wetter in der Hauptzone, abends die Musik im Fussband. Der Text darauf ist
+ * dunkel — eine helle Schrift auf heller Flaeche waere zweimal dieselbe
+ * Helligkeit, und die Flaeche traegt hier die Aufmerksamkeit, nicht der Text.
+ */
+.box--solid {
+  background: var(--mirror-accent);
+  border: none;
+  border-radius: var(--mirror-radius-xl);
+  color: var(--mirror-on-accent);
+}
+
+.box--solid-warm {
+  background: var(--mirror-accent-warm);
+  border: none;
+  border-radius: var(--mirror-radius-xl);
+  color: var(--mirror-on-accent-warm);
+}
+
+/*
+ * Auf einer deckenden Flaeche gibt es keinen Akzent mehr — die Flaeche *ist*
+ * der Akzent. Beschriftungen werden dort zur abgedunkelten Variante des
+ * Textes statt zu Salbei auf Salbei.
+ */
+.box--solid .clock__weekday,
+.box--solid .weather__place,
+.box--solid .spotify__eyebrow,
+.box--solid .weather__label {
+  color: color-mix(in srgb, var(--mirror-on-accent) 62%, transparent);
+}
+
+.box--solid-warm .clock__weekday,
+.box--solid-warm .weather__place,
+.box--solid-warm .spotify__eyebrow,
+.box--solid-warm .weather__label {
+  color: color-mix(in srgb, var(--mirror-on-accent-warm) 62%, transparent);
+}
+
+.box--solid .clock__date,
+.box--solid .weather__meta,
+.box--solid .spotify__artist {
+  color: color-mix(in srgb, var(--mirror-on-accent) 70%, transparent);
+}
+
+.box--solid-warm .clock__date,
+.box--solid-warm .weather__meta,
+.box--solid-warm .spotify__artist {
+  color: color-mix(in srgb, var(--mirror-on-accent-warm) 70%, transparent);
+}
+
+/*
+ * Nachts keine deckende Flaeche.
+ *
+ * Nicht abgedunkelt, sondern weg: eine Flaeche in 20 % Salbei waere im
+ * dunklen Zimmer immer noch ein Rechteck, das leuchtet. Uebrig bleibt der
+ * Inhalt, frei auf Schwarz — genau wie in Szene 4.
+ */
+[data-night='1'] .box--solid,
+[data-night='1'] .box--solid-warm {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+[data-night='1'] .box--solid *,
+[data-night='1'] .box--solid-warm * {
+  color: inherit;
+}
+
+/* ------------------------------ Zustaende (1c) ---------------------------- */
+
+/*
+ * Offline und Laden fallen auf Grau zurueck, nur der Fehler darf eine eigene
+ * Toenung tragen. Eine leere Zelle rendert gar nichts — kein "Keine Daten",
+ * kein Platzhalter: eine leere Flaeche auf einem Spiegel ist ein Spiegel und
+ * faellt niemandem auf, ein Platzhalter faellt jedem auf.
+ */
+.state {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  color: var(--mirror-fg-dim);
+  font-weight: var(--mirror-weight-value);
+  min-width: 0;
+}
+
+.state__icon {
+  flex: none;
+  line-height: 0;
+  display: inline-flex;
+  color: var(--mirror-fg-mute);
+}
+
+.state__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15em;
+  min-width: 0;
+}
+
+.state__note {
+  font-size: 0.75em;
+  color: var(--mirror-fg-mute);
+}
+
+.state--error {
+  color: var(--mirror-danger-fg);
+}
+
+.state--error .state__icon {
+  color: var(--mirror-danger-fg);
+}
+
+/*
+ * Laden: Balken atmen, bis Daten da sind.
+ *
+ * Kein Kreisel und kein Fortschritt in Prozent — beides behauptet, dass
+ * jemand zusieht. Die Balken sind dieselbe Form, die der Block gleich mit
+ * echten Werten zeigt, nur ohne Werte: das Auge findet die Zeile danach an
+ * derselben Stelle wieder.
+ */
+.loading {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.2em;
+  height: 2.2em;
+  width: 100%;
+  min-width: 0;
+}
+
+.loading i {
+  flex: 1 1 0;
+  background: var(--mirror-accent);
+  border-radius: 4px;
+  animation: mirror-breathe var(--motion-breathe);
+}
+
+.loading i:nth-child(1) {
+  height: 40%;
+}
+.loading i:nth-child(2) {
+  height: 72%;
+  animation-delay: 150ms;
+}
+.loading i:nth-child(3) {
+  height: 54%;
+  animation-delay: 300ms;
+}
+.loading i:nth-child(4) {
+  height: 88%;
+  animation-delay: 450ms;
+}
+
+@keyframes mirror-breathe {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/*
+ * Nachts atmet nichts.
+ *
+ * Eine Animation, die im dunklen Zimmer im Augenwinkel laeuft, weckt
+ * zuverlaessig auf — und dass gerade geladen wird, ist um drei Uhr nachts
+ * niemandes Sorge.
+ */
+[data-night='1'] .loading i {
+  animation: none;
+  opacity: 0.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading i {
+    animation: none;
+  }
+}
+
+/* --------------------------- Chips und Fortschritt ------------------------- */
+
+/* Ein Wert, der keine Zahl ist: "Fenster zu", "Paket unterwegs". */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--mirror-box-line);
+  border-radius: var(--mirror-radius-pill);
+  padding: 0.3em 0.7em;
+  font-weight: var(--mirror-weight-value);
+  color: var(--mirror-fg-dim);
+}
+
+.chip--warm {
+  background: var(--mirror-box-warm);
+  border-color: var(--mirror-box-warm-line);
+  color: var(--mirror-accent-warm);
+  font-weight: var(--mirror-weight-label-soft);
+}
+
+/*
+ * Fortschritt: nur eine Eigenschaft bewegt sich, und zwar die Breite.
+ *
+ * Keine Farbe, die mitwandert, keine Hoehe, die pulsiert. Zwei bewegte
+ * Eigenschaften gleichzeitig liest das Auge als Zappeln, eine als Fortschritt.
+ */
+.progress {
+  height: 4px;
+  background: color-mix(in srgb, var(--mirror-fg) 14%, transparent);
+  border-radius: var(--mirror-radius-pill);
+  overflow: hidden;
+}
+
+.progress i {
+  display: block;
+  height: 100%;
+  background: var(--mirror-accent);
+  border-radius: var(--mirror-radius-pill);
+  transition: width var(--motion-tick);
+}
+
+/*
+ * Die Punktreihe kuendigt an, dass mehr kommt.
+ *
+ * Ohne sie waere ein Wechsel eine Ueberraschung: man liest im Vorbeigehen
+ * "Heute 18°" und weiss nicht, dass gleich "Morgen 19°" dasteht. Der breite
+ * Punkt ist die aktuelle Karte.
+ */
+.dots {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dots i {
+  height: 10px;
+  width: 10px;
+  border-radius: var(--mirror-radius-pill);
+  background: var(--mirror-accent);
+  opacity: 0.3;
+  transition: width var(--motion-swap-duration) ease, opacity var(--motion-swap-duration) ease;
+}
+
+.dots i.is-active {
+  width: 34px;
+  opacity: 1;
+}
+
+/* Nachts wird nicht weitergeschaltet, also gibt es auch nichts anzukuendigen. */
+[data-night='1'] .dots {
+  display: none;
 }
 
 /* ------------------------- Grundstile fuer Module ------------------------- */
@@ -430,16 +994,19 @@ body {
  *     tatsaechlich an derselben Linie. Der Abstand zum Nachbarn kommt aus
  *     --mirror-gap und muss nicht doppelt vorkommen.
  *  2. Eyebrow: woher der Wert kommt (Wochentag, Ort, Konto). Klein, gesperrt,
- *     gedimmt – gelesen wird er erst im zweiten Blick.
- *  3. Titel: der eine Wert, fuer den der Block da ist. Schnitt 800.
- *  4. Zweitzeile: Versalien, gesperrt, und als einzige Zeile farbig.
+ *     und farbig – er traegt den Akzent, nicht der Wert.
+ *  3. Titel: der eine Wert, fuer den der Block da ist. Schnitt 300.
+ *  4. Zweitzeile: Versalien, gesperrt, gedimmt.
  *  5. Balken: 8 px, Spur 10 % Weiss. Eine Linie, keine Flaeche – Flaechen
  *     leuchten hinter der Folie.
  *  6. Ziffern: tabular-nums, damit beim Weiterzaehlen nichts zappelt.
  *
- * Fette Schnitte sind kein Widerspruch zur Regel "300 bis 400" ganz oben: die
- * gilt duennen Schnitten, die durch die Folie auswaschen. Nach oben ist sie
- * offen, solange die helle Flaeche klein bleibt – eine Zeile ist klein.
+ * Punkt 2 und 3 haben mit dem Design-System die Rollen getauscht. Bis 0.8 war
+ * der Wert fett und die Beschriftung grau; jetzt ist der Wert duenn und die
+ * Beschriftung traegt Farbe. Der Grund ist derselbe wie ueberall hier: ein
+ * fetter Wert in 240 px ist eine grosse helle Flaeche, und die leuchtet durch
+ * das Glas. Bei Schnitt 300 traegt allein der Groessensprung die Hierarchie —
+ * 240 gegen 26 liest man aus 3 m in einer Sekunde, ganz ohne Fettung.
  */
 
 /* 1 – die Kante */
@@ -464,10 +1031,10 @@ body {
 .weather__place,
 .spotify__eyebrow {
   font-size: 0.62em;
-  font-weight: 700;
-  letter-spacing: 0.24em;
+  font-weight: var(--mirror-weight-label);
+  letter-spacing: var(--mirror-track-label-wide);
   text-transform: uppercase;
-  color: var(--mirror-fg-dim);
+  color: var(--mirror-accent);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -477,9 +1044,9 @@ body {
 .clock__time,
 .weather__temp,
 .spotify__title {
-  font-weight: 800;
+  font-weight: var(--mirror-weight-value);
   line-height: 1.06;
-  letter-spacing: -0.02em;
+  letter-spacing: var(--mirror-track-value);
 }
 
 .clock__time,
@@ -493,9 +1060,10 @@ body {
 .weather__meta,
 .spotify__artist {
   font-size: 0.78em;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+  font-weight: var(--mirror-weight-value);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--mirror-fg-dim);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -531,7 +1099,7 @@ body {
 }
 
 .clock__date {
-  color: var(--mirror-fg-muted);
+  color: var(--mirror-fg-dim);
 }
 
 /* Im kleinsten Block bleibt neben der Uhrzeit nichts uebrig. */
@@ -548,7 +1116,7 @@ body {
 }
 
 .weather--stale {
-  color: var(--mirror-fg-muted);
+  color: var(--mirror-fg-dim);
 }
 
 .weather__now {
@@ -597,7 +1165,7 @@ body {
   font-size: 0.38em;
   letter-spacing: 0;
   vertical-align: 0.8em;
-  color: var(--mirror-fg-muted);
+  color: var(--mirror-fg-dim);
 }
 
 .weather__meta {
@@ -638,7 +1206,7 @@ body {
   flex-direction: column;
   gap: 0.3em;
   min-width: 0;
-  animation: weather-slide-in 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation: weather-slide-in var(--motion-swap) both;
 }
 
 /*
@@ -677,12 +1245,13 @@ body {
    * spraenge die Beschriftung alle fuenf Sekunden in eine andere Groesse, und
    * aus dem ruhigen Weiterschalten wuerde ein Zappeln. Die Anzeige gibt die
    * Laenge als --weather-label-chars herein; 110 ist der Erfahrungswert fuer
-   * Versalien im Schnitt 800 samt Sperrung, mit einem Finger Luft rechts.
+   * Versalien im Schnitt 700 samt Sperrung, mit einem Finger Luft rechts.
    */
   font-size: min(17cqh, calc(110cqw / var(--weather-label-chars, 8)));
-  font-weight: 800;
+  font-weight: var(--mirror-weight-label);
+  color: var(--mirror-accent);
   line-height: 1.06;
-  letter-spacing: 0.12em;
+  letter-spacing: var(--mirror-track-label);
   text-transform: uppercase;
   white-space: nowrap;
   overflow: hidden;
@@ -735,10 +1304,10 @@ body {
 
 .weather__day-name {
   font-size: 0.72em;
-  font-weight: 700;
-  letter-spacing: 0.18em;
+  font-weight: var(--mirror-weight-label);
+  letter-spacing: var(--mirror-track-label);
   text-transform: uppercase;
-  color: var(--mirror-fg-dim);
+  color: var(--mirror-fg-mute);
   white-space: nowrap;
   overflow: hidden;
 }
@@ -751,14 +1320,14 @@ body {
 }
 
 .weather__day-range {
-  font-weight: 700;
+  font-weight: var(--mirror-weight-label-soft);
   white-space: nowrap;
 }
 
 .weather__day-range i {
   font-style: normal;
   font-weight: 600;
-  color: var(--mirror-fg-dim);
+  color: var(--mirror-fg-mute);
 }
 
 /*
@@ -791,13 +1360,13 @@ body {
   font-weight: 400;
   letter-spacing: 0;
   text-transform: none;
-  color: var(--mirror-fg-dim);
+  color: var(--mirror-fg-mute);
 }
 
 .weather--empty {
   font-size: min(9cqh, 5cqw);
   font-weight: 400;
-  color: var(--mirror-fg-dim);
+  color: var(--mirror-fg-mute);
   display: flex;
   align-items: center;
 }
@@ -821,7 +1390,7 @@ body {
 }
 
 .spotify--paused {
-  color: var(--mirror-fg-muted);
+  color: var(--mirror-fg-dim);
 }
 
 /*
@@ -882,7 +1451,7 @@ body {
 .spotify__album {
   font-size: 0.72em;
   font-weight: 300;
-  color: var(--mirror-fg-dim);
+  color: var(--mirror-fg-mute);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -901,9 +1470,10 @@ body {
 .spotify__bar i {
   display: block;
   height: 100%;
-  /* Eine Sekunde lineare Bewegung – genau die Spanne bis zum naechsten
-   * Zeichnen. Damit waechst der Balken gleichmaessig statt zu springen. */
-  transition: width 1s linear;
+  /* Der Takt aus dem Design-System: 900 ms lineare Bewegung, also etwa die
+   * Spanne bis zum naechsten Zeichnen. Damit waechst der Balken gleichmaessig
+   * statt zu springen. */
+  transition: width var(--motion-tick);
 }
 
 .spotify__times {
@@ -911,8 +1481,8 @@ body {
   justify-content: space-between;
   margin-top: 0.5em;
   font-size: min(6cqh, 3.2cqw);
-  font-weight: 600;
-  color: var(--mirror-fg-muted);
+  font-weight: var(--mirror-weight-label-soft);
+  color: var(--mirror-fg-dim);
 }
 
 /* ------------------------------ S: nur das Cover ------------------------------ */
@@ -1012,7 +1582,7 @@ body {
 .spotify--hint {
   font-size: min(7cqh, 4cqw);
   font-weight: 300;
-  color: var(--mirror-fg-dim);
+  color: var(--mirror-fg-mute);
   text-align: center;
 }
 
@@ -1020,4 +1590,212 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* ----------------------------- Mitteilungsfeed ---------------------------- */
+
+/*
+ * Der Feed zeigt genau drei Mitteilungen.
+ *
+ * Die oberste traegt die Flaeche und die volle Groesse, die beiden darunter
+ * stehen frei und gedimmt als Ausblick. Damit liest man aus 3 m nur die
+ * oberste Zeile und weiss trotzdem, dass mehr wartet — der Rest ist kein Text,
+ * den man lesen soll, sondern die Auskunft "da kommt noch was".
+ *
+ * Ein leerer Feed heisst leere Hauptzone. Kein "Keine Mitteilungen": eine
+ * leere Flaeche auf einem Spiegel ist ein Spiegel, ein Satz darueber ist eine
+ * Meldung, dass nichts zu melden ist.
+ */
+.feed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--feed-gap);
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  container-type: size;
+}
+
+.feed__head {
+  display: flex;
+  align-items: center;
+  gap: 0.8em;
+  flex: none;
+  font-size: min(4cqh, 2.6cqw);
+  font-weight: var(--mirror-weight-label);
+  letter-spacing: var(--mirror-track-label-wide);
+  text-transform: uppercase;
+  color: var(--mirror-fg-mute);
+}
+
+/* Die Linie fuellt, was zwischen Beschriftung und Zahl uebrig bleibt. */
+.feed__rule {
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--mirror-box-line);
+}
+
+.feed__count {
+  font-weight: var(--mirror-weight-value);
+  letter-spacing: 0;
+}
+
+.feed__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--feed-gap);
+  flex: 1 1 auto;
+  min-height: 0;
+  /*
+   * Die unterste Karte faellt aus dem Bild, statt den Block aufzuziehen. Ohne
+   * das schoebe jedes Nachruecken die halbe Anzeige mit.
+   */
+  overflow: hidden;
+}
+
+/*
+ * Die Rangfolge steckt in den Positionen und nicht in den Daten.
+ *
+ * Ein Eintrag weiss nicht, der wievielte er ist — er wird an eine Position
+ * gehaengt, und die Position bestimmt Groesse, Flaeche und Deckkraft. Beim
+ * Nachruecken aendert sich damit nur, welcher Eintrag an welcher Position
+ * haengt, und die Form der Liste bleibt exakt dieselbe.
+ */
+.feed__item {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.1em;
+  border-radius: var(--mirror-radius-l);
+  min-width: 0;
+  flex: none;
+}
+
+.feed__item--1 {
+  min-height: min(var(--feed-item-h), 30cqh);
+  padding: 0 var(--mirror-box-pad);
+  background: var(--mirror-accent);
+  color: var(--mirror-on-accent);
+  animation: mirror-swap var(--motion-swap) both;
+}
+
+/* Dringendes bekommt Sand statt Salbei und rueckt sofort auf Position 1. */
+.feed__item--1.feed__item--urgent {
+  background: var(--mirror-accent-warm);
+  color: var(--mirror-on-accent-warm);
+}
+
+.feed__item--2,
+.feed__item--3 {
+  min-height: min(var(--feed-item-h-rest), 19cqh);
+  color: var(--mirror-fg);
+}
+
+.feed__item--2 {
+  opacity: var(--feed-dim-1);
+}
+
+.feed__item--3 {
+  opacity: var(--feed-dim-2);
+}
+
+.feed__label {
+  font-size: min(3.6cqh, 2.4cqw);
+  font-weight: var(--mirror-weight-label);
+  letter-spacing: var(--mirror-track-label-wide);
+  text-transform: uppercase;
+  color: var(--mirror-accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.feed__item--1 .feed__label {
+  color: color-mix(in srgb, var(--mirror-on-accent) 62%, transparent);
+}
+
+.feed__item--1.feed__item--urgent .feed__label {
+  color: color-mix(in srgb, var(--mirror-on-accent-warm) 62%, transparent);
+}
+
+.feed__title {
+  font-weight: var(--mirror-weight-value);
+  line-height: 1.05;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.feed__item--1 .feed__title {
+  font-size: min(9.4cqh, 6.6cqw);
+}
+
+.feed__item--2 .feed__title,
+.feed__item--3 .feed__title {
+  font-size: min(7.3cqh, 5.2cqw);
+}
+
+.feed__meta {
+  font-size: min(3.8cqh, 2.6cqw);
+  font-weight: var(--mirror-weight-value);
+  line-height: 1.2;
+  color: var(--mirror-fg-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.feed__item--1 .feed__meta {
+  color: color-mix(in srgb, var(--mirror-on-accent) 70%, transparent);
+}
+
+.feed__item--1.feed__item--urgent .feed__meta {
+  color: color-mix(in srgb, var(--mirror-on-accent-warm) 70%, transparent);
+}
+
+/*
+ * Nachts traegt auch die oberste Position keine Flaeche mehr — dieselbe Regel
+ * wie fuer jedes andere Highlight. Uebrig bleibt eine Liste in Grau.
+ */
+[data-night='1'] .feed__item--1 {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  animation: none;
+}
+
+[data-night='1'] .feed__item--1 .feed__label {
+  color: var(--mirror-accent);
+}
+
+[data-night='1'] .feed__item--1 .feed__meta {
+  color: var(--mirror-fg-dim);
+}
+
+/* ------------------------------ Der Wechsel ------------------------------- */
+
+/*
+ * Eintritt: von unten und aus dem Nichts. Kein Wischen zur Seite — seitliche
+ * Bewegung im Augenwinkel liest sich als "da laeuft etwas", und genau das soll
+ * ein Spiegel nicht tun.
+ *
+ * Steht hier und nicht bei einem einzelnen Modul: Wetter, Feed und alles, was
+ * spaeter dazukommt, sollen denselben Wechsel zeigen. Zwei verschiedene
+ * Ueberblendungen auf einer Wand fallen sofort auf.
+ */
+@keyframes mirror-swap {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .feed__item--1 {
+    animation: none;
+  }
 }
