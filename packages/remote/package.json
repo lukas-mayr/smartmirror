@@ -1,6 +1,6 @@
 {
   "name": "@mirror/remote",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "private": true,
   "type": "module",
   "description": "Fernsteuerung des Spiegels als installierbare Web-App",
@@ -11,7 +11,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@mirror/sdk": "0.10.0",
+    "@mirror/sdk": "0.11.0",
     "lit": "^3.2.1"
   },
   "devDependencies": {
