@@ -70,9 +70,15 @@ export interface NotificationsState {
   items: Notification[];
 }
 
-/** Grenzen der sichtbaren Positionen, aus dem Design-System. */
-export const VISIBLE_MIN = FEED.visibleMin;
-export const VISIBLE_MAX = FEED.visibleMax;
+/**
+ * Grenzen der sichtbaren Positionen, aus dem Design-System.
+ *
+ * Ausdruecklich als `number` und nicht als das Literal, das aus dem `as const`
+ * des Design-Systems faellt: wer damit eine Zaehlvariable anlegt, bekaeme sonst
+ * eine Variable vom Typ `1`, die nie etwas anderes werden darf.
+ */
+export const VISIBLE_MIN: number = FEED.visibleMin;
+export const VISIBLE_MAX: number = FEED.visibleMax;
 
 /** Voreingestellte Taktung in Sekunden, aus dem Design-System. */
 export const ADVANCE_SECONDS = FEED.advance / 1000;
