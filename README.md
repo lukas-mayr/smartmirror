@@ -435,10 +435,21 @@ Pixeln bedeutete auf jedem Bildschirm etwas anderes.
 Tabelle: jeder Tag bekommt ein Viertel der Breite, also ein Symbol in
 Fußnotengröße und zwei Zahlen, die man aus zwei Metern nicht mehr liest. Ein
 Spiegel wird aber im Vorbeigehen gelesen. Deshalb zeigt das Wetter im L-Block
-immer nur einen Tag und schaltet im Takt des Design-Systems (`--motion-dwell`,
-2,6 s) zum nächsten: *Heute*, *Morgen*, *Übermorgen*, danach der Wochentag — im
-Raster wie im Kopfband einer Szene, denn die Form hängt an der Größe und nicht
-an der Aufhängung.
+immer nur einen Tag und schaltet zum nächsten: *Heute*, *Morgen*, danach der
+Wochentag — im Raster wie im Kopfband einer Szene, denn die Form hängt an der
+Größe und nicht an der Aufhängung.
+
+Zwei Tage haben Namen, die näher sind als ihr Wochentag; „Übermorgen" gehört
+nicht mehr dazu. Es ist zwar ein Wort, aber keine Auskunft — man muss erst zwei
+Tage weiterzählen, um zu wissen, welcher gemeint ist, während man „Freitag"
+sofort weiß. Nebenbei war es das längste Wort des Stapels und das einzige, das
+an der Blockkante endete.
+
+Der Takt dafür ist **einstellbar** (*Standzeit einer Karte*, 2 bis 60 s). Ohne
+eigene Angabe gilt der Takt des Design-Systems (`--motion-dwell`, 2,6 s). Dass
+das Wetter davon abweichen darf, ist eine bewusste Ausnahme: es ist der einzige
+Block, bei dem man den Takt tatsächlich spürt, weil man auf eine bestimmte
+Karte wartet.
 
 **Das Symbol trägt die Karte.** Es nimmt die ganze Wertzeile ein und steht neben
 Tag und Zahl wie ein Bild neben seiner Bildunterschrift. Das ist keine Vorliebe,

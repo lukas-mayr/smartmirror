@@ -1,4 +1,5 @@
 import type { IconName } from '@mirror/icons';
+import { MOTION } from '@mirror/sdk';
 
 export interface WeatherConfig {
   location: string;
@@ -16,7 +17,44 @@ export interface WeatherConfig {
    * nimmt, waere nach dem zweiten Modul mit derselben Idee ein Leuchtfeld.
    */
   highlight: boolean;
+  /**
+   * Wie lange eine Karte steht, in Sekunden.
+   *
+   * Fehlt der Wert, gilt der Takt des Design-Systems. Aeltere Konfigurationen
+   * kennen ihn nicht, und die sollen sich nicht ploetzlich anders bewegen.
+   */
+  dwellSeconds?: number;
   refreshMinutes: number;
+}
+
+/**
+ * Die Spanne, in der sich die Standzeit einstellen laesst.
+ *
+ * Unter zwei Sekunden flimmert die Durchschaltung, ueber sechzig steht sie
+ * praktisch – wer so lange einen Tag sehen will, nimmt besser den breiten
+ * Block, in dem alle Tage nebeneinander stehen.
+ */
+export const DWELL_SECONDS = { min: 2, max: 60 } as const;
+
+/**
+ * Die Standzeit in Millisekunden.
+ *
+ * Das Design-System gibt mit MOTION.dwell einen Takt fuer alles vor, was
+ * durchschaltet – auch fuer den Mitteilungsfeed. Dass das Wetter davon
+ * abweichen darf, ist eine bewusste Ausnahme und kein Versehen: es ist der
+ * einzige Block, bei dem man den Takt tatsaechlich spuert, weil man auf eine
+ * bestimmte Karte wartet. Ohne eigene Angabe bleibt es beim Systemtakt.
+ */
+export function dwellMs(seconds: unknown): number {
+  /*
+   * Nur eine echte Zahl zaehlt. `Number(null)` und `Number('')` sind beide
+   * null, und die rutschten sonst als "null Sekunden" in die Spanne statt als
+   * "keine Angabe" – aus einer fehlenden Einstellung wuerde der schnellste
+   * erlaubte Takt.
+   */
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds)) return MOTION.dwell;
+  const clamped = Math.min(DWELL_SECONDS.max, Math.max(DWELL_SECONDS.min, seconds));
+  return Math.round(clamped * 1000);
 }
 
 export interface CurrentWeather {
@@ -73,10 +111,17 @@ export interface WeatherAppearance {
   night?: IconName;
 }
 
+/*
+ * Die Beschriftungen stehen mit echten Umlauten, im Unterschied zu den
+ * Kommentaren ringsum. Der Grund ist der Ort, an dem sie landen: sie stehen
+ * auf dem Spiegel, direkt neben einem Datum, das aus dem System kommt und
+ * "12. Maerz" niemals so schreiben wuerde. Zwei Schreibweisen nebeneinander
+ * liest man als Fehler, auch wenn keiner da ist.
+ */
 export const WEATHER_CODES: Record<number, WeatherAppearance> = {
   0: { label: 'Klar', icon: 'sun', night: 'moon' },
-  1: { label: 'Ueberwiegend klar', icon: 'sun', night: 'moon' },
-  2: { label: 'Teilweise bewoelkt', icon: 'cloud-sun', night: 'cloud-moon' },
+  1: { label: 'Überwiegend klar', icon: 'sun', night: 'moon' },
+  2: { label: 'Teilweise bewölkt', icon: 'cloud-sun', night: 'cloud-moon' },
   3: { label: 'Bedeckt', icon: 'cloudy' },
   45: { label: 'Nebel', icon: 'cloud-fog' },
   48: { label: 'Reifnebel', icon: 'cloud-fog' },
@@ -96,7 +141,7 @@ export const WEATHER_CODES: Record<number, WeatherAppearance> = {
   77: { label: 'Schneegriesel', icon: 'snowflake' },
   80: { label: 'Schauer', icon: 'cloud-rain' },
   81: { label: 'Schauer', icon: 'cloud-rain' },
-  82: { label: 'Kraeftige Schauer', icon: 'cloud-rain' },
+  82: { label: 'Kräftige Schauer', icon: 'cloud-rain' },
   85: { label: 'Schneeschauer', icon: 'cloud-snow' },
   86: { label: 'Schneeschauer', icon: 'cloud-snow' },
   95: { label: 'Gewitter', icon: 'cloud-lightning' },
@@ -245,10 +290,12 @@ export function daysBetween(from: string, to: string): number {
 /**
  * Beschriftung einer Karte.
  *
- * Die naechsten beiden Tage haben Namen, die naeher sind als ihr Wochentag:
- * "Morgen" versteht man ohne nachzurechnen, "Freitag" erst, wenn man weiss,
- * welcher Tag heute ist. Weiter draussen kippt es – dort ist der Wochentag die
- * kuerzere Auskunft, weil "in vier Tagen" niemand mitzaehlt.
+ * Zwei Tage haben Namen, die naeher sind als ihr Wochentag: "Heute" und
+ * "Morgen" versteht man ohne nachzurechnen. Danach kippt es – und zwar frueher,
+ * als es die Sprache nahelegt. "Uebermorgen" ist zwar ein Wort, aber keine
+ * Auskunft: man muss erst zwei Tage weiterzaehlen, um zu wissen, welcher Tag
+ * gemeint ist. "Freitag" weiss man sofort. Dazu kommt, dass es das laengste
+ * Wort des ganzen Stapels war und als einziges an der Blockkante endete.
  */
 export function dayLabel(iso: string, todayIso: string, locale: string, timeZone: string): string {
   switch (daysBetween(todayIso, iso)) {
@@ -256,8 +303,6 @@ export function dayLabel(iso: string, todayIso: string, locale: string, timeZone
       return 'Heute';
     case 1:
       return 'Morgen';
-    case 2:
-      return 'Uebermorgen';
     default:
       // Mittag in UTC: der Tag bleibt damit in jeder Zeitzone derselbe, waehrend
       // Mitternacht je nach Verschiebung schon der Vortag waere.
