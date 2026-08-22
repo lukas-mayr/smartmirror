@@ -839,3 +839,88 @@ button.primary {
   background: var(--surface);
   color: var(--fg);
 }
+
+/* In der Einrichtung steht alles mittig – die Knopfreihe dann auch. */
+.setup__step .card__actions {
+  justify-content: center;
+}
+
+/* -------------------------- Gekoppelte Geraete ------------------------- */
+
+/*
+ * Ein Spiegel gehoert selten einem allein. Die Liste zeigt deshalb nicht nur,
+ * dass gekoppelt ist, sondern was: Name, letzte Sichtung und ob das Geraet
+ * gerade haengt. Ohne das waere "Entkoppeln" ein Knopf mit verbundenen Augen.
+ */
+.devices {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.device {
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+}
+
+.device p {
+  margin: 0.35rem 0 0;
+}
+
+.device__head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/*
+ * Der Name ist ein Feld und keine Ueberschrift: Geraete melden sich mit dem,
+ * was der Browser ueber sich verraet ("iPhone · App"), und das sagt bei drei
+ * iPhones im Haus niemandem etwas.
+ */
+.device__name {
+  flex: 1;
+  min-width: 0;
+  height: var(--tap);
+  padding: 0 0.6rem;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--fg);
+  font-size: 1rem;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.device__name:focus {
+  border-color: var(--border);
+  background: var(--surface);
+  outline: none;
+}
+
+.device__tag {
+  /* Steht in der Zeile unter dem Namen und nicht daneben: neben ihm nahm es
+     dem Namen genau die Breite weg, die "iPhone (2)" von "iPhone (3)"
+     unterscheidet. */
+  display: inline-block;
+  margin-right: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.05rem 0.5rem;
+}
+
+/* Der Punkt sagt in einem Zeichen, was sonst eine Zeile braeuchte. */
+.device.is-online .device__head::after {
+  content: '';
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}

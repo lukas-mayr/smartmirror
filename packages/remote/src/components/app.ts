@@ -37,6 +37,7 @@ import {
   type MirrorScreen,
   type ModuleDescriptor,
   type ModuleInstance,
+  type PairedDevice,
   type ScreenInsets,
   type SetupStep,
   type WidgetSize,
@@ -80,6 +81,30 @@ function clampCell(value: number, max: number): number {
 }
 
 const formatPercent = (value: number): string => value.toFixed(1).replace('.', ',').replace(',0', '');
+
+/** Uhrzeit ohne Sekunden – mehr braucht ein Ablauf in fuenf Minuten nicht. */
+function formatTime(iso: string): string {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime())
+    ? '–'
+    : date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+}
+
+/**
+ * "heute 14:32" statt eines vollen Datums: bei einem Geraet, das gerade eben
+ * noch da war, interessiert die Uhrzeit – beim Rest der Tag.
+ */
+function formatMoment(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '–';
+  const time = date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  const today = new Date();
+  const sameDay =
+    date.getFullYear() === today.getFullYear() &&
+    date.getMonth() === today.getMonth() &&
+    date.getDate() === today.getDate();
+  return sameDay ? `heute ${time}` : `${date.toLocaleDateString('de-DE')} ${time}`;
+}
 
 export class MirrorRemote extends LitElement {
   static override properties = {
@@ -141,7 +166,13 @@ export class MirrorRemote extends LitElement {
     // Die Einrichtung ist kein Reiter neben den anderen: solange sie laeuft,
     // ist sie die ganze App. Wer beim Ausrichten zwischen Modulen und Rahmen
     // hin- und herspringen kann, richtet nicht aus.
-    if (status === 'pairing') return this.#renderSetup('pair');
+    // Ein Geraet, das der Spiegel noch nicht kennt, ist zweierlei: entweder der
+    // allererste Kontakt – dann fuehrt die Einrichtung – oder eines, das zu
+    // schon gekoppelten dazukommt. Das zweite ist keine Einrichtung und darf
+    // sich auch nicht so anfuehlen.
+    if (status === 'pairing') {
+      return this.snapshot.mirrorPaired ? this.#renderJoin() : this.#renderSetup('pair');
+    }
     if (!config) return this.#renderLoading();
     if (config.setup.step !== 'done') return this.#renderSetup(config.setup.step);
 
@@ -235,23 +266,90 @@ export class MirrorRemote extends LitElement {
       <section class="setup__step">
         <h1>Spiegel koppeln</h1>
         <p class="muted">Auf dem Spiegel steht ein sechsstelliger Code. Gib ihn hier ein.</p>
-        <input
-          class="pairing__input"
-          inputmode="numeric"
-          pattern="[0-9]*"
-          maxlength="6"
-          placeholder="000000"
-          .value=${this.code}
-          @input=${(event: Event) => {
-            this.code = (event.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 6);
-            if (this.code.length === 6) store.pair(this.code);
-          }}
-        />
+        ${this.snapshot.pairing.open
+          ? html`
+              ${this.#renderCodeEntry()}
+              <p class="muted small">
+                Der Code laeuft ${this.snapshot.pairing.expiresAt
+                  ? html`um ${formatTime(this.snapshot.pairing.expiresAt)}`
+                  : 'nach fuenf Minuten'}
+                ab.
+              </p>
+            `
+          : html`
+              <!-- Abgelaufen, waehrend die App offen lag: ein neuer Code ist
+                   einen Fingertipp entfernt und keinen Neustart. -->
+              <p class="muted small">Der Code ist abgelaufen.</p>
+              <div class="card__actions">
+                <button class="primary" @click=${() => store.requestPairing()}>Neuen Code anzeigen</button>
+              </div>
+            `}
         ${this.snapshot.lastError ? html`<p class="banner banner--error">${this.snapshot.lastError}</p>` : nothing}
-        <p class="muted small">
-          Der Code wird nur angezeigt, wenn ein ungekoppeltes Geraet verbunden ist, und laeuft nach fuenf Minuten ab.
-        </p>
       </section>
+    `;
+  }
+
+  /**
+   * Ein weiteres Geraet meldet sich an einem Spiegel, der schon laeuft.
+   *
+   * Bewusst keine Einrichtung mit Schrittanzeige: eingerichtet ist der Spiegel
+   * laengst. Und bewusst mit einem Knopf davor – der Code erscheint erst, wenn
+   * jemand ihn anfordert. Vorher zeigte ihn der Spiegel jedem, der die Adresse
+   * im Browser oeffnete, quer ueber den Inhalt.
+   */
+  #renderJoin(): TemplateResult {
+    const { pairing } = this.snapshot;
+    return html`
+      <div class="setup">
+        <section class="setup__step">
+          <h1>Mit dem Spiegel koppeln</h1>
+          <p class="muted">
+            Dieses Geraet kennt der Spiegel noch nicht. Lass dir einen Code anzeigen und gib ihn hier ein – die
+            bereits gekoppelten Geraete bleiben davon unberuehrt.
+          </p>
+
+          ${pairing.open
+            ? html`
+                ${this.#renderCodeEntry()}
+                <p class="muted small">
+                  Der Code steht am unteren Rand des Spiegels${pairing.expiresAt
+                    ? html` und laeuft um ${formatTime(pairing.expiresAt)} ab`
+                    : nothing}.
+                </p>
+                <div class="card__actions">
+                  <button @click=${() => store.cancelPairing()}>Code wieder ausblenden</button>
+                </div>
+              `
+            : html`
+                <div class="card__actions">
+                  <button class="primary" @click=${() => store.requestPairing()}>Code am Spiegel anzeigen</button>
+                </div>
+              `}
+          ${this.snapshot.lastError ? html`<p class="banner banner--error">${this.snapshot.lastError}</p>` : nothing}
+          <p class="muted small">
+            Auf dem iPhone sind Safari und die zum Startbildschirm hinzugefuegte App zwei getrennte Speicher – und
+            damit zwei Geraete. Beide koennen gekoppelt sein.
+          </p>
+        </section>
+      </div>
+    `;
+  }
+
+  #renderCodeEntry(): TemplateResult {
+    return html`
+      <input
+        class="pairing__input"
+        inputmode="numeric"
+        pattern="[0-9]*"
+        maxlength="6"
+        placeholder="000000"
+        autocomplete="one-time-code"
+        .value=${this.code}
+        @input=${(event: Event) => {
+          this.code = (event.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 6);
+          if (this.code.length === 6) store.pair(this.code);
+        }}
+      />
     `;
   }
 
@@ -1327,15 +1425,106 @@ export class MirrorRemote extends LitElement {
           : nothing}
       </section>
 
-      <h2>Dieses Geraet</h2>
+      <h2>Gekoppelte Geraete</h2>
+      ${this.#renderDevices()}
+    `;
+  }
+
+  /**
+   * Alle Geraete, die den Spiegel bedienen duerfen.
+   *
+   * Der Spiegel gehoert selten einem allein: im Haushalt hat jeder ein Handy,
+   * und auf dem iPhone zaehlen Safari und die App zum Startbildschirm getrennt.
+   * Deshalb eine Liste statt einer einzigen Kopplung – mit Namen, damit man
+   * beim Entziehen weiss, welches man trifft.
+   */
+  #renderDevices(): TemplateResult {
+    const { devices, deviceId, pairing } = this.snapshot;
+
+    return html`
       <section class="panel">
-        <p class="muted small">
-          Die Kopplung liegt nur auf diesem Handy. Loeschen bedeutet, den Code am Spiegel erneut einzugeben.
-        </p>
-        <div class="card__actions">
-          <button class="danger" @click=${() => store.forgetToken()}>Kopplung auf diesem Geraet loeschen</button>
-        </div>
+        ${devices.length === 0
+          ? html`<p class="muted small">Noch kein Geraet gekoppelt.</p>`
+          : html`
+              <ul class="devices">
+                ${devices.map((device) => this.#renderDevice(device, device.id === deviceId))}
+              </ul>
+            `}
+
+        ${pairing.open
+          ? html`
+              <p class="muted small">
+                Auf dem Spiegel steht ein Kopplungscode${pairing.expiresAt
+                  ? html` bis ${formatTime(pairing.expiresAt)}`
+                  : nothing}. Ihn am neuen Geraet eingeben.
+              </p>
+              <div class="card__actions">
+                <button @click=${() => store.cancelPairing()}>Code wieder ausblenden</button>
+              </div>
+            `
+          : html`
+              <div class="card__actions">
+                <button class="primary" @click=${() => store.requestPairing()}>Weiteres Geraet koppeln</button>
+              </div>
+            `}
       </section>
+    `;
+  }
+
+  #renderDevice(device: PairedDevice, isSelf: boolean): TemplateResult {
+    const confirming = this.pendingDelete === `device:${device.id}`;
+    return html`
+      <li class="device ${device.online ? 'is-online' : ''}">
+        <div class="device__head">
+          <input
+            class="device__name"
+            .value=${device.name}
+            maxlength="64"
+            aria-label="Name des Geraets"
+            @change=${(event: Event) => {
+              const name = (event.target as HTMLInputElement).value.trim();
+              if (!name || name === device.name) return;
+              store.send({ t: 'admin:renameDevice', deviceId: device.id, name });
+            }}
+          />
+        </div>
+        <p class="muted small">
+          ${isSelf ? html`<span class="device__tag">dieses Geraet</span>` : nothing}
+          ${device.online ? 'gerade verbunden' : `zuletzt ${formatMoment(device.lastSeen)}`} · gekoppelt
+          ${formatMoment(device.pairedAt)}
+        </p>
+        ${confirming
+          ? html`
+              <p class="muted small">
+                ${isSelf
+                  ? 'Danach braucht dieses Geraet wieder einen Code vom Spiegel.'
+                  : 'Das Geraet kann den Spiegel danach nicht mehr bedienen.'}
+              </p>
+              <div class="card__actions">
+                <button @click=${() => (this.pendingDelete = null)}>Abbrechen</button>
+                <button
+                  class="danger"
+                  @click=${() => {
+                    this.pendingDelete = null;
+                    // Das eigene Geraet raeumt zusaetzlich sein Token weg und
+                    // startet die App neu – sonst bliebe eine Oberflaeche
+                    // stehen, die nichts mehr darf.
+                    if (isSelf) store.forgetToken();
+                    else store.send({ t: 'admin:revokeDevice', deviceId: device.id });
+                  }}
+                >
+                  Entkoppeln
+                </button>
+              </div>
+            `
+          : html`
+              <div class="card__actions">
+                <button class="danger" @click=${() => (this.pendingDelete = `device:${device.id}`)}>
+                  Entkoppeln
+                </button>
+              </div>
+            `}
+      </li>
     `;
   }
 

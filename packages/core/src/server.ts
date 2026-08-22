@@ -18,6 +18,8 @@ import {
   type ClientType,
   type ErrorCode,
   type MirrorConfig,
+  type PairedDevice,
+  type PairingState,
   type ServerMessage,
   type Viewport,
 } from '@mirror/sdk';
@@ -43,6 +45,11 @@ interface Client {
   socket: WebSocket;
   type: ClientType;
   authenticated: boolean;
+  /**
+   * Id des gekoppelten Geraets. `null` bei der Anzeige auf dem Pi selbst: die
+   * ist nicht gekoppelt, sondern von Haus aus vertraut.
+   */
+  deviceId: string | null;
   /** Loopback-Verbindungen sind die Anzeige auf demselben Geraet. */
   local: boolean;
   appVersion: string;
@@ -154,6 +161,80 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
   const pushConfig = (): void => {
     broadcast({ t: 'config:update', config: deps.config.current });
     broadcast({ t: 'modules:update', modules: deps.modules.descriptors() });
+  };
+
+  /* ---------------------------------- Kopplung --------------------------------- */
+
+  /**
+   * Laeuft mit dem Kopplungscode ab und nimmt ihn dann vom Spiegel.
+   *
+   * Ohne diesen Timer blieb der Code stehen, bis zufaellig jemand koppelte:
+   * fuenf Minuten Gueltigkeit stand in der Pruefung, auf der Wand aber stand er
+   * die ganze Nacht.
+   */
+  let pairingTimer: NodeJS.Timeout | null = null;
+
+  const pairingState = (): PairingState => {
+    const pending = deps.auth.pendingCode;
+    return { open: pending !== null, expiresAt: pending?.expiresAt.toISOString() ?? null };
+  };
+
+  const devices = (): PairedDevice[] => {
+    const online = new Set(
+      [...clients]
+        .filter((candidate) => candidate.authenticated && candidate.deviceId)
+        .map((candidate) => candidate.deviceId as string),
+    );
+    return deps.auth.listClients().map((device) => ({ ...device, online: online.has(device.id) }));
+  };
+
+  const pushDevices = (): void => broadcast({ t: 'devices:update', devices: devices() }, (c) => c.type === 'remote');
+
+  /**
+   * Bringt den Kopplungscode auf den Spiegel – oder nimmt ihn wieder weg.
+   *
+   * Nur die Anzeige bekommt den Code selbst. Alle uebrigen erfahren, *dass*
+   * eine Kopplung offen ist: das genuegt der App fuer ihren Hinweis, und ein
+   * ungekoppeltes Handy koennte sich den Code sonst abholen, ohne je vor dem
+   * Spiegel gestanden zu haben.
+   */
+  const publishPairing = (): void => {
+    if (pairingTimer) clearTimeout(pairingTimer);
+    pairingTimer = null;
+
+    const pending = deps.auth.pendingCode;
+    broadcast(
+      {
+        t: 'pair:code',
+        code: pending?.code ?? '',
+        expiresAt: (pending?.expiresAt ?? new Date(0)).toISOString(),
+      },
+      (candidate) => candidate.type === 'shell',
+    );
+    const state = pairingState();
+    for (const client of clients) {
+      if (client.type !== 'remote') continue;
+      send(client, { t: 'pair:state', pairing: state });
+    }
+
+    if (pending) {
+      pairingTimer = setTimeout(() => {
+        deps.auth.cancelPairing();
+        publishPairing();
+      }, Math.max(0, pending.expiresAt.getTime() - Date.now()));
+      pairingTimer.unref?.();
+    }
+  };
+
+  /** Beendet alle Verbindungen eines Geraets, dem gerade die Kopplung entzogen wurde. */
+  const dropDevice = (deviceId: string): void => {
+    for (const client of clients) {
+      if (client.deviceId !== deviceId) continue;
+      client.authenticated = false;
+      client.deviceId = null;
+      send(client, { t: 'error', code: 'unauthorized', message: 'Kopplung dieses Geraets wurde entzogen' });
+      client.socket.close();
+    }
   };
 
   /* --------------------------- Ereignisse der Dienste -------------------------- */
@@ -270,6 +351,7 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
       socket,
       type: 'remote',
       authenticated: false,
+      deviceId: null,
       local: address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1',
       appVersion: 'unbekannt',
     };
@@ -280,6 +362,11 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
       // Wer die Vorschau angefordert hat, ist weg – der Spiegel schaltet
       // wieder von selbst weiter.
       if (preview?.owner === client) setPreview(null, null);
+      // In der Geraeteliste der anderen Handys erlischt der Punkt.
+      if (client.deviceId) {
+        deps.auth.touch(client.deviceId);
+        pushDevices();
+      }
       if (client.type === 'shell') {
         log.info('Anzeige hat die Verbindung getrennt.');
         shellReady = [...clients].some((candidate) => candidate.type === 'shell' && candidate.authenticated);
@@ -312,7 +399,12 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
 
   async function handleMessage(client: Client, message: ClientMessage): Promise<void> {
     /* --- Nachrichten, die ohne Anmeldung erlaubt sind --- */
-    if (message.t === 'ping') return send(client, { t: 'pong' });
+    if (message.t === 'ping') {
+      // Ein Lebenszeichen ist auch eines fuer die Geraeteliste: "zuletzt
+      // gesehen" soll die Zeit am Spiegel meinen, nicht die letzte Kopplung.
+      if (client.deviceId) deps.auth.touch(client.deviceId);
+      return send(client, { t: 'pong' });
+    }
 
     if (message.t === 'hello') {
       client.type = message.clientType === 'shell' ? 'shell' : 'remote';
@@ -321,16 +413,32 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
       // Die Anzeige laeuft auf demselben Geraet wie der Server. Sie zu koppeln
       // waere ein Ritual ohne Sicherheitsgewinn: wer auf dem Pi Prozesse
       // starten kann, hat den Spiegel ohnehin.
-      client.authenticated = client.type === 'shell' && client.local ? true : deps.auth.verify(message.token);
+      const trusted = client.type === 'shell' && client.local;
+      const device = trusted ? null : deps.auth.identify(message.token);
+      client.authenticated = trusted || device !== null;
+      client.deviceId = device?.id ?? null;
 
       if (!client.authenticated) {
-        const pending = deps.auth.pendingCode ?? deps.auth.startPairing();
-        send(client, { t: 'welcome', serverVersion: appVersion(), authenticated: false, needsPairing: true });
-        // Der Code erscheint auf dem Spiegel – nur wer davorsteht, kann koppeln.
-        broadcast(
-          { t: 'pair:code', code: pending.code, expiresAt: pending.expiresAt.toISOString() },
-          (candidate) => candidate.type === 'shell',
-        );
+        // Der frische Spiegel hat noch kein Geraet: dort zeigt die Anzeige den
+        // Code von selbst, sonst haette niemand einen Weg hinein.
+        //
+        // Danach nicht mehr. Frueher legte jeder Browser, der die Adresse
+        // oeffnete, dem Spiegel ungefragt einen Kopplungscode ueber den
+        // Inhalt – ein Blick auf die Seite am Rechner, und die Wand sah aus
+        // wie frisch zurueckgesetzt. Jetzt fragt die App danach, und zwar
+        // erst, wenn jemand wirklich koppeln will.
+        const firstEver = !deps.auth.hasPairedClients;
+        if (firstEver) deps.auth.startPairing();
+
+        send(client, {
+          t: 'welcome',
+          serverVersion: appVersion(),
+          authenticated: false,
+          needsPairing: true,
+          mirrorPaired: !firstEver,
+          pairing: pairingState(),
+        });
+        if (firstEver) publishPairing();
         return;
       }
 
@@ -344,16 +452,54 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
         });
       }
 
-      send(client, { t: 'welcome', serverVersion: appVersion(), authenticated: true, needsPairing: false });
+      send(client, {
+        t: 'welcome',
+        serverVersion: appVersion(),
+        authenticated: true,
+        needsPairing: false,
+        mirrorPaired: deps.auth.hasPairedClients,
+        deviceId: device?.id,
+      });
       send(client, snapshotFor(client));
-      if (client.type === 'shell') log.info(`Anzeige verbunden (v${message.appVersion}).`);
+      if (client.type === 'remote') {
+        send(client, { t: 'pair:state', pairing: pairingState() });
+        // Geht an alle Handys, auch an dieses: dort steht die frische Liste,
+        // bei den uebrigen geht der Punkt dieses Geraets an.
+        pushDevices();
+      }
+      if (client.type === 'shell') {
+        log.info(`Anzeige verbunden (v${message.appVersion}).`);
+        // Eine Anzeige, die waehrend einer offenen Kopplung neu startet, muss
+        // den Code wiederbekommen – sonst steht er nirgends mehr.
+        publishPairing();
+      }
+      return;
+    }
+
+    /**
+     * Kopplung anfordern. Erlaubt fuer jeden, der die Adresse erreicht – der
+     * Schutz ist der Sichtkontakt zum Spiegel, nicht die Frage. Ein bereits
+     * gekoppeltes Handy nutzt dieselbe Nachricht fuer "weiteres Geraet
+     * koppeln".
+     */
+    if (message.t === 'pair:start') {
+      const pending = deps.auth.startPairing();
+      log.info(`Kopplung angefordert, Code laeuft ${pending.expiresAt.toLocaleTimeString('de-DE')} ab.`);
+      publishPairing();
+      return;
+    }
+
+    if (message.t === 'pair:cancel') {
+      deps.auth.cancelPairing();
+      publishPairing();
       return;
     }
 
     if (message.t === 'pair:request') {
-      const token = await deps.auth.redeem(message.code, message.clientName);
-      if (!token) return fail(client, 'pairing-failed', 'Code ist falsch oder abgelaufen');
+      const result = await deps.auth.redeem(message.code, message.clientName);
+      if (!result) return fail(client, 'pairing-failed', 'Code ist falsch oder abgelaufen');
       client.authenticated = true;
+      client.deviceId = result.device.id;
 
       // Schritt 1 ist damit erledigt. Der Wechsel passiert hier und nicht in
       // der Handy-App: der Spiegel muss ab jetzt den Ausricht-Rahmen zeigen,
@@ -364,10 +510,11 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
         });
       }
 
-      send(client, { t: 'pair:result', ok: true, token });
+      send(client, { t: 'pair:result', ok: true, token: result.token, deviceId: result.device.id });
       send(client, snapshotFor(client));
       // Code vom Spiegel nehmen – er ist verbraucht.
-      broadcast({ t: 'pair:code', code: '', expiresAt: new Date(0).toISOString() }, (c) => c.type === 'shell');
+      publishPairing();
+      pushDevices();
       return;
     }
 
@@ -558,6 +705,27 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
       case 'admin:power':
         await deps.power.setManual(message.on);
         return;
+
+      case 'admin:renameDevice': {
+        const name = message.name.trim();
+        if (!name) return fail(client, 'bad-request', 'Ein Geraet braucht einen Namen');
+        if (!(await deps.auth.rename(message.deviceId, name))) {
+          return fail(client, 'not-found', 'Dieses Geraet ist nicht (mehr) gekoppelt');
+        }
+        pushDevices();
+        return;
+      }
+
+      case 'admin:revokeDevice': {
+        if (!(await deps.auth.revoke(message.deviceId))) {
+          return fail(client, 'not-found', 'Dieses Geraet ist nicht (mehr) gekoppelt');
+        }
+        // Erst trennen, dann die Liste verteilen: die verbleibenden Handys
+        // sollen den Punkt des entzogenen Geraets nicht noch leuchten sehen.
+        dropDevice(message.deviceId);
+        pushDevices();
+        return;
+      }
 
       case 'admin:checkUpdate':
         await deps.updates.requestCheck();

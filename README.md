@@ -426,6 +426,28 @@ Später ändern: **Anzeige → Bildschirmfläche**. Dort lässt sich der Rahmen
 jederzeit wieder einblenden — der Bildschirm rutscht beim Putzen, der Rahmen
 wird getauscht. Die Kopplung bleibt dabei bestehen.
 
+### Weitere Geräte koppeln
+
+Ein Spiegel gehört selten einem allein: im Haushalt hat jeder ein Handy, und
+auf dem iPhone sind Safari und die zum Startbildschirm hinzugefügte App zwei
+getrennte Speicher — also auch zwei Geräte. Es können deshalb beliebig viele
+Geräte gekoppelt sein, jedes mit eigenem Token.
+
+Ein neues Gerät fragt in **System → Gekoppelte Geräte** nach einem Code
+(**Weiteres Gerät koppeln**), oder — wenn es selbst noch nicht gekoppelt ist —
+gleich auf seinem ersten Bildschirm. Der Code erscheint dann als kleine Karte
+am unteren Rand des Spiegels und läuft nach fünf Minuten ab; die Anzeige läuft
+daneben weiter.
+
+Der Code kommt nur auf Anfrage. Nur beim allerersten Gerät zeigt ihn der
+Spiegel von selbst — sonst legte jeder Browser, der die Adresse zufällig
+öffnet, dem Spiegel einen Kopplungscode über den Inhalt, und die Wand sähe aus
+wie frisch zurückgesetzt.
+
+Dieselbe Liste zeigt zu jedem Gerät den Namen, wann es zuletzt am Spiegel war
+und ob es gerade hängt. **Entkoppeln** trifft genau eines: sein Token gilt
+sofort nicht mehr, die Verbindung wird getrennt, alle anderen bleiben.
+
 ### Drehen
 
 Genau deshalb ist die Drehung keine reine App-Einstellung: Sie steht in der

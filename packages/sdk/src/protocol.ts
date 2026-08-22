@@ -81,11 +81,47 @@ export interface ModuleStateEnvelope {
   updatedAt?: string;
 }
 
+/**
+ * Ein gekoppeltes Geraet, wie die Handy-App es in der Liste zeigt.
+ *
+ * Bewusst ohne Token und ohne dessen Hash: die Liste geht an jedes gekoppelte
+ * Geraet, und keines davon braucht das Geheimnis eines anderen.
+ */
+export interface PairedDevice {
+  id: string;
+  name: string;
+  /** ISO-Zeitstempel der Kopplung. */
+  pairedAt: string;
+  /** ISO-Zeitstempel der letzten gesehenen Verbindung. */
+  lastSeen: string;
+  /** Haengt das Geraet gerade am Spiegel? */
+  online: boolean;
+}
+
+/**
+ * Stand der offenen Kopplung: der Code steht auf dem Spiegel, hier steht nur,
+ * dass und bis wann einer offen ist. Der Code selbst geht nie an ein
+ * ungekoppeltes Handy – sonst waere der Sichtkontakt zum Spiegel keine Huerde
+ * mehr.
+ */
+export interface PairingState {
+  open: boolean;
+  expiresAt: string | null;
+}
+
 /* ------------------------------- Client → Server ------------------------------- */
 
 export type ClientMessage =
   | { t: 'hello'; clientType: ClientType; token?: string; appVersion: string }
   | { t: 'pair:request'; code: string; clientName: string }
+  /**
+   * Bitte um einen Kopplungscode auf dem Spiegel. Bewusst eine eigene
+   * Nachricht und keine Nebenwirkung des Verbindens: sonst wirft jeder
+   * Browser, der die Adresse zufaellig oeffnet, dem Spiegel einen Code
+   * ueber den Inhalt.
+   */
+  | { t: 'pair:start' }
+  | { t: 'pair:cancel' }
   | { t: 'shell:ready'; appVersion: string }
   | { t: 'shell:viewport'; viewport: Viewport }
   | { t: 'command'; instanceId: string; name: string; payload?: unknown }
@@ -106,6 +142,8 @@ export type ClientMessage =
   | { t: 'admin:setSettings'; patch: Partial<Pick<MirrorConfig, 'deviceName' | 'locale' | 'timezone' | 'display' | 'power' | 'update' | 'setup'>> }
   | { t: 'admin:setSecret'; moduleId: string; key: string; value: string }
   | { t: 'admin:power'; on: boolean }
+  | { t: 'admin:renameDevice'; deviceId: string; name: string }
+  | { t: 'admin:revokeDevice'; deviceId: string }
   | { t: 'admin:checkUpdate' }
   | { t: 'admin:applyUpdate'; version?: string }
   | { t: 'ping' };
@@ -113,7 +151,18 @@ export type ClientMessage =
 /* ------------------------------- Server → Client ------------------------------- */
 
 export type ServerMessage
-  = { t: 'welcome'; serverVersion: string; authenticated: boolean; needsPairing: boolean }
+  = {
+      t: 'welcome';
+      serverVersion: string;
+      authenticated: boolean;
+      needsPairing: boolean;
+      /** Haengt schon mindestens ein Geraet am Spiegel? */
+      mirrorPaired: boolean;
+      /** Eigene Geraete-Id, sobald angemeldet – die Liste markiert damit "dieses Geraet". */
+      deviceId?: string;
+      /** Nur fuer ungekoppelte Clients: laeuft gerade eine Kopplung? */
+      pairing?: PairingState;
+    }
   | { t: 'snapshot'; config: MirrorConfig; modules: ModuleDescriptor[]; state: Record<string, ModuleStateEnvelope>; power: { on: boolean }; update: UpdateStatus; viewport: Viewport | null; previewScreenId: string | null }
   | { t: 'state:patch'; envelope: ModuleStateEnvelope }
   | { t: 'config:update'; config: MirrorConfig }
@@ -122,8 +171,12 @@ export type ServerMessage
   | { t: 'display:viewport'; viewport: Viewport | null }
   | { t: 'display:previewScreen'; screenId: string | null }
   | { t: 'update:status'; status: UpdateStatus }
-  | { t: 'pair:result'; ok: true; token: string }
+  | { t: 'pair:result'; ok: true; token: string; deviceId: string }
+  /** Nur an die Anzeige: der Code zum Abschreiben. Leer heisst "wieder wegnehmen". */
   | { t: 'pair:code'; code: string; expiresAt: string }
+  /** An alle anderen: dass eine Kopplung offen ist, ohne den Code selbst. */
+  | { t: 'pair:state'; pairing: PairingState }
+  | { t: 'devices:update'; devices: PairedDevice[] }
   | { t: 'error'; code: ErrorCode; message: string }
   | { t: 'pong' };
 

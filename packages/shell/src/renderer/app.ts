@@ -63,6 +63,8 @@ export class MirrorApp {
   #powerOn = true;
   #burnInIndex = 0;
   #ready = false;
+  /** Was gerade ueber der Buehne liegt, damit nur das Passende wieder weggeht. */
+  #overlayVariant: 'full' | 'badge' | null = null;
 
   constructor(stage: HTMLElement, connection: CoreConnection, coreUrl: string) {
     this.#stage = stage;
@@ -149,13 +151,24 @@ export class MirrorApp {
         this.#scheduleCycle();
         return;
 
-      case 'pair:code':
-        if (message.code && this.#config?.setup.step !== 'frame') {
-          this.#showOverlay('Spiegel koppeln', message.code, 'Diesen Code in der Spiegel-App eingeben.');
-        } else {
+      case 'pair:code': {
+        if (!message.code) {
           this.#hideOverlay();
+          return;
         }
+        // Beim ersten Koppeln gehoert der Code ueber den ganzen Spiegel – es
+        // gibt ohnehin nichts anderes zu sehen. Danach ist er ein Zettel am
+        // unteren Rand: ein zweites Handy zu koppeln darf weder die Wand
+        // leerraeumen noch den Ausricht-Rahmen verdecken.
+        const initial = (this.#config?.setup.step ?? 'pair') === 'pair';
+        this.#showOverlay(
+          initial ? 'Spiegel koppeln' : 'Neues Geraet koppeln',
+          message.code,
+          'Diesen Code in der Spiegel-App eingeben.',
+          initial ? 'full' : 'badge',
+        );
         return;
+      }
 
       case 'error':
         console.error(`[shell] ${message.code}: ${message.message}`);
@@ -441,7 +454,10 @@ export class MirrorApp {
   #applySetup(config: MirrorConfig): void {
     const aligning = config.setup.step === 'frame';
     this.#frame.classList.toggle('frame--visible', aligning);
-    if (aligning) this.#hideOverlay();
+    // Beim Ausrichten zaehlt der Rahmen, und zwar ganz – eine deckende
+    // Einblendung muss weg. Der kleine Kopplungszettel darf bleiben: sonst
+    // haette ein zweites Handy, das waehrenddessen dazukommt, keinen Code.
+    if (aligning && this.#overlayVariant === 'full') this.#hideOverlay();
   }
 
   /**
@@ -474,29 +490,42 @@ export class MirrorApp {
     this.#screens.setAttribute('aria-hidden', this.#powerOn ? 'false' : 'true');
   }
 
-  #showOverlay(title: string, code: string | null, hint: string): void {
-    this.#overlay.replaceChildren();
+  /**
+   * Einblendung ueber der Buehne.
+   *
+   * `full` deckt den Spiegel ab, `badge` legt eine kleine Karte an den unteren
+   * Rand und laesst alles andere stehen.
+   */
+  #showOverlay(title: string, code: string | null, hint: string, variant: 'full' | 'badge' = 'full'): void {
+    const card = document.createElement('div');
+    card.className = 'overlay__card';
+
     const titleElement = document.createElement('div');
     titleElement.className = 'overlay__title';
     titleElement.textContent = title;
-    this.#overlay.append(titleElement);
+    card.append(titleElement);
 
     if (code) {
       const codeElement = document.createElement('div');
       codeElement.className = 'overlay__code';
       codeElement.textContent = code;
-      this.#overlay.append(codeElement);
+      card.append(codeElement);
     }
 
     const hintElement = document.createElement('div');
     hintElement.className = 'overlay__hint';
     hintElement.textContent = hint;
-    this.#overlay.append(hintElement);
+    card.append(hintElement);
+
+    this.#overlay.replaceChildren(card);
+    this.#overlay.classList.toggle('overlay--badge', variant === 'badge');
     this.#overlay.classList.add('overlay--visible');
+    this.#overlayVariant = variant;
   }
 
   #hideOverlay(): void {
-    this.#overlay.classList.remove('overlay--visible');
+    this.#overlay.classList.remove('overlay--visible', 'overlay--badge');
+    this.#overlayVariant = null;
   }
 
   #startBurnInProtection(): void {

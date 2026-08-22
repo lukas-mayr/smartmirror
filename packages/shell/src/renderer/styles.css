@@ -194,10 +194,8 @@ body {
 
 .overlay {
   display: none;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1.5rem;
   background: #000000;
   text-align: center;
 }
@@ -206,11 +204,45 @@ body {
   display: flex;
 }
 
+.overlay__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+/*
+ * Kopplung im laufenden Betrieb.
+ *
+ * Beim ersten Einrichten deckt der Code den Spiegel ab – es gibt nichts
+ * anderes zu sehen. Kommt spaeter ein zweites Handy dazu, darf er das nicht:
+ * eine kleine Karte am unteren Rand genuegt, und die Wand bleibt die Wand.
+ */
+.overlay--badge {
+  background: transparent;
+  align-items: flex-end;
+  /* Nicht auf der Kante kleben – dort laeuft beim Ausrichten der Rahmen. */
+  padding-bottom: 1.5rem;
+}
+
+.overlay--badge .overlay__card {
+  gap: 0.4rem;
+  padding: 1rem 1.75rem;
+  /* Deckt den Block darunter ab – halbdurchsichtig waere hier ein Schleier. */
+  background: #000000;
+  border: 1px solid var(--mirror-fg-dim);
+  border-radius: 1.25rem;
+}
+
 .overlay__title {
   font-size: 1.5rem;
   font-weight: 300;
   color: var(--mirror-fg-muted);
   letter-spacing: 0.04em;
+}
+
+.overlay--badge .overlay__title {
+  font-size: 0.9rem;
 }
 
 .overlay__code {
@@ -221,11 +253,19 @@ body {
   text-indent: 0.35em;
 }
 
+.overlay--badge .overlay__code {
+  font-size: 2.5rem;
+}
+
 .overlay__hint {
   font-size: 1rem;
   color: var(--mirror-fg-dim);
   max-width: 32ch;
   line-height: 1.6;
+}
+
+.overlay--badge .overlay__hint {
+  font-size: 0.85rem;
 }
 
 /*
