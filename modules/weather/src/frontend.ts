@@ -2,6 +2,7 @@ import { html, render, nothing, type TemplateResult } from 'lit';
 import { keyed } from 'lit/directives/keyed.js';
 import { defineFrontend, MOTION, type ModuleView } from '@mirror/sdk';
 import { icon } from '@mirror/icons';
+import { weatherGlyph } from './icons.js';
 import {
   accentForTemperature,
   barHeight,
@@ -125,15 +126,29 @@ export default defineFrontend<WeatherState, WeatherConfig>({
       `;
     };
 
-    /** Eine Karte – fuer heute wie fuer jeden Vorhersagetag dieselbe Form. */
+    /**
+     * Eine Karte – fuer heute wie fuer jeden Vorhersagetag dieselbe Form.
+     *
+     * Das Symbol traegt die Karte: es nimmt die ganze Wertzeile ein und steht
+     * neben Tag und Zahl wie ein Bild neben seiner Bildunterschrift. Der Grund
+     * ist keine Vorliebe, sondern die Leseentfernung – aus fuenf Metern
+     * erkennt man eine Wolke, lange bevor man eine Zahl liest.
+     *
+     * Der Aufbau ist in jeder Groesse und in jeder Aufhaengung derselbe: eine
+     * Wertzeile fester Hoehe, darunter eine Textzeile. Dieselbe Hoehe benutzt
+     * die Uhr fuer ihre Uhrzeit – deshalb liegen die beiden Zahlen im Kopfband
+     * auf einer Mittelachse und die beiden Zeilen darunter auf einer Linie.
+     */
     const card = (slide: WeatherSlide, unit: string, accent: string | null): TemplateResult => html`
       <div class="weather__slide">
-        <div class="weather__label">${slide.label}</div>
-        <div class="weather__now">
-          <span class="weather__icon">${icon(slide.icon, { size: '1em', strokeWidth: 1.5 })}</span>
-          <span class="weather__temp"
-            >${slide.temperature}<span class="weather__unit">${unit}</span></span
-          >
+        <div class="weather__value">
+          <span class="weather__icon">${weatherGlyph(slide.icon, { size: '1em' })}</span>
+          <span class="weather__body">
+            <span class="weather__label">${slide.label}</span>
+            <span class="weather__temp"
+              >${slide.temperature}<span class="weather__unit">${unit}</span></span
+            >
+          </span>
         </div>
         <div class="weather__meta" style=${accent ? `color:${accent}` : nothing}>
           <span>${slide.note}</span>
@@ -150,40 +165,21 @@ export default defineFrontend<WeatherState, WeatherConfig>({
         Date.now() - Date.parse(state.fetchedAt) > STALE_AFTER_MS;
 
       /*
-       * Welche Form der Block zeigt, entscheidet sein Platz und nicht nur
-       * seine Groesse: im Kopfband ist ein "grosser" Block 300 px breit, und
-       * was dort nach L gerechnet wird, steht am Ende unter der
-       * Lesbarkeitsgrenze. Die Regel selbst steht in shared.ts, damit sie
+       * Welche Form der Block zeigt, entscheidet allein seine Groesse – im
+       * Raster wie in der Szene. Die Regel steht in shared.ts, damit sie
        * pruefbar ist und nicht als Kette von && mitten im Zeichnen.
        */
       const night = document.documentElement.dataset.night === '1';
-      const form = weatherForm({
-        zone: host.dataset.zone ?? null,
-        size,
-        stale,
-        error: error !== null,
-        night,
-      });
+      const form = weatherForm({ size, stale, error: error !== null, night });
 
       /*
        * Die deckende Flaeche ist eine Einstellung und keine Automatik – und
        * sie gilt nur, solange die Zahl darauf auch stimmt. Ein veralteter Wert
        * bekommt kein Highlight: eine Flaeche in Salbei behauptet Frische, die
        * die Zahl nicht mehr hat.
-       *
-       * Im Kopfband gibt es sie ueberhaupt nicht. Der Slot ist dort so hoch
-       * wie das ganze Band; eine deckende Flaeche darin waere ein Rechteck von
-       * 300 x 350 px in vollem Salbei, oben rechts, und damit genau die grosse
-       * helle Flaeche, vor der die erste Regel des Stylesheets warnt. Die
-       * Aussage der Szene traegt die Hauptzone, nicht das Kopfband.
        */
       const solid =
-        config.highlight &&
-        form !== 'head' &&
-        !stale &&
-        !error &&
-        current !== null &&
-        current !== undefined;
+        config.highlight && !stale && !error && current !== null && current !== undefined;
       const shell = (body: TemplateResult, extra = ''): void => {
         render(
           html`<div class="weather ${extra} ${solid ? 'box box--solid' : ''}">${body}</div>`,
@@ -243,32 +239,14 @@ export default defineFrontend<WeatherState, WeatherConfig>({
        * Steht in jeder Form an derselben Stelle – ganz unten, in der
        * gedaempften Stufe. Ein Fehler ohne diese Zeile waere eine Anzeige, die
        * einfach eine alte Temperatur behauptet.
-       *
-       * Die Kurzfassung ist fuer den Kopf-Slot. Dort ersetzt der Hinweis den
-       * Kurztext, statt eine dritte Zeile anzufangen: eine dritte Zeile
-       * schoebe den Wert gegen die Uhrzeit daneben aus der Linie, und die
-       * Ausrichtung ist in diesem Band mehr wert als der ganze Satz. Der
-       * Kurztext geht dabei nicht verloren – er *ist* veraltet.
        */
-      const hint = (short = false): TemplateResult | typeof nothing => {
+      const hint = (): TemplateResult | typeof nothing => {
         if (!error && !stale) return nothing;
         const reason = error ?? 'Keine aktuellen Daten';
-        const text = short
-          ? (error ?? (stamp ? `Stand ${stamp}` : reason))
-          : stamp
-            ? `${reason} · Stand ${stamp}`
-            : reason;
-        return html`<div class="weather__hint">${text}</div>`;
+        return html`<div class="weather__hint">${stamp ? `${reason} · Stand ${stamp}` : reason}</div>`;
       };
 
-      /**
-       * Die Zeile unter der Zahl: was fuer ein Wetter, und auf Wunsch der Wind.
-       *
-       * Sie steht als Baustein hier und nicht zweimal ausgeschrieben, weil der
-       * Kopf-Slot und die feste Ansicht dieselbe Zeile zeigen – sie sind
-       * derselbe Satz in zwei Groessen, und zwei Fassungen davon liefen mit der
-       * Zeit auseinander.
-       */
+      /** Die Zeile unter der Zahl: was fuer ein Wetter, und auf Wunsch der Wind. */
       const metaRow = (): TemplateResult => html`
         <div class="weather__meta" style=${accent ? `color:${accent}` : nothing}>
           <span>${now.label}</span>
@@ -279,41 +257,15 @@ export default defineFrontend<WeatherState, WeatherConfig>({
         </div>
       `;
 
-      /**
-       * Symbol und Zahl – die eine Zeile, die jede Form gemeinsam hat.
-       */
+      /** Symbol und Zahl nebeneinander – die feste Ansicht und der kleinste Block. */
       const nowRow = (): TemplateResult => html`
         <div class="weather__now">
-          <span class="weather__icon">${icon(now.icon, { size: '1em', strokeWidth: 1.5 })}</span>
+          <span class="weather__icon">${weatherGlyph(now.icon, { size: '1em' })}</span>
           <span class="weather__temp"
             >${current.temperature}<span class="weather__unit">${unit}</span></span
           >
         </div>
       `;
-
-      /**
-       * Der Slot im Kopfband: ein Wert und eine Zeile darunter.
-       *
-       * Neben der Uhr ist kein Platz fuer eine zweite Erzaehlung. Der Ort faellt
-       * weg (er steht in jeder Karte gleich und beantwortet nichts, was man im
-       * Vorbeigehen wissen will), die Durchschaltung faellt weg (sie braucht
-       * eine grosse Beschriftung ueber der Zahl und eine Punktreihe darunter –
-       * fuenf Ebenen auf 300 px Breite), Tagesverlauf und Vorhersage fallen weg.
-       *
-       * Uebrig bleibt genau das, was das Design-System fuer dieses Band
-       * vorsieht: ein Wert. Wie hoch er steht und wie er sich mit der Uhrzeit
-       * daneben auf eine Linie legt, entscheidet das Stylesheet – die Hoehe des
-       * Bandes ist fuer beide Bloecke dieselbe, also kann sie beide ausrichten.
-       */
-      if (form === 'head') {
-        stopCycle();
-        const outdated = stale || error !== null;
-        shell(
-          html`${nowRow()}${outdated ? hint(true) : metaRow()}`,
-          `weather--head ${outdated ? 'weather--stale' : ''}`,
-        );
-        return;
-      }
 
       /**
        * Der kleinste Block zeigt Symbol und Zahl, sonst nichts.
@@ -331,10 +283,14 @@ export default defineFrontend<WeatherState, WeatherConfig>({
       /**
        * Der grosse Block schaltet durch, statt alles nebeneinander zu zeigen.
        *
-       * Er ist der einzige, der hoch genug ist, dass eine Karte mit grosser
-       * Beschriftung, grossem Symbol und grosser Zahl darin Platz hat – im
+       * Er ist der einzige, der hoch genug ist, dass eine Karte mit grossem
+       * Symbol, grosser Zahl und lesbarem Kurztext darin Platz hat – im
        * mittleren Block bliebe von jeder Zeile ein Rest, im breiten steht der
        * Tagesverlauf ohnehin komplett und braucht niemanden, der wartet.
+       *
+       * Im Raster wie in der Szene: der Slot im Kopfband ist so breit wie ein
+       * L-Block, also zeigt der Block dort dieselbe Karte und keine gequetschte
+       * Fassung davon.
        *
        * Sind die Werte veraltet oder die Abfrage fehlgeschlagen, faellt auch der
        * grosse Block auf die feste Ansicht zurueck: eine Durchschaltung, die
@@ -355,22 +311,18 @@ export default defineFrontend<WeatherState, WeatherConfig>({
         const slideAccent = solid
           ? null
           : accentForTemperature(slide.celsius);
-        /**
-         * Die laengste Beschriftung des Stapels bestimmt die Schriftgroesse
-         * aller – "Heute" duerfte allein groesser stehen als "Uebermorgen",
-         * aber dann waere die Karte bei jedem Wechsel eine andere. Die Untergrenze
-         * verhindert, dass ein Stapel aus lauter kurzen Woertern die Zeile
-         * ueber den Block hinaus aufblaest.
+        /*
+         * Kein Ort ueber der Karte.
+         *
+         * Er steht auf jeder Karte gleich, aendert sich nie und beantwortet
+         * nichts, was man im Vorbeigehen wissen will – und er waere eine
+         * dritte Ebene, die die Wertzeile aus der Linie mit der Uhr daneben
+         * schoebe. In der festen Ansicht bleibt er: dort ist Platz, und dort
+         * traegt er die Vorhersage mit.
          */
-        const labelChars = Math.max(6, ...slides.map((entry) => entry.label.length));
         shell(
           html`
-            ${state.resolvedLocation
-              ? html`<div class="weather__place">${state.resolvedLocation}</div>`
-              : nothing}
-            <div class="weather__deck" style="--weather-label-chars:${labelChars}">
-              ${keyed(slide.key, card(slide, unit, slideAccent))}
-            </div>
+            <div class="weather__deck">${keyed(slide.key, card(slide, unit, slideAccent))}</div>
             ${dots(slides.length, index)}
           `,
           'weather--deck',
@@ -402,7 +354,14 @@ export default defineFrontend<WeatherState, WeatherConfig>({
                       <div class="weather__day">
                         <span class="weather__day-name">${label}</span>
                         <span class="weather__day-icon">
-                          ${icon(appearance.icon, { size: '1em', strokeWidth: 1.6, title: appearance.label })}
+                          ${weatherGlyph(appearance.icon, {
+                            size: '1em',
+                            strokeWidth: 1.6,
+                            /* In Fussnotengroesse waere eine Reihe driftender
+                               Wolken Flimmern und keine Auskunft. */
+                            animated: false,
+                            title: appearance.label,
+                          })}
                         </span>
                         <span class="weather__day-range">${day.max}° <i>${day.min}°</i></span>
                       </div>

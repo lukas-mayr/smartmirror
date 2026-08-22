@@ -154,18 +154,15 @@ export function toCelsius(value: number, units: WeatherConfig['units']): number 
 /* ---------------------------------- Form ---------------------------------- */
 
 /**
- * Welche der vier Formen der Block gerade zeigt.
+ * Welche der drei Formen der Block gerade zeigt.
  *
  *  - `badge`  Symbol und Zahl in einer getoenten Box. Der kleinste Block.
- *  - `head`   Symbol, Zahl, eine Zeile darunter. Der Slot im Kopfband.
  *  - `deck`   Ein Tag nach dem anderen, gross. Der grosse Block.
  *  - `full`   Zahl, Kurztext und darunter Tagesverlauf oder Vorhersage.
  */
-export type WeatherForm = 'badge' | 'head' | 'deck' | 'full';
+export type WeatherForm = 'badge' | 'deck' | 'full';
 
 export interface WeatherPlace {
-  /** Das Band, in dem der Block liegt. `null` heisst freies Raster. */
-  zone: string | null;
   size: string;
   /** Die Werte sind zu alt, um sich als aktuell auszugeben. */
   stale: boolean;
@@ -176,27 +173,22 @@ export interface WeatherPlace {
 }
 
 /**
- * Die Form haengt am Platz, nicht nur an der Blockgroesse.
+ * Die Form haengt an der Blockgroesse – und an sonst nichts.
  *
- * Die Groesse beschreibt ein Rechteck im Raster: L sind zwei mal zwei Zellen,
- * also 448 x 328 px. Im Kopfband gibt es dieses Raster nicht – dort steht
- * links die Uhr und rechts ein Slot ueber 30 % der Breite, keine 300 px. Ein
- * Block, der dort weiterhin nach L rechnet, legt fuenf Ebenen uebereinander
- * (Ort, Tag, Symbol mit Zahl, Kurztext, Punktreihe), und weil alle
- * Schriftgroessen auch gegen die Breite rechnen, faellt dabei die halbe Leiter
- * unter die 32 px, ab denen aus 3 m ueberhaupt noch etwas lesbar ist.
+ * Insbesondere nicht daran, ob der Block im freien Raster liegt oder in einem
+ * Band einer Szene. Ein Modul, das je nach Aufhaengung etwas anderes zeigt,
+ * ist aus Sicht dessen, der davorsteht, zwei Module: derselbe Name, dieselbe
+ * Groesse, zwei Anzeigen. Wo ein Block haengt, ist eine Sache der Anordnung.
  *
- * Das Kopfband bekommt deshalb seine eigene Form, und zwar unabhaengig von der
- * eingestellten Groesse: ein Wert, eine Zeile. Genau das steht auch im
- * Design-System ueber dieses Band – "Uhr fix links, rechts genau ein Slot".
+ * Damit das aufgeht, muss der Platz zur Groesse passen: der Slot im Kopfband
+ * ist deshalb so breit wie ein L-Block (siehe styles.css, `.zone--head`).
  *
- * Der Rest ist die bisherige Regel: der kleinste Block zeigt eine Zahl, der
- * grosse schaltet durch, alle anderen zeigen die feste Ansicht. Durchgeschaltet
- * wird nur, solange die Tage auch stimmen – eine Durchschaltung veralteter
- * Werte sieht lebendiger aus, als die Daten sind – und nachts gar nicht.
+ * Der Rest ist die alte Regel: der kleinste Block zeigt eine Zahl, der grosse
+ * schaltet durch, alle anderen zeigen die feste Ansicht. Durchgeschaltet wird
+ * nur, solange die Tage auch stimmen – eine Durchschaltung veralteter Werte
+ * sieht lebendiger aus, als die Daten sind – und nachts gar nicht.
  */
 export function weatherForm(place: WeatherPlace): WeatherForm {
-  if (place.zone === 'head') return 'head';
   if (place.size === 's') return 'badge';
   if (place.size === 'l' && !place.stale && !place.error && !place.night) return 'deck';
   return 'full';

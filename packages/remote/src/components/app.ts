@@ -990,13 +990,6 @@ export class MirrorRemote extends LitElement {
     // Auswahl stehen, wie sie ist, statt Groessen zu verbieten.
     const sizes = descriptor?.sizes ?? WIDGET_SIZES;
     const zones = config.screens.find((entry) => entry.id === instance.screenId)?.layout === 'zones';
-    /*
-     * Im Kopfband gibt es das Raster nicht, an dem die Groesse haengt: links
-     * die Uhr, rechts ein Slot ueber 30 % der Breite. Der Block zeigt dort
-     * einen Wert, egal was hier eingestellt ist – und das gehoert unter die
-     * Auswahl, sonst drueckt man dreimal auf L und wundert sich.
-     */
-    const inHead = zones && instance.zone === 'head';
 
     return html`
       <section class="card card--sheet ${instance.enabled ? '' : 'card--off'}">
@@ -1048,11 +1041,9 @@ export class MirrorRemote extends LitElement {
             <span class="field__label">
               Groesse
               <span class="field__hint">
-                ${inHead
-                  ? 'Im Kopfband zeigt der Block einen Wert – die Groesse gilt erst wieder in einem anderen Band.'
-                  : sizes.length < WIDGET_SIZE_OPTIONS.length
-                    ? `Dieses Modul gibt es in ${formatWidgetSizes(sizes)} – kleiner bliebe vom Inhalt nichts uebrig.`
-                    : 'Wie viele Rasterfelder der Block belegt.'}
+                ${sizes.length < WIDGET_SIZE_OPTIONS.length
+                  ? `Dieses Modul gibt es in ${formatWidgetSizes(sizes)} – kleiner bliebe vom Inhalt nichts uebrig.`
+                  : 'Wie viele Rasterfelder der Block belegt.'}
               </span>
             </span>
             <div class="sizes">
