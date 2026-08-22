@@ -222,7 +222,7 @@ export const ZONE_SPECS: Record<Zone, ZoneSpec> = {
     name: 'Kopf',
     height: 328,
     share: 20,
-    note: 'Uhr fix links, rechts genau ein Slot.',
+    note: 'Uhr fix links, rechts ein Slot – beide so breit wie ein L-Block.',
   },
   main: {
     id: 'main',

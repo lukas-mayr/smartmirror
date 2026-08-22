@@ -232,30 +232,16 @@ test('rechnet die Balkenhoehe gegen die Spanne des Tages', () => {
 
 /* ---------------------------------- Form ---------------------------------- */
 
-const place = (patch = {}) => ({
-  zone: null,
-  size: 'l',
-  stale: false,
-  error: false,
-  night: false,
-  ...patch,
-});
+const place = (patch = {}) => ({ size: 'l', stale: false, error: false, night: false, ...patch });
 
-test('zeigt im Kopfband einen Wert, egal welche Groesse eingestellt ist', () => {
-  // Der Slot im Kopf ist 30 % breit. Was dort nach L gerechnet wird, landet
-  // unter der Lesbarkeitsgrenze – also gilt dort der Platz und nicht die
-  // Groesse, und zwar fuer jede der vier.
-  for (const size of ['s', 'm', 'l', 'xl']) {
-    assert.equal(weatherForm(place({ zone: 'head', size })), 'head');
-  }
-  // Auch dann, wenn die Werte alt sind: die Form haengt am Platz.
-  assert.equal(weatherForm(place({ zone: 'head', stale: true })), 'head');
-});
-
-test('laesst die anderen Baender bei der Groesse', () => {
-  assert.equal(weatherForm(place({ zone: 'main', size: 'l' })), 'deck');
-  assert.equal(weatherForm(place({ zone: 'foot', size: 's' })), 'badge');
-  assert.equal(weatherForm(place({ zone: null, size: 'xl' })), 'full');
+test('zeigt in jeder Aufhaengung dieselbe Form', () => {
+  // Die Form haengt an der Groesse und an sonst nichts. Ein Modul, das im
+  // Kopfband etwas anderes zeigte als im Raster, waere fuer den, der davor
+  // steht, zwei Module: derselbe Name, dieselbe Groesse, zwei Anzeigen.
+  assert.equal(weatherForm(place({ size: 's' })), 'badge');
+  assert.equal(weatherForm(place({ size: 'm' })), 'full');
+  assert.equal(weatherForm(place({ size: 'l' })), 'deck');
+  assert.equal(weatherForm(place({ size: 'xl' })), 'full');
 });
 
 test('schaltet nur im grossen Block durch, und nur mit frischen Werten', () => {

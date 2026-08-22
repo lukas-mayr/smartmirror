@@ -261,23 +261,34 @@ als viertes nur, wenn es etwas Laufendes zeigt. Wo kein vierter Platz ist,
 landet auch kein vierter Block — das ist der Unterschied zu einer Regel, an die
 man sich halten muss.
 
-**Im Kopfband gilt der Platz und nicht die Blockgröße.** Eine Größe beschreibt
-ein Rechteck im Raster — L sind zwei mal zwei Zellen, also 448 x 328 px. Im Kopf
-gibt es dieses Raster nicht: links steht die Uhr, rechts ein Slot über 30 % der
-Breite, keine 300 px. Ein Modul, das dort weiter nach L rechnet, legt fünf Ebenen
-übereinander und schiebt dabei die halbe Größenleiter unter die 32 px, ab denen
-aus 3 m überhaupt noch etwas lesbar ist. Der Slot zeigt deshalb einen Wert und
-eine Zeile darunter, gleich welche Größe eingestellt ist — das Wetter also Symbol,
-Temperatur und Wetterlage, ohne Ort, ohne Durchschaltung, ohne Vorschau.
+**Ein Modul sieht in beiden Anordnungen gleich aus.** Welche Form ein Block
+zeigt, hängt an seiner Größe und an sonst nichts — nicht daran, ob er im freien
+Raster liegt oder in einem Band. Ein Modul, das je nach Aufhängung etwas anderes
+zeigt, ist für den, der davorsteht, zwei Module: derselbe Name, dieselbe Größe,
+zwei Anzeigen.
 
-Beide Blöcke des Kopfbands teilen sich außerdem **eine Linie**: die Wertzeile ist
-in Uhr und Slot gleich hoch, also liegen die Uhrzeit und die Temperatur auf einer
-Mittelachse und die beiden kleinen Zeilen darunter auf derselben Grundlinie. Ohne
+Damit das aufgeht, muss der Platz zur Größe passen. Uhr und Slot bekommen im
+Kopfband deshalb je **die halbe Bandbreite** — auf 994 px Inhaltsbreite sind das
+481, und genau so breit ist ein L-Block im Raster (zwei von vier Spalten samt
+Abstand). Der Slot ist damit kein Sonderformat mehr, sondern ein L-Block. Das
+kostet die Uhrzeit ein paar Pixel: sie fällt von 162 auf 144 px, weil ihr Block
+nun ebenfalls die Hälfte ist. Weil die linke Kante des Slots jetzt in der Mitte
+des Bandes liegt, also auf einer Rasterlinie, ist er außerdem linksbündig wie
+jeder andere Block — die alte Ausnahme („was im rechten Slot steht, endet an der
+rechten Kante") fällt weg, und mit ihr der spiegelverkehrte Aufbau.
+
+**Die Wertzeile: 49 % der Blockhöhe.** Jeder Block, der einen großen Wert und
+eine Zeile darunter zeigt, gibt diesem Wert eine Zeile fester Höhe — die Uhr für
+ihre Uhrzeit, das Wetter für seine Karte. Weil beide Blöcke im Kopfband gleich
+hoch sind, bedeutet die Zahl in beiden dasselbe: die großen Zahlen liegen auf
+einer Achse und die beiden kleinen Zeilen darunter auf einer Grundlinie. Ohne
 das säße die Zahl rechts irgendwo neben der Uhrzeit — man sieht sofort, dass
-etwas fehlt, auch wenn man nicht benennen kann, was. Die deckende Fläche gibt es
-im Kopf nicht: der Slot ist so hoch wie das Band, und eine volle Salbeifläche von
-300 x 350 px oben rechts wäre genau die große helle Fläche, die hinter dem Glas
-blendet.
+etwas fehlt, auch wenn man nicht benennen kann, was.
+
+Aus demselben Grund rechnen die zweiten Zeilen gegen die Blockhöhe und nicht
+gegen die Breite. Vorher waren sie 0,62 em einer Größe, die selbst an der Breite
+hängt; in einem 481 px breiten Block landete das Datum unter der Uhr damit bei
+15 px — weit unter den 32 px, ab denen aus 3 m überhaupt noch etwas lesbar ist.
 
 Ein Block behält seinen Rasterplatz, auch während sein Screen eine Szene ist.
 Beim Zurückschalten liegt er wieder dort, wo er lag.
@@ -424,21 +435,69 @@ Pixeln bedeutete auf jedem Bildschirm etwas anderes.
 Tabelle: jeder Tag bekommt ein Viertel der Breite, also ein Symbol in
 Fußnotengröße und zwei Zahlen, die man aus zwei Metern nicht mehr liest. Ein
 Spiegel wird aber im Vorbeigehen gelesen. Deshalb zeigt das Wetter im L-Block
-immer nur einen Tag — groß, mit Beschriftung, Symbol, Zahl und Kurztext — und
-schaltet im Takt des Design-Systems (`--motion-dwell`, 2,6 s) zum nächsten:
-*Heute*, *Morgen*, *Übermorgen*,
-danach der Wochentag. Der Aufbau der Karte bleibt dabei bei jedem Tag derselbe;
-nur der Inhalt wechselt, damit aus dem Weiterschalten eine ruhige Bewegung wird
-und kein Umbau. Auch die Schriftgröße der Beschriftung richtet sich nach dem
-längsten Wort des ganzen Stapels und nicht nach der sichtbaren Karte — sonst
-spränge sie bei jedem Wechsel. Sind die Werte veraltet, hört das
-Weiterschalten auf: eine Durchschaltung, die alte Tage durchblättert, sieht
-lebendiger aus, als die Daten sind. Eine Punktreihe kündigt den Wechsel an —
-ohne sie liest man im Vorbeigehen „Heute 18°" und weiß nicht, dass gleich
-„Morgen 19°" dasteht. Im XL-Block bleibt der Tagesverlauf stehen, weil dort
-alles gleichzeitig lesbar groß ist. Im Kopfband einer Szene schaltet das Wetter
-gar nicht durch — dort ist es der Slot neben der Uhr und zeigt einen Wert (siehe
-[Szene](#szene)).
+immer nur einen Tag und schaltet im Takt des Design-Systems (`--motion-dwell`,
+2,6 s) zum nächsten: *Heute*, *Morgen*, *Übermorgen*, danach der Wochentag — im
+Raster wie im Kopfband einer Szene, denn die Form hängt an der Größe und nicht
+an der Aufhängung.
+
+**Das Symbol trägt die Karte.** Es nimmt die ganze Wertzeile ein und steht neben
+Tag und Zahl wie ein Bild neben seiner Bildunterschrift. Das ist keine Vorliebe,
+sondern die Leseentfernung: aus fünf Metern erkennt man eine Wolke, lange bevor
+man eine Zahl liest. Darunter steht eine einzige Textzeile, groß genug, um zu
+zählen — der Ort fällt weg, weil er sich nie ändert und nichts beantwortet, was
+man im Vorbeigehen wissen will.
+
+Der Aufbau der Karte bleibt bei jedem Tag derselbe; nur der Inhalt wechselt,
+damit aus dem Weiterschalten eine ruhige Bewegung wird und kein Umbau. Sind die
+Werte veraltet, hört das Weiterschalten auf: eine Durchschaltung, die alte Tage
+durchblättert, sieht lebendiger aus, als die Daten sind. Eine Punktreihe an der
+rechten Kante kündigt den Wechsel an — ohne sie liest man im Vorbeigehen
+„Heute 18°" und weiß nicht, dass gleich „Morgen 19°" dasteht. Sie steht
+senkrecht: waagerecht unter der Karte bräuchte sie eine eigene Zeile, und die
+schöbe die Karte aus der Linie mit dem Block daneben. Im XL-Block bleibt der
+Tagesverlauf stehen, weil dort alles gleichzeitig lesbar groß ist.
+
+**Die Wettersymbole zeichnet das Modul selbst** statt sie aus der Bibliothek zu
+nehmen, und sie bewegen sich. In 155 px fällt auf, dass Bibliotheksformen für
+24 px gedacht sind: „bedeckt" ist dort dieselbe einzelne Wolke wie „bewölkt",
+und der Blitz ein Haken, den man neben der Wolke kaum findet. Der eigene Satz
+gibt „bedeckt" eine zweite Wolke — die in eigenem Takt zieht, damit aus zwei
+Linien ein Himmel mit Tiefe wird — und dem Gewitter drei kleine Blitze, die
+unabhängig voneinander einschlagen.
+
+Bewegt wird immer nur ein Teil und nie das ganze Symbol: Strahlen drehen, Wolken
+driften, Tropfen und Flocken fallen versetzt, Flocken taumeln dabei. Was zu
+einer Wolke gehört, liegt in *einer* Gruppe und zieht mit ihr — sonst wanderte
+die Wolke davon und der Regen bliebe in der Luft hängen.
+
+**Ein Blitz ist nur da, wenn er schlägt**, und ein Einschlag ist kein einzelnes
+Aufblitzen, sondern ein kurzes Flackern: hell, aus, hell, halten, Nachzucker.
+Die drei haben verschiedene Dauern (2,3 / 2,9 / 3,7 s) und starten mitten im
+Takt, also schlagen sie nie zusammen ein und das Muster wiederholt sich erst
+nach Minuten. Dicht genug, dass fast immer irgendwo einer zuckt — sonst läse man
+„bewölkt" statt „Gewitter".
+
+Nachts steht alles still, und `prefers-reduced-motion` schaltet es ebenfalls ab:
+wer um drei Uhr aufsteht, will eine Uhrzeit lesen und nicht von einer tropfenden
+Wolke geweckt werden. In der Vorschaureihe stehen dieselben Symbole still — eine
+Reihe driftender Wolken in Fußnotengröße ist Flimmern und keine Auskunft. Dass
+Tropfen und Blitze dort trotzdem sichtbar sind, liegt daran, dass ihre
+Deckkraft ausschließlich in den Animationsbildern steht und nicht am Element.
+
+**Zwei Dinge sind an diesem Satz ungewöhnlich, und beide stehen dort, weil sie
+beim ersten Anlauf schiefgingen.** Erstens werden die Wolken aus Kreisen
+*gerechnet* (`src/glyphs.ts`) und nicht aus Bögen geraten: SVG vergrößert einen
+zu kleinen Bogenradius stillschweigend, und die rechte Kuppe blähte sich dadurch
+weiter auf als beabsichtigt — die Wolken standen über der Kante ihres Feldes und
+waren abgeschnitten, schon im Stillstand. Zweitens kennt jede Form ihren
+**Bewegungsraum**: Zeichnung plus halbe Strichstärke plus größter Ausschlag
+ihrer Animation. Ein Test hält diesen Raum gegen das Feld, damit nie wieder
+etwas an den Rand stößt, das sich bewegt.
+
+Deshalb liegt die Geometrie in `src/glyphs.ts` und das Zeichnen in
+`src/icons.ts`: der Schnitt läuft entlang der Frage, wer einen Browser braucht.
+Die Rechnung nicht, das Zeichnen schon — und nur so lässt sich die Rechnung
+prüfen.
 
 ### Bewegung
 
