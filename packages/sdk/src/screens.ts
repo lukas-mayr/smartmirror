@@ -10,12 +10,57 @@
  * Blick, der andere will gelesen werden.
  */
 
+/**
+ * Wie die Bloecke eines Screens angeordnet werden.
+ *
+ * `grid` ist das freie Raster: jeder Block liegt auf einem Rasterplatz, den
+ * man am Handy verschiebt. Es kann alles und laesst deshalb auch zu, dass
+ * jemand zehn Zeilen fuellt.
+ *
+ * `zones` ist die Szene aus dem Design-System: drei Baender, Uhr fix links
+ * oben, hoechstens drei Elemente. Die Obergrenze ist hier keine Regel, an die
+ * man sich halten muss, sondern die Form selbst – wo kein vierter Platz ist,
+ * landet auch kein vierter Block.
+ *
+ * Zwei Modi und nicht eine Ablœsung: ein Spiegel, der seit einem Jahr an der
+ * Wand haengt, soll durch ein Update nicht neu angeordnet werden.
+ */
+export const SCREEN_LAYOUTS = ['grid', 'zones'] as const;
+
+export type ScreenLayout = (typeof SCREEN_LAYOUTS)[number];
+
+export const DEFAULT_SCREEN_LAYOUT: ScreenLayout = 'grid';
+
+export interface ScreenLayoutOption {
+  id: ScreenLayout;
+  name: string;
+  note: string;
+}
+
+export const SCREEN_LAYOUT_OPTIONS: readonly ScreenLayoutOption[] = [
+  { id: 'grid', name: 'Raster', note: 'Bloecke frei auf dem Raster anordnen.' },
+  { id: 'zones', name: 'Szene', note: 'Drei Baender: Kopf, Hauptzone, Fussband. Hoechstens drei Bloecke.' },
+];
+
+export function isScreenLayout(value: unknown): value is ScreenLayout {
+  return typeof value === 'string' && (SCREEN_LAYOUTS as readonly string[]).includes(value);
+}
+
+export function normalizeScreenLayout(
+  value: unknown,
+  fallback: ScreenLayout = DEFAULT_SCREEN_LAYOUT,
+): ScreenLayout {
+  return isScreenLayout(value) ? value : fallback;
+}
+
 export interface MirrorScreen {
   /** Stabil ueber die Lebensdauer, z.B. "screen-2". */
   id: string;
   name: string;
   /** Standzeit, bevor der naechste Screen an die Reihe kommt. */
   durationSeconds: number;
+  /** Freies Raster oder die drei Baender der Szene. */
+  layout: ScreenLayout;
 }
 
 /** Unter fuenf Sekunden ist es kein Screen mehr, sondern ein Flackern. */
@@ -32,8 +77,12 @@ export function clampScreenDuration(value: unknown): number {
   return Math.min(SCREEN_DURATION_MAX, Math.max(SCREEN_DURATION_MIN, stepped));
 }
 
-export function createScreen(id: string, name: string): MirrorScreen {
-  return { id, name, durationSeconds: DEFAULT_SCREEN_DURATION };
+export function createScreen(
+  id: string,
+  name: string,
+  layout: ScreenLayout = DEFAULT_SCREEN_LAYOUT,
+): MirrorScreen {
+  return { id, name, durationSeconds: DEFAULT_SCREEN_DURATION, layout };
 }
 
 /** Naechste freie Id. Die Nummer im Namen ist nur der Vorschlag beim Anlegen. */
@@ -53,7 +102,12 @@ export function normalizeScreen(value: unknown, fallbackId: string, fallbackName
   const source = (typeof value === 'object' && value !== null ? value : {}) as Partial<MirrorScreen>;
   const id = typeof source.id === 'string' && source.id.length > 0 ? source.id : fallbackId;
   const name = typeof source.name === 'string' && source.name.trim().length > 0 ? source.name.trim() : fallbackName;
-  return { id, name, durationSeconds: clampScreenDuration(source.durationSeconds) };
+  return {
+    id,
+    name,
+    durationSeconds: clampScreenDuration(source.durationSeconds),
+    layout: normalizeScreenLayout(source.layout),
+  };
 }
 
 /**

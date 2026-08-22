@@ -1,0 +1,361 @@
+/**
+ * Das Design-System, als Zahlen.
+ *
+ * Zwei Oberflaechen, ein System: die *Anzeige* hinter dem Zwei-Wege-Spiegel
+ * (1080 x 1920, kein Eingabegeraet) und die *Fernbedienung* als PWA am Handy.
+ * Beide haben ihr eigenes Stylesheet, und beide brauchen dieselben Werte –
+ * aber nicht nur als CSS: das Wetter-Modul muss wissen, wie lange eine Karte
+ * steht, der Feed, wann er nachrueckt, die Anzeige, wie hoch das Kopfband ist.
+ *
+ * Deshalb stehen die Werte hier und nicht nur in den beiden Stylesheets. Was
+ * ausschliesslich CSS betrifft (Farben, Radien, Schriftgroessen), steht als
+ * Konstante hier *und* als Custom Property dort; ein Test in packages/sdk/test
+ * vergleicht beide Seiten, damit sie nicht auseinanderlaufen. Was Logik
+ * braucht (Standzeiten, Rastermasse, Bandhoehen), wird von hier importiert.
+ *
+ * Die Custom Properties heissen auf der Anzeige `--mirror-*` und in der PWA
+ * schlicht `--bg`, `--surface`, `--accent`: die Anzeige teilt sich ihr
+ * Dokument mit Modul-Frontends fremder Herkunft, die PWA nicht.
+ */
+
+/* ------------------------------ Anzeige: Farbe ----------------------------- */
+
+/**
+ * Die Farben der Anzeige.
+ *
+ * Zwei Toene und sonst Grauwerte. Salbei traegt die Normalwerte – Beschriftungen,
+ * Balken, Ringe, Konturen –, Sand die Spitzen und alles, was Aufmerksamkeit
+ * verlangt. Ein dritter Ton wuerde die Rollen aufweichen: sobald Farbe nur noch
+ * huebsch ist und nichts mehr bedeutet, liest man sie nicht mehr mit.
+ */
+export const MIRROR_COLORS = {
+  /** Exakt schwarz, nie #050505: jeder Grauwert leuchtet durch das Glas. */
+  bg: '#000000',
+  /** Nur Text und Strich, nie Flaeche. */
+  fg: '#ffffff',
+  /** Sekundaerwerte. */
+  fgDim: '#9a9a9a',
+  /** Untergrenze, Achsen, Zustaende. Darunter verschwindet alles. */
+  fgMute: '#707070',
+  /** Salbei: Beschriftungen, Daten, Balken, Ringe. */
+  accent: '#93b1a6',
+  /** Sand: Spitzenwerte, Aufmerksamkeit. */
+  accentWarm: '#d4b483',
+  /** Dunkler Text auf einer deckenden Salbei-Flaeche. */
+  onAccent: '#0d1512',
+  /** Dunkler Text auf einer deckenden Sand-Flaeche. */
+  onAccentWarm: '#1a1408',
+  /** Fehler. Der einzige Zustand, der eine eigene Toenung tragen darf. */
+  danger: '#c4574a',
+  /** Fehlertext – die Flaeche selbst bleibt bei 8 %. */
+  dangerFg: '#d97a6c',
+} as const;
+
+/**
+ * Getoente Flaechen.
+ *
+ * Obergrenze fuer jede Flaeche: 12 % Deckkraft. Daruber summieren sich zwei
+ * Boxen nebeneinander zu einem Leuchtfeld, und genau daran erkennt man von der
+ * anderen Zimmerseite, dass hinter dem Spiegel ein Bildschirm haengt.
+ */
+export const MIRROR_SURFACES = {
+  /** Neutrale Box: fast schwarz mit einer Kontur, die man eher ahnt. */
+  box: '#0a0c0f',
+  boxLine: 'rgba(255, 255, 255, 0.12)',
+  boxAccent: 'rgba(147, 177, 166, 0.09)',
+  boxAccentLine: 'rgba(147, 177, 166, 0.35)',
+  boxWarm: 'rgba(212, 180, 131, 0.10)',
+  boxWarmLine: 'rgba(212, 180, 131, 0.32)',
+  boxDanger: 'rgba(196, 87, 74, 0.08)',
+  boxDangerLine: 'rgba(196, 87, 74, 0.35)',
+} as const;
+
+/** Hoechste erlaubte Deckkraft einer getoenten Flaeche, in Prozent. */
+export const MIRROR_SURFACE_MAX_ALPHA = 12;
+
+/* ------------------------------ Anzeige: Typo ------------------------------ */
+
+/**
+ * Die Groessenstufen der Anzeige, in Pixeln auf 1080 x 1920.
+ *
+ * Der Kontrast entsteht aus dem Sprung: 240 gegen 26. Mittlere Groessen
+ * sparsam – wo alles gleich gross ist, muss man jede Zeile einzeln lesen,
+ * statt die Hierarchie in einer Sekunde zu sehen.
+ *
+ * Auf der Anzeige selbst rechnen die Module in Container-Einheiten (`cqh`,
+ * `cqw`), damit dasselbe Modul jede Blockgroesse fuellt. Die Zahlen hier sind
+ * die Referenz, gegen die diese Rechnungen gedacht sind – und die Vorlage fuer
+ * jedes Element, das nicht in einem Block liegt (Zonen, Feed, Overlays).
+ */
+export const MIRROR_TYPE = {
+  /** Die Uhrzeit im Kopfband. */
+  mega: 240,
+  /** Ein Titel, der den Raum traegt. */
+  hero: 112,
+  /** Grosse Werte: Temperatur, Restzeit. */
+  xl: 84,
+  /** Werte in mittleren Boecken. */
+  l: 56,
+  /** Zweitzeilen. */
+  m: 40,
+  /** Beschriftungen. Versalien, gesperrt, farbig. */
+  label: 26,
+  /** Untergrenze fuer 2 bis 3 m Leseabstand. */
+  min: 32,
+} as const;
+
+/**
+ * Schriftschnitte.
+ *
+ * Werte duenn, Beschriftungen halbfett. Das ist der Punkt, an dem das
+ * Design-System der frueheren Handschrift widerspricht: bis 0.8 standen die
+ * Werte im Schnitt 800. Ein fetter Wert in 240 px ist aber genau die grosse
+ * helle Flaeche, vor der die Physik warnt – bei 300 traegt allein die Groesse
+ * die Hierarchie, und die Flaeche bleibt klein.
+ */
+export const MIRROR_WEIGHT = {
+  value: 300,
+  label: 700,
+  labelSoft: 600,
+} as const;
+
+/** Sperrung der Beschriftungen. */
+export const MIRROR_TRACKING = {
+  /** Grosse Werte ziehen optisch auseinander und werden zurueckgenommen. */
+  value: '-0.035em',
+  label: '0.14em',
+  labelWide: '0.16em',
+} as const;
+
+/* ---------------------------- Anzeige: Geometrie --------------------------- */
+
+/** Radien in Pixeln. Eine Box waehlt nach ihrer Groesse, nicht nach Geschmack. */
+export const MIRROR_RADIUS = { s: 24, m: 24, l: 28, xl: 32, pill: 999 } as const;
+
+/** Strichstaerken in Pixeln. */
+export const MIRROR_STROKE = {
+  /** Konturen von Boxen. */
+  line: 1,
+  /** Symbole. */
+  icon: 1.5,
+  /** Ringe, Linien, Diagramme. */
+  graph: 4,
+} as const;
+
+/**
+ * Das Raster der Anzeige, in Pixeln auf 1080 x 1920.
+ *
+ * 1080 minus zweimal 43 ergibt 994 px Inhaltsbreite. Davon drei Abstaende zu
+ * je 32 px abgezogen und durch vier geteilt: 224 px Spaltenbreite. Zehn Zeilen
+ * zu 148 px plus neun Abstaende ergeben 1768 px, oben und unten bleiben je
+ * 76 px Rand.
+ *
+ * Die Zelle ist bewusst quer (3:2) und nicht quadratisch: eine Box traegt eine
+ * Beschriftung und darunter einen grossen Wert, und dafuer ist Breite mehr
+ * wert als Hoehe.
+ */
+export const MIRROR_RASTER = {
+  width: 1080,
+  height: 1920,
+  columns: 4,
+  rows: 10,
+  /** 4 % der Breite. */
+  marginX: 43,
+  marginY: 76,
+  /** 2 rem. */
+  gap: 32,
+  cellWidth: 224,
+  cellHeight: 148,
+  /** Innenabstand einer Box. */
+  boxPadding: 28,
+} as const;
+
+/**
+ * Wieviele der zehn Zeilen hoechstens belegt sein duerfen.
+ *
+ * Leere Zeilen gruppieren die Boecke und lassen den Spiegel Spiegel bleiben.
+ * Randvoll summieren sich die Toenungen zu einer leuchtenden Flaeche, und
+ * nichts hat mehr Vorrang.
+ */
+export const MIRROR_MAX_FILLED_ROWS = 6;
+
+/** Hoechstens zwei Boxen nebeneinander – vier erzwingen Schrift unter 32 px. */
+export const MIRROR_MAX_BOXES_PER_ROW = 2;
+
+/* ------------------------------ Anzeige: Zonen ----------------------------- */
+
+/**
+ * Die drei Baender einer Szene.
+ *
+ * Kopf 20 %, Hauptzone 60 %, Fussband 20 %. Die Uhr sitzt fix links oben,
+ * rechts daneben genau ein Slot. Die Hauptzone traegt die Aussage der Szene,
+ * das Fussband nur breite, flache Elemente – und darf leer bleiben.
+ *
+ * Der Unterschied zum freien Raster ist keine Geschmacksfrage: im Raster kann
+ * jeder Block ueberall liegen, und wer zehn Zeilen hat, fuellt sie irgendwann.
+ * Die Baender machen die Obergrenze zur Form.
+ */
+export const ZONES = ['head', 'main', 'foot'] as const;
+
+export type Zone = (typeof ZONES)[number];
+
+export const DEFAULT_ZONE: Zone = 'main';
+
+export interface ZoneSpec {
+  id: Zone;
+  name: string;
+  /** Hoehe in Pixeln auf 1920; `null` heisst "der Rest". */
+  height: number | null;
+  /** Anteil an der Hoehe, in Prozent – die Bezeichnung in der Handy-App. */
+  share: number;
+  note: string;
+}
+
+export const ZONE_SPECS: Record<Zone, ZoneSpec> = {
+  head: {
+    id: 'head',
+    name: 'Kopf',
+    height: 328,
+    share: 20,
+    note: 'Uhr fix links, rechts genau ein Slot.',
+  },
+  main: {
+    id: 'main',
+    name: 'Hauptzone',
+    height: null,
+    share: 60,
+    note: 'Die Aussage der Szene. 1 bis 2 Bloecke, hoechstens eine Flaeche.',
+  },
+  foot: {
+    id: 'foot',
+    name: 'Fussband',
+    height: 328,
+    share: 20,
+    note: 'Nur laengliche Elemente. Darf leer bleiben.',
+  },
+};
+
+export const ZONE_OPTIONS: readonly ZoneSpec[] = ZONES.map((zone) => ZONE_SPECS[zone]);
+
+/** Abstand zwischen zwei Baendern, in Pixeln. */
+export const ZONE_GAP = 32;
+
+/**
+ * Hoechstens drei Elemente pro Szene: Uhr, ein Kopf-Slot, ein Hauptwidget.
+ * Das Fussband zaehlt als viertes nur, wenn es etwas Laufendes zeigt.
+ */
+export const SCENE_MAX_ELEMENTS = 3;
+
+/** Wieviele Bloecke ein Band traegt, bevor es zu voll wird. */
+export const ZONE_CAPACITY: Record<Zone, number> = { head: 2, main: 2, foot: 1 };
+
+export function isZone(value: unknown): value is Zone {
+  return typeof value === 'string' && (ZONES as readonly string[]).includes(value);
+}
+
+export function normalizeZone(value: unknown, fallback: Zone = DEFAULT_ZONE): Zone {
+  return isZone(value) ? value : fallback;
+}
+
+/* -------------------------------- Bewegung -------------------------------- */
+
+/**
+ * Bewegt wird nur, was sich inhaltlich aendert.
+ *
+ * Ein Wechsel steigt kurz auf und blendet ueber, Fortschritt waechst als
+ * Breite, Laden atmet. Nie gleichzeitig zwei Elemente, nie Position und
+ * Groesse zusammen, nachts gar nicht: im dunklen Raum zieht jede Animation den
+ * Blick auf sich, und ein Spiegel, der den Blick zieht, ist kaputt.
+ */
+export const MOTION = {
+  /** Dauer eines Wechsels in ms. */
+  swap: 500,
+  swapEasing: 'cubic-bezier(0.2, 0.7, 0.2, 1)',
+  /** Wie lange eine Karte steht, bevor die naechste kommt. */
+  dwell: 2600,
+  /** Takt einer fortlaufenden Bewegung (Fortschrittsbalken). */
+  tick: 900,
+  /** Atmen des Ladezustands. */
+  breathe: 1400,
+  /** Ueberblendung zwischen zwei Screens. */
+  screen: 900,
+} as const;
+
+/* ------------------------------ Mitteilungsfeed ---------------------------- */
+
+/**
+ * Der Feed zeigt genau drei Mitteilungen.
+ *
+ * Die oberste traegt die Flaeche und die volle Groesse, die beiden darunter
+ * stehen frei und gedimmt als Ausblick. Damit liest man aus 3 m nur die
+ * oberste Zeile und weiss trotzdem, dass mehr wartet. Ein leerer Feed heisst
+ * leere Hauptzone – kein "Keine Mitteilungen".
+ */
+export const FEED = {
+  visible: 3,
+  /** Wie lange, bis die Liste eine Position nachrueckt. */
+  advance: 3400,
+  /** Hoehe der obersten Position in Pixeln. */
+  itemHeight: 232,
+  /** Hoehe der beiden darunter. */
+  itemHeightRest: 148,
+  gap: 32,
+  /** Schriftgroesse des Titels auf Position 1 bzw. 2 und 3. */
+  titleSize: 72,
+  titleSizeRest: 56,
+  /** Deckkraft von Position 2 und 3. */
+  dim1: 0.8,
+  dim2: 0.45,
+} as const;
+
+/* ---------------------------------- PWA ----------------------------------- */
+
+/**
+ * Die Fernbedienung.
+ *
+ * Sie haengt nicht hinter Glas und darf deshalb Flaechen und Grauwerte nutzen.
+ * Die beiden Akzente behalten aber ihre Rollen: Salbei traegt die primaere
+ * Aktion, Sand Hinweise und Updates, Rot ausschliesslich Zerstoerendes.
+ */
+export const PWA_COLORS = {
+  bg: '#101012',
+  surface: '#1a1a1d',
+  surfaceRaised: '#24242a',
+  line: '#33333a',
+  text: '#f2f2f4',
+  textDim: '#9a9aa4',
+  accent: '#93b1a6',
+  accentWarm: '#d4b483',
+  danger: '#c4574a',
+  /** Lesbares Rot auf dunklem Grund – die Flaeche selbst bleibt bei 14 %. */
+  dangerFg: '#e08b80',
+  success: '#6fa36f',
+  /** Text auf einer deckenden Akzentflaeche. */
+  onAccent: '#05060a',
+} as const;
+
+/** Groessenstufen der PWA in Pixeln. */
+export const PWA_TYPE = {
+  title: 28,
+  heading: 20,
+  body: 17,
+  sm: 15,
+  label: 13,
+} as const;
+
+export const PWA_RADIUS = { field: 12, card: 14, sheet: 28, pill: 999 } as const;
+
+export const PWA_METRICS = {
+  /**
+   * Kleinstes Tap-Ziel. Alles, was man antippen kann, ist mindestens so gross –
+   * darunter trifft ein Daumen zuverlaessig daneben.
+   */
+  tap: 48,
+  /** Hoehe eines Formularfelds und einer Schaltflaeche. */
+  field: 52,
+  /** Hoehe eines Segments in einer Auswahlleiste. */
+  segment: 44,
+  /** Der Bildschirm, gegen den die Screens gezeichnet sind. */
+  screenWidth: 390,
+  screenHeight: 844,
+} as const;

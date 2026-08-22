@@ -1,12 +1,13 @@
+import type { Zone } from './design.js';
 import { DEFAULT_FONT, type FontId } from './fonts.js';
 import { createDefaultInsets, type ScreenInsets } from './insets.js';
-import { DEFAULT_GRID, type GridSize, type WidgetSize } from './layout.js';
+import { defaultGridForRotation, type GridSize, type WidgetSize } from './layout.js';
 import { DEFAULT_ROTATION, type Rotation } from './rotation.js';
 import { createScreen, type MirrorScreen } from './screens.js';
 import { createDefaultSetup, type SetupState } from './setup.js';
 
 /** Aktuelle Version des Config-Formats. Erhoehen = Migration schreiben. */
-export const CONFIG_SCHEMA_VERSION = 4;
+export const CONFIG_SCHEMA_VERSION = 5;
 
 export interface ModuleInstance {
   /** Stabil ueber die Lebensdauer der Instanz, z.B. "weather-1". */
@@ -17,6 +18,15 @@ export interface ModuleInstance {
   /** Nullbasierte Rasterkoordinaten der linken oberen Ecke. */
   x: number;
   y: number;
+  /**
+   * In welchem Band der Block liegt, wenn sein Screen als Szene angeordnet ist.
+   *
+   * Steht neben `x`/`y` und nicht statt ihnen: ein Screen laesst sich zwischen
+   * Raster und Szene umschalten, und beim Zurueckschalten soll der Block
+   * wieder dort liegen, wo er lag. Welcher der beiden Werte gilt, entscheidet
+   * `MirrorScreen.layout`.
+   */
+  zone: Zone;
   size: WidgetSize;
   enabled: boolean;
   config: Record<string, unknown>;
@@ -43,9 +53,74 @@ export interface PowerSettings {
   manualOverride: { active: boolean; on: boolean } | null;
 }
 
+/**
+ * Nachtabsenkung.
+ *
+ * Nicht dasselbe wie der Zeitplan aus `power`: der schaltet den Bildschirm
+ * ganz ab. Hier bleibt der Spiegel an, nimmt aber eine Stufe zurueck – keine
+ * deckende Flaeche, kein Akzent, kein Weiterschalten, alle Werte auf Grau.
+ *
+ * Der Grund steht in der Szene "Nacht": wer um drei Uhr aufsteht, soll eine
+ * Uhrzeit lesen koennen und nicht geblendet werden. Und eine Animation, die im
+ * dunklen Zimmer im Augenwinkel laeuft, weckt zuverlaessig auf.
+ */
+export interface NightModeSettings {
+  enabled: boolean;
+  /** "HH:MM" – ab hier ist die Absenkung aktiv. */
+  from: string;
+  /** "HH:MM" – ab hier wieder nicht. Ueber Mitternacht hinweg erlaubt. */
+  to: string;
+}
+
+export const DEFAULT_NIGHT_MODE: NightModeSettings = { enabled: true, from: '22:30', to: '06:00' };
+
+/** "HH:MM" in Minuten seit Mitternacht, oder `null` bei Unsinn. */
+function parseClock(value: unknown): number | null {
+  if (typeof value !== 'string') return null;
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) return null;
+  return hours * 60 + minutes;
+}
+
+function normalizeClock(value: unknown, fallback: string): string {
+  const minutes = parseClock(value);
+  if (minutes === null) return fallback;
+  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+}
+
+export function normalizeNightMode(value: unknown): NightModeSettings {
+  const source = (typeof value === 'object' && value !== null ? value : {}) as Partial<NightModeSettings>;
+  return {
+    enabled: source.enabled === undefined ? DEFAULT_NIGHT_MODE.enabled : source.enabled !== false,
+    from: normalizeClock(source.from, DEFAULT_NIGHT_MODE.from),
+    to: normalizeClock(source.to, DEFAULT_NIGHT_MODE.to),
+  };
+}
+
+/**
+ * Laeuft die Nachtabsenkung gerade?
+ *
+ * Das Fenster darf ueber Mitternacht gehen – das ist sogar der Normalfall
+ * (22:30 bis 06:00). Sind beide Zeiten gleich, ist das Fenster leer und nicht
+ * etwa 24 Stunden lang: "von 6 bis 6" heisst nicht "immer".
+ */
+export function isNightNow(settings: NightModeSettings, now: Date = new Date()): boolean {
+  if (!settings.enabled) return false;
+  const from = parseClock(settings.from);
+  const to = parseClock(settings.to);
+  if (from === null || to === null || from === to) return false;
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  return to < from ? minutes >= from || minutes < to : minutes >= from && minutes < to;
+}
+
 export interface DisplaySettings {
   /** 0..100. Wird per ddcutil gesetzt, sonst per CSS-Overlay abgedunkelt. */
   brightness: number;
+  /** Absenkung in den Nachtstunden. */
+  nightMode: NightModeSettings;
   /**
    * Drehung des Inhalts im Uhrzeigersinn – fuer hochkant aufgehaengte Spiegel.
    *
@@ -129,6 +204,7 @@ export function createDefaultConfig(): MirrorConfig {
         screenId: 'screen-1',
         x: 2,
         y: 0,
+        zone: 'head',
         size: 'l',
         enabled: true,
         config: {},
@@ -139,6 +215,7 @@ export function createDefaultConfig(): MirrorConfig {
         screenId: 'screen-1',
         x: 4,
         y: 0,
+        zone: 'main',
         size: 'l',
         enabled: true,
         config: {},
@@ -146,10 +223,11 @@ export function createDefaultConfig(): MirrorConfig {
     ],
     display: {
       brightness: 100,
+      nightMode: { ...DEFAULT_NIGHT_MODE },
       rotation: DEFAULT_ROTATION,
       fontFamily: DEFAULT_FONT,
       burnInProtection: true,
-      grid: { ...DEFAULT_GRID },
+      grid: defaultGridForRotation(DEFAULT_ROTATION),
       insets: createDefaultInsets(),
     },
     power: {

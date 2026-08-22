@@ -7,10 +7,12 @@ import {
   FONT_STACKS,
   normalizeGrid,
   normalizeInsets,
+  normalizeNightMode,
   normalizeRotation,
   normalizeScreens,
   normalizeSetup,
   normalizeWidgetSize,
+  normalizeZone,
   rectFor,
   rectsOverlap,
   type GridRect,
@@ -106,6 +108,8 @@ function normalize(input: Record<string, unknown>): MirrorConfig {
   // lassen – und wer sie von Hand in die Datei geschrieben hat, saehe nur einen
   // querstehenden Spiegel und keinen Grund dafuer.
   display.rotation = normalizeRotation(display.rotation);
+  // Eine Nachtabsenkung mit "25:00" waere nie aktiv, und man saehe nicht warum.
+  display.nightMode = normalizeNightMode(display.nightMode);
   // Eine Schrift, die es nicht gibt, wuerde in der Anzeige stumm auf die
   // Systemschrift zurueckfallen – lieber hier auf den Standard zurechtruecken.
   if (!(display.fontFamily in FONT_STACKS)) display.fontFamily = defaults.display.fontFamily;
@@ -150,6 +154,7 @@ function normalize(input: Record<string, unknown>): MirrorConfig {
         screenId,
         x: rect.x,
         y: rect.y,
+        zone: normalizeZone(entry.zone),
         size,
         enabled: entry.enabled !== false,
         config: typeof entry.config === 'object' && entry.config !== null ? entry.config : {},
