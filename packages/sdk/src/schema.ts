@@ -18,7 +18,13 @@ export interface JsonSchema {
   enum?: readonly (string | number)[];
   /** Anzeigetexte zu `enum`, gleiche Reihenfolge. */
   enumLabels?: readonly string[];
-  format?: 'time' | 'date' | 'uri' | 'color' | 'timezone';
+  /**
+   * `textarea` ist der einzige Wert, der nicht die *Art* des Werts beschreibt,
+   * sondern seine Laenge: mehrere Zeilen, die die Handy-App als mehrzeiliges
+   * Feld anbietet statt als einzeilige Eingabe, in der man ab dem zweiten Satz
+   * blind tippt.
+   */
+  format?: 'time' | 'date' | 'uri' | 'color' | 'timezone' | 'textarea';
   minLength?: number;
   maxLength?: number;
   pattern?: string;

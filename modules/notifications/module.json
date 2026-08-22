@@ -1,0 +1,37 @@
+{
+  "id": "notifications",
+  "name": "Mitteilungen",
+  "version": "0.1.0",
+  "description": "Ein Feed aus drei Mitteilungen: die oberste gross und mit Flaeche, die beiden darunter als Ausblick. Feste Eintraege aus den Einstellungen, alles Weitere per Kommando von aussen.",
+  "author": "smartmirror",
+  "singleton": true,
+  "sizes": ["l", "xl"],
+  "preferredSize": "xl",
+  "permissions": ["commands"],
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "entries": {
+        "type": "string",
+        "title": "Feste Mitteilungen",
+        "description": "Eine je Zeile, als \"Woher | Was | Zusatz\". Ein \"!\" am Zeilenanfang macht sie dringend. Alles darf weggelassen werden ausser dem Was.",
+        "default": "",
+        "format": "textarea"
+      },
+      "advanceSeconds": {
+        "type": "number",
+        "title": "Nachruecken alle (Sekunden)",
+        "description": "Nur wirksam, wenn es mehr Mitteilungen gibt als Plaetze.",
+        "minimum": 2,
+        "maximum": 60,
+        "default": 3.4
+      },
+      "showHeading": {
+        "type": "boolean",
+        "title": "Ueberschrift zeigen",
+        "description": "\"Mitteilungen\" mit der Anzahl ueber der Liste.",
+        "default": true
+      }
+    }
+  }
+}
