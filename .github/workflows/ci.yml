@@ -33,6 +33,7 @@ jobs:
           npx tsc --noEmit -p modules/calendar
           npx tsc --noEmit -p modules/clock
           npx tsc --noEmit -p modules/weather
+          npx tsc --noEmit -p modules/sbb
           npx tsc --noEmit -p modules/spotify
           npx tsc --noEmit -p modules/notifications
 

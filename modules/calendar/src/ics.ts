@@ -1,3 +1,5 @@
+import { instantOf } from '@mirror/sdk';
+
 /**
  * iCalendar lesen.
  *
@@ -64,47 +66,16 @@ export interface EventInstance {
 /* -------------------------------- Zeitzonen -------------------------------- */
 
 /**
- * Verschiebung einer Zone gegenueber UTC, zu einem bestimmten Zeitpunkt.
- *
- * Ueber `Intl` und keine eigene Zeitzonentabelle: die Regeln aendern sich, und
- * eine mitgelieferte Tabelle waere ab dem Tag ihrer Auslieferung veraltet. Was
- * Node mitbringt, wird mit Node aktualisiert.
- */
-function zoneOffset(utcMillis: number, zone: string): number {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: zone,
-    hour12: false,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }).formatToParts(new Date(utcMillis));
-
-  const get = (type: string): number => Number(parts.find((part) => part.type === type)?.value ?? '0');
-  // Mitternacht kommt aus Intl je nach Umgebung als "24" heraus.
-  const hour = get('hour') % 24;
-  const asUtc = Date.UTC(get('year'), get('month') - 1, get('day'), hour, get('minute'), get('second'));
-  return asUtc - utcMillis;
-}
-
-/**
  * Wandzeit in einen Zeitpunkt.
  *
- * Zwei Durchgaenge, weil die Verschiebung selbst vom Zeitpunkt abhaengt: der
- * erste schaetzt, der zweite korrigiert. In der doppelten Stunde der
- * Rueckstellung gibt es zwei richtige Antworten; genommen wird die fruehere,
- * denn ein Termin um 02:30 ist der erste 02:30 des Tages.
+ * Die Zeitzonenrechnung steht im SDK: sonst braechte jedes Modul, das Zeiten
+ * liest, seine eigene mit, und zwei Implementierungen derselben Sache weichen
+ * frueher oder spaeter voneinander ab. Hier bleibt nur, was der Kalender
+ * darueber hinaus weiss — dass eine Zeit ohne Zone in der Zone des Spiegels
+ * gilt.
  */
 export function toInstant(time: WallTime, fallbackZone: string): number {
-  const naive = Date.UTC(time.year, time.month - 1, time.day, time.hour, time.minute, time.second);
-  const zone = time.zone ?? fallbackZone;
-  if (zone === 'UTC') return naive;
-
-  let guess = naive - zoneOffset(naive, zone);
-  guess = naive - zoneOffset(guess, zone);
-  return guess;
+  return instantOf(time, time.zone ?? fallbackZone);
 }
 
 /** Schluessel eines Startzeitpunkts, um Ausnahmen zu erkennen. */

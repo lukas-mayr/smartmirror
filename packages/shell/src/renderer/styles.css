@@ -2104,6 +2104,113 @@ body {
   justify-content: center;
 }
 
+/* -------------------------------- Abfahrten -------------------------------- */
+
+/*
+ * Drei Spalten: Linie, Ziel, wann.
+ *
+ * Die Linie steht links und in fester Breite, damit die Ziele an einer Kante
+ * beginnen; die Minutenzahl steht rechts und ist das, weswegen man hinsieht.
+ * Sie traegt deshalb den Akzent und die Ziffernbreite der Tabelle — beim
+ * Herunterzaehlen soll nichts zappeln.
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  text-align: left;
+  container-type: size;
+}
+
+.board__list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.board__row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.8em;
+  flex: none;
+  min-width: 0;
+}
+
+.board__line {
+  flex: none;
+  min-width: 3.2em;
+  font-size: min(4.4cqh, 3cqw);
+  font-weight: var(--mirror-weight-value);
+  color: var(--mirror-fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.board__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 0.1em;
+}
+
+.board__destination {
+  font-size: min(4.8cqh, 3.2cqw);
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.board__track {
+  font-size: min(2.8cqh, 2cqw);
+  letter-spacing: var(--mirror-track-label-wide);
+  text-transform: uppercase;
+  color: var(--mirror-fg-mute);
+  white-space: nowrap;
+}
+
+.board__when {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: 0.3em;
+  font-size: min(4.4cqh, 3cqw);
+  font-variant-numeric: tabular-nums;
+  color: var(--mirror-accent);
+  white-space: nowrap;
+}
+
+/* Die Verspaetung steht hinter der Zahl und in Sand: sie aendert die
+   Auskunft, sie ersetzt sie nicht. */
+.board__delay {
+  font-size: 0.7em;
+  color: var(--mirror-accent-warm);
+}
+
+/*
+ * Ein Ausfall wird durchgestrichen und gedimmt, nicht rot: Rot ist im
+ * Design-System fuer Zerstoerendes reserviert, und ein Zug, der nicht faehrt,
+ * zerstoert nichts. Die durchgestrichene Zeile sagt es ohnehin deutlicher als
+ * jede Farbe.
+ */
+.board__row--cancelled .board__destination,
+.board__row--cancelled .board__line {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.board__row--cancelled .board__when {
+  color: var(--mirror-fg-mute);
+  font-size: min(3.2cqh, 2.2cqw);
+}
+
 /* --------------------------------- Kalender -------------------------------- */
 
 /*

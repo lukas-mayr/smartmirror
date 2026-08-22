@@ -35,9 +35,11 @@ packages/
   icons/     Flache Strichsymbole, aus Lucide generiert
 modules/
   clock/         Uhrzeit und Datum (rein im Frontend)
-  weather/       Open-Meteo, mit Cache, Tagesverlauf und Offline-Zustand
+  weather/       Open-Meteo, mit Cache, Tagesverlauf und Warnungen von MeteoAlarm
   spotify/       Was gerade läuft, mit eigener Spotify-App
-  notifications/ Mitteilungsfeed, gefüttert per Kommando
+  calendar/      ICS-Kalender (iCloud, Gemeinde, Schule), Zeitraum einstellbar
+  sbb/           Abfahrten einer Haltestelle, von der Fahrplanauskunft search.ch
+  notifications/ Die Fläche für Mitteilungen; den Inhalt melden die Module
 deploy/      systemd-Units, Compositor-Start, Installer, Drehung
 scripts/     Build-, Bundle- und Generator-Skripte
 ```
