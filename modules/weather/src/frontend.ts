@@ -67,12 +67,37 @@ export default defineFrontend<WeatherState, WeatherConfig>({
      * zusaetzlich den warmen Akzent des Design-Systems: die Spitze ist der eine
      * Wert, fuer den man auf ein Diagramm ueberhaupt schaut.
      */
-    const hourlyChart = (points: readonly HourlyPoint[], unit: string): TemplateResult | typeof nothing => {
+    const hourlyChart = (
+      points: readonly HourlyPoint[],
+      unit: string,
+      solid: boolean,
+    ): TemplateResult | typeof nothing => {
       if (points.length < 2) return nothing;
       const values = points.map((point) => point.temperature);
       const min = Math.min(...values);
       const max = Math.max(...values);
       const peak = peakIndex(points);
+
+      /**
+       * Die Farbe eines Balkens.
+       *
+       * Auf schwarzem Grund kommt sie aus der Temperatur, und die Spitze traegt
+       * zusaetzlich den warmen Akzent. Auf einer deckenden Salbei-Flaeche geht
+       * beides nicht: ein salbeifarbener Balken auf Salbei ist unsichtbar, und
+       * ein warmer daneben behauptet, er sei der einzige Wert. Dort zeichnen
+       * die Balken deshalb in der dunklen Textfarbe der Flaeche — halb
+       * durchlaessig fuer die Normalwerte, deckend fuer die Spitze.
+       */
+      const fill = (point: HourlyPoint, index: number): string => {
+        if (solid) {
+          return index === peak
+            ? 'var(--mirror-on-accent)'
+            : 'color-mix(in srgb, var(--mirror-on-accent) 38%, transparent)';
+        }
+        return index === peak
+          ? 'var(--mirror-accent-warm)'
+          : accentForTemperature(toCelsius(point.temperature, config.units));
+      };
 
       return html`
         <div class="weather__hourly">
@@ -85,11 +110,10 @@ export default defineFrontend<WeatherState, WeatherConfig>({
               (point, index) => html`
                 <div class="weather__bar">
                   <i
-                    style=${`height:${barHeight(point.temperature, min, max).toFixed(1)}%;background:${
-                      index === peak
-                        ? 'var(--mirror-accent-warm)'
-                        : accentForTemperature(toCelsius(point.temperature, config.units))
-                    }`}
+                    style=${`height:${barHeight(point.temperature, min, max).toFixed(1)}%;background:${fill(
+                      point,
+                      index,
+                    )}`}
                   ></i>
                   <span class="weather__bar-hour">${point.hour}</span>
                 </div>
@@ -272,7 +296,7 @@ export default defineFrontend<WeatherState, WeatherConfig>({
                   <span>${current.windSpeed} ${state.windUnit ?? 'km/h'}</span>`
               : nothing}
           </div>
-          ${hourly.length > 1 ? hourlyChart(hourly, unit) : nothing}
+          ${hourly.length > 1 ? hourlyChart(hourly, unit, solid) : nothing}
           ${hourly.length < 2 && state.forecast && state.forecast.length > 0
             ? html`
                 <div class="weather__forecast">

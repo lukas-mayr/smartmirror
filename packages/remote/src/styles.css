@@ -2,20 +2,61 @@
  * Fernbedienung: dunkel, grossflaechig antippbar, einhaendig bedienbar.
  * Anders als die Anzeige darf sie ruhig Grauwerte und Flaechen nutzen –
  * sie haengt nicht hinter einem Spiegel.
+ *
+ * Die beiden Akzente behalten trotzdem ihre Rollen aus dem Design-System:
+ * Salbei traegt die primaere Aktion, Sand Hinweise und Updates, Rot
+ * ausschliesslich Zerstoerendes. So heisst eine Farbe auf beiden Oberflaechen
+ * dasselbe – wer am Handy auf Salbei tippt, sieht am Spiegel Salbei.
+ *
+ * Die Werte stehen doppelt: als Custom Property hier und als Konstante in
+ * packages/sdk/src/design.ts, wo ein Test beide Seiten vergleicht.
  */
 
 :root {
   color-scheme: dark;
-  --bg: #0b0b0c;
-  --surface: #17171a;
-  --surface-2: #202025;
-  --border: #2c2c33;
-  --fg: #f2f2f3;
-  --muted: #9a9aa3;
-  --accent: #6ea8fe;
-  --danger: #ff6b6b;
-  --radius: 14px;
+
+  /* --------------------------------- Farbe --------------------------------- */
+
+  --bg: #101012;
+  --surface: #1a1a1d;
+  --surface-raised: #24242a;
+  --line: #33333a;
+  --text: #f2f2f4;
+  --text-dim: #9a9aa4;
+
+  --accent: #93b1a6;
+  --accent-warm: #d4b483;
+  --danger: #c4574a;
+  /* Lesbares Rot auf dunklem Grund – die Flaeche selbst bleibt bei 14 %. */
+  --danger-fg: #e08b80;
+  --success: #6fa36f;
+  /* Text auf einer deckenden Akzentflaeche. */
+  --on-accent: #05060a;
+
+  /* --------------------------------- Typo ---------------------------------- */
+
+  --text-title: 28px;
+  --text-heading: 20px;
+  --text-body: 17px;
+  --text-sm: 15px;
+  --text-label: 13px;
+
+  /* ------------------------------- Geometrie ------------------------------- */
+
+  --radius-field: 12px;
+  --radius-card: 14px;
+  --radius-sheet: 28px;
+  --radius-pill: 999px;
+
+  /*
+   * Kleinstes Tap-Ziel. Alles, was man antippen kann, ist mindestens so
+   * gross – darunter trifft ein Daumen zuverlaessig daneben.
+   */
   --tap: 48px;
+  /* Hoehe eines Formularfelds und einer Schaltflaeche. */
+  --field: 52px;
+  /* Hoehe eines Segments in einer Auswahlleiste. */
+  --segment: 44px;
 }
 
 * {
@@ -25,7 +66,7 @@
 body {
   margin: 0;
   background: var(--bg);
-  color: var(--fg);
+  color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
   font-size: 16px;
   line-height: 1.5;
@@ -41,22 +82,23 @@ mirror-remote {
 }
 
 h1 {
-  font-size: 1.4rem;
+  font-size: var(--text-title);
   margin: 0;
   font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 h2 {
-  font-size: 0.85rem;
+  font-size: var(--text-label);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
   margin: 2rem 0 0.75rem;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .muted {
-  color: var(--muted);
+  color: var(--text-dim);
 }
 .small {
   font-size: 0.85rem;
@@ -72,56 +114,97 @@ h2 {
   padding: 0.5rem 0 1rem;
 }
 
+/*
+ * Der Verbindungszustand als Pille mit Punkt.
+ *
+ * Ein Wort allein beantwortet die Frage nicht schnell genug: "Anzeige an"
+ * und "keine Verbindung" unterscheiden sich erst beim Lesen. Der Punkt
+ * unterscheidet sich schon davor – gruen heisst verbunden, rot heisst nicht,
+ * und das sieht man, ohne die Zeile zu lesen.
+ */
 .topbar__status {
-  display: block;
-  font-size: 0.85rem;
-  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 0.35rem;
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+  font-size: var(--text-label);
+  color: var(--text-dim);
+}
+
+.topbar__status::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--success);
+  flex: none;
 }
 
 .topbar__status.is-offline {
-  color: var(--danger);
+  background: rgba(196, 87, 74, 0.16);
+  color: var(--danger-fg);
+}
+
+.topbar__status.is-offline::before {
+  background: var(--danger);
 }
 
 .power {
   min-width: 72px;
   height: var(--tap);
   border-radius: 999px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   background: var(--surface);
-  color: var(--fg);
+  color: var(--text);
   font-size: 1rem;
   font-weight: 600;
 }
 
 .power--on {
-  background: var(--surface-2);
+  background: var(--surface-raised);
 }
 
 /* ---------------------------------- Tabs ---------------------------------- */
 
-.tabs {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.25rem;
+/*
+ * Auswahlleisten – Reiter, Einheit, Blockgroesse, Betriebsart.
+ *
+ * Immer dieselbe Form: eine Pille als Spur, darin gleich breite Segmente, das
+ * gewaehlte als erhabene Flaeche. Die Segmente sind 44 px hoch und damit unter
+ * den 48 px, die sonst gelten – zulaessig, weil die Spur ringsum mitzaehlt und
+ * das Tap-Ziel damit wieder darueber liegt.
+ */
+.tabs,
+.segmented {
+  display: flex;
+  gap: 4px;
   background: var(--surface);
-  border-radius: var(--radius);
-  padding: 0.25rem;
+  border-radius: var(--radius-pill);
+  padding: 4px;
   margin-bottom: 1rem;
 }
 
-.tabs button {
-  height: 40px;
+.tabs button,
+.segmented button {
+  flex: 1 1 0;
+  min-height: var(--segment);
+  padding: 0 0.5rem;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-pill);
   background: transparent;
-  color: var(--muted);
-  font-size: 0.95rem;
+  color: var(--text-dim);
+  font-size: var(--text-sm);
   font-weight: 500;
 }
 
-.tabs button.is-active {
-  background: var(--surface-2);
-  color: var(--fg);
+.tabs button.is-active,
+.segmented button.is-active {
+  background: var(--surface-raised);
+  color: var(--text);
+  font-weight: 600;
 }
 
 /* ---------------------------- Karten und Felder ---------------------------- */
@@ -135,13 +218,13 @@ h2 {
 
 .panel {
   background: var(--surface);
-  border-radius: var(--radius);
+  border-radius: var(--radius-card);
   padding: 1rem;
 }
 
 .card {
   background: var(--surface);
-  border-radius: var(--radius);
+  border-radius: var(--radius-card);
   overflow: hidden;
 }
 
@@ -164,7 +247,7 @@ h2 {
 
 .card__body {
   padding: 0 1rem 1rem;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--line);
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -223,55 +306,186 @@ h2 {
   display: block;
   font-size: 0.8rem;
   font-weight: 400;
-  color: var(--muted);
+  color: var(--text-dim);
 }
 
 input[type='text'],
 input[type='password'],
 input[type='number'],
 input[type='time'],
-select {
-  height: var(--tap);
+select,
+textarea {
+  min-height: var(--field);
   padding: 0 0.75rem;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  color: var(--fg);
-  font-size: 1rem;
+  border-radius: var(--radius-field);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--text-body);
+  font-family: inherit;
   width: 100%;
 }
 
+/*
+ * Ein mehrzeiliges Feld waechst nicht mit dem Inhalt, sondern rollt.
+ *
+ * Sonst schoebe eine Liste aus zwanzig Mitteilungen die Schaltflaeche
+ * darunter aus dem Bild – und die primaere Aktion gehoert in Daumenreichweite
+ * am unteren Rand, nicht irgendwo hinter dem Feld.
+ */
+textarea {
+  padding: 0.75rem;
+  line-height: 1.5;
+  resize: vertical;
+  max-height: 40vh;
+}
+
+/* Das Feld gehoert dem Eingegebenen, nicht dem Rahmen: der Rahmen zeigt nur,
+   wo gerade getippt wird. */
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+/*
+ * Regler: 6 px Spur, 28 px Griff.
+ *
+ * Der Griff ist deutlich groesser als die Spur, weil er das ist, was man
+ * anfasst – eine Spur, die so dick ist wie ihr Griff, sieht aus wie ein
+ * Fortschrittsbalken und laedt nicht zum Ziehen ein.
+ */
 input[type='range'] {
+  appearance: none;
+  -webkit-appearance: none;
   width: 100%;
   height: var(--tap);
-  accent-color: var(--accent);
+  background: transparent;
 }
 
+input[type='range']::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+}
+
+input[type='range']::-moz-range-track {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+}
+
+input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-pill);
+  background: var(--text);
+  border: none;
+  /* Mittig auf der 6-px-Spur: (28 - 6) / 2. */
+  margin-top: -11px;
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-pill);
+  background: var(--text);
+  border: none;
+}
+
+input[type='range']::-moz-range-progress {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+}
+
+/*
+ * Der Ein/Aus-Schalter als Pille.
+ *
+ * Ein natives Kaestchen beantwortet die falsche Frage: es sagt "angekreuzt"
+ * und nicht "eingeschaltet". Bei einem Modul, das entweder auf dem Spiegel
+ * steht oder nicht, ist der Schalter die ehrlichere Form – und er zeigt
+ * seinen Zustand ueber die Position des Knopfs, also auch dann, wenn jemand
+ * Salbei und Grau nicht unterscheiden kann.
+ *
+ * Die Pille selbst ist 32 px hoch, das Tap-Ziel darum herum kommt aus der
+ * Zeile, in der sie sitzt (`.field--switch` traegt `min-height: var(--tap)`).
+ */
 input[type='checkbox'] {
-  width: 30px;
-  height: 30px;
-  accent-color: var(--accent);
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  width: 52px;
+  height: 32px;
+  margin: 0;
+  border-radius: var(--radius-pill);
+  background: var(--line);
   flex: none;
+  transition: background 160ms ease;
 }
 
+input[type='checkbox']::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-pill);
+  background: var(--bg);
+  transition: transform 160ms ease;
+}
+
+input[type='checkbox']:checked {
+  background: var(--accent);
+}
+
+input[type='checkbox']:checked::after {
+  transform: translateX(20px);
+}
+
+input[type='checkbox']:disabled {
+  opacity: 0.4;
+}
+
+/*
+ * Drei Rollen, drei Formen.
+ *
+ * Die neutrale Schaltflaeche traegt eine Kontur und keine Flaeche, die
+ * primaere traegt Salbei, die zerstoerende ein gedaempftes Rot. Kein vierter
+ * Zustand: sobald es fuenf Aussehen gibt, sagt keines mehr etwas.
+ */
 button {
-  min-height: var(--tap);
+  min-height: var(--field);
   padding: 0 1rem;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  color: var(--fg);
-  font-size: 0.95rem;
+  border-radius: var(--radius-field);
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  font-size: var(--text-body);
   font-weight: 500;
+  font-family: inherit;
 }
 
 button:disabled {
   opacity: 0.4;
 }
 
+/*
+ * Zerstoerendes traegt Rot – und zwar als Flaeche und nicht nur als Schrift.
+ *
+ * Eine rote Schrift auf dunklem Grund liest sich als Hinweis; was ein Modul
+ * entfernt oder den Spiegel zuruecksetzt, soll sich vor dem Antippen von den
+ * Nachbarn unterscheiden, nicht erst beim Lesen.
+ */
 button.danger {
-  color: var(--danger);
+  background: rgba(196, 87, 74, 0.14);
+  color: var(--danger-fg);
   border-color: transparent;
+  font-weight: 600;
 }
 
 /* --------------------------------- Screens --------------------------------- */
@@ -303,20 +517,20 @@ button.danger {
   min-height: 44px;
   padding: 0.3rem 0.9rem;
   background: var(--surface);
-  color: var(--muted);
+  color: var(--text-dim);
   white-space: nowrap;
   flex: none;
 }
 
 .screens__tab.is-active {
-  background: var(--surface-2);
-  color: var(--fg);
+  background: var(--surface-raised);
+  color: var(--text);
   border-color: var(--accent);
 }
 
 .screens__time {
   font-size: 0.75rem;
-  color: var(--muted);
+  color: var(--text-dim);
   font-weight: 400;
 }
 
@@ -339,7 +553,7 @@ button.danger {
   position: relative;
   width: 100%;
   background: #000;
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: 10px;
   overflow: hidden;
 }
@@ -362,12 +576,12 @@ button.danger {
 .board__ghost {
   border: 1px solid var(--accent);
   border-radius: 6px;
-  background: rgba(110, 168, 254, 0.12);
+  background: rgba(147, 177, 166, 0.14);
 }
 
 .board__ghost.is-invalid {
   border-color: var(--danger);
-  background: rgba(255, 107, 107, 0.12);
+  background: rgba(196, 87, 74, 0.14);
 }
 
 .board__widget {
@@ -379,9 +593,9 @@ button.danger {
   gap: 0.1rem;
   padding: 0.2rem;
   border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  color: var(--fg);
+  border: 1px solid var(--line);
+  background: var(--surface-raised);
+  color: var(--text);
   font-size: 0.8rem;
   line-height: 1.2;
   text-align: center;
@@ -432,7 +646,7 @@ button.danger {
 
 .board__size {
   font-size: 0.7rem;
-  color: var(--muted);
+  color: var(--text-dim);
   letter-spacing: 0.06em;
 }
 
@@ -449,22 +663,109 @@ button.danger {
   margin: 0.75rem 0 0;
 }
 
-/* Groessenauswahl S / M / L / XL. */
+/* ------------------------------ Brett: Szene ------------------------------ */
+
+/*
+ * Die Szene auf dem Brett: dieselben Anteile wie auf dem Spiegel.
+ *
+ * 20 / 60 / 20 – wer hier ein Band voll macht, sieht sofort, wieviel von der
+ * Wand das ist. Ein Brett mit drei gleich hohen Kaesten waere bequemer zu
+ * bauen und wuerde genau die Frage nicht beantworten, fuer die es da ist.
+ */
+.board__area--zones {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0;
+}
+
+.board__zone {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  padding: 4px;
+  border: 1px dashed rgba(147, 177, 166, 0.35);
+  border-radius: 6px;
+  min-height: 0;
+}
+
+.board__zone--head,
+.board__zone--foot {
+  flex: 0 0 20%;
+}
+
+.board__zone--main {
+  flex: 1 1 60%;
+}
+
+/*
+ * Der Name des Bands steht in der Ecke und nicht mittig: mittig saesse er
+ * genau dort, wo der erste Block hinkommt, und waere ab dem ersten Modul
+ * verdeckt.
+ */
+.board__zone-name {
+  position: absolute;
+  top: 3px;
+  left: 6px;
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  pointer-events: none;
+}
+
+/* Mehr Bloecke als vorgesehen: kein Fehler, aber sichtbar. */
+.board__zone.is-overfull {
+  border-color: rgba(212, 180, 131, 0.5);
+}
+
+/*
+ * Ein Block in der Szene wird angetippt und nicht gezogen: es gibt je Band
+ * nur "drin" oder "nicht drin", und das waehlt man am Block aus.
+ */
+.board__widget--zone {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  padding: 0.2rem;
+  /* Unter dem Namen des Bands, damit der erste Block ihn nicht ueberdeckt. */
+  margin-top: 0.6rem;
+}
+
+/*
+ * Groessenauswahl S / M / L / XL – dieselbe Auswahlleiste wie ueberall sonst.
+ *
+ * Bis 0.8 war sie eine Reihe eigener Knoepfe mit gefuelltem Akzent fuer die
+ * gewaehlte Groesse. Damit sah dieselbe Frage ("welches von diesen?") an drei
+ * Stellen der App verschieden aus, und der gefuellte Akzent behauptete
+ * ausserdem eine Aktion, wo nur eine Auswahl steht: Salbei traegt die
+ * primaere Aktion, und "L" ist keine.
+ */
 .sizes {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0.25rem;
+  display: flex;
+  gap: 4px;
+  background: var(--surface);
+  border-radius: var(--radius-pill);
+  padding: 4px;
 }
 
 .sizes button {
+  flex: 1 1 0;
+  min-height: var(--segment);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: var(--text-sm);
   font-weight: 600;
   letter-spacing: 0.04em;
 }
 
 .sizes button.is-active {
-  background: var(--accent);
-  color: #0b0b0c;
-  border-color: transparent;
+  background: var(--surface-raised);
+  color: var(--text);
 }
 
 /*
@@ -476,7 +777,7 @@ button.danger {
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  background: var(--surface-2);
+  background: var(--surface-raised);
   border-radius: 10px;
   padding: 0.25rem;
 }
@@ -497,7 +798,7 @@ button.danger {
 
 .card--sheet {
   margin-top: 0.75rem;
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
 }
 
 /*
@@ -511,14 +812,14 @@ button.danger {
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem;
-  background: var(--surface-2);
+  background: var(--surface-raised);
   border-radius: 10px;
 }
 
 .action__label {
   flex: 1;
   font-size: 0.9rem;
-  color: var(--muted);
+  color: var(--text-dim);
 }
 
 .action__link {
@@ -528,7 +829,7 @@ button.danger {
   padding: 0 1rem;
   border-radius: 10px;
   background: var(--accent);
-  color: #0b0b0c;
+  color: var(--on-accent);
   font-size: 0.95rem;
   font-weight: 600;
   text-decoration: none;
@@ -541,7 +842,7 @@ button.danger {
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.75rem;
-  background: var(--surface-2);
+  background: var(--surface-raised);
   border-radius: 10px;
 }
 
@@ -556,12 +857,12 @@ button.danger {
   padding: 0;
   font-size: 0.8rem;
   background: transparent;
-  color: var(--muted);
+  color: var(--text-dim);
 }
 
 .rule__days button.is-active {
   background: var(--accent);
-  color: #0b0b0c;
+  color: var(--on-accent);
   border-color: transparent;
   font-weight: 600;
 }
@@ -577,7 +878,105 @@ button.danger {
   align-items: center;
   gap: 0.5rem;
   font-size: 0.9rem;
-  color: var(--muted);
+  color: var(--text-dim);
+}
+
+/* ---------------------------------- Toast ---------------------------------- */
+
+/*
+ * Jede Aenderung wird bestaetigt und ist widerrufbar.
+ *
+ * Der Toast liegt ueber der Safe-Area am unteren Rand und nicht oben: dort ist
+ * er in Daumenreichweite, und "Rueckgaengig" ist die einzige Stelle der App,
+ * an der Eile eine Rolle spielt.
+ *
+ * Ueber der Seite und nicht in ihr, weil er sonst beim Erscheinen alles
+ * darunter verschoebe – auf einer Liste, in der man gerade getippt hat, ist
+ * das die zuverlaessigste Art, den naechsten Tipp danebengehen zu lassen.
+ */
+.toasts {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0 1rem calc(1rem + env(safe-area-inset-bottom));
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 608px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 16px;
+  border-radius: var(--radius-card);
+  background: var(--surface-raised);
+  color: var(--text);
+  font-size: var(--text-sm);
+  pointer-events: auto;
+  animation: toast-in 200ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+}
+
+/* Der Punkt sagt in einem Zeichen, worum es geht: getan, oder schiefgegangen. */
+.toast::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--success);
+  flex: none;
+}
+
+.toast--warn::before {
+  background: var(--accent-warm);
+}
+
+.toast--error::before {
+  background: var(--danger);
+}
+
+.toast__text {
+  flex: 1;
+  min-width: 0;
+}
+
+/*
+ * Die Aktion im Toast traegt Salbei, aber keine Flaeche: der Toast selbst ist
+ * schon eine Flaeche, und eine Flaeche auf einer Flaeche waere ein Knopf, den
+ * man versehentlich trifft.
+ */
+.toast__action {
+  min-height: var(--tap);
+  padding: 0 0.5rem;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  flex: none;
 }
 
 /* --------------------------------- Sonstiges -------------------------------- */
@@ -590,14 +989,18 @@ button.danger {
 }
 
 .banner--error {
-  background: rgba(255, 107, 107, 0.12);
-  color: var(--danger);
+  background: rgba(196, 87, 74, 0.14);
+  color: var(--danger-fg);
 }
 
-/* Kein Fehler vom Spiegel, sondern ein Hinweis der App – etwa "kein Platz". */
+/*
+ * Kein Fehler vom Spiegel, sondern ein Hinweis der App – etwa "kein Platz".
+ * Sand und nicht Salbei: Salbei traegt die primaere Aktion, und ein Hinweis
+ * ist keine.
+ */
 .banner--hint {
-  background: rgba(110, 168, 254, 0.12);
-  color: var(--accent);
+  background: rgba(212, 180, 131, 0.12);
+  color: var(--accent-warm);
 }
 
 .dot {
@@ -629,10 +1032,10 @@ progress {
   accent-color: var(--accent);
 }
 
-.switch input {
-  width: 44px;
-  height: 28px;
-}
+/*
+ * Der Schalter hat ab 0.9 ueberall dieselbe Groesse – die Sonderregel hier
+ * machte ihn an einer Stelle 44 px breit und an allen anderen 52.
+ */
 
 .pairing {
   display: flex;
@@ -679,7 +1082,7 @@ progress {
 
 button.primary {
   background: var(--accent);
-  color: #0b0b0c;
+  color: var(--on-accent);
   border-color: transparent;
   font-weight: 600;
 }
@@ -699,7 +1102,7 @@ button.primary {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: var(--muted);
+  color: var(--text-dim);
   font-size: 0.85rem;
 }
 
@@ -707,7 +1110,7 @@ button.primary {
   content: '';
   width: 1.5rem;
   height: 1px;
-  background: var(--border);
+  background: var(--line);
 }
 
 .stepper__dot {
@@ -716,20 +1119,20 @@ button.primary {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   font-size: 0.8rem;
   font-weight: 600;
   flex: none;
 }
 
 .stepper li.is-active {
-  color: var(--fg);
+  color: var(--text);
 }
 
 .stepper li.is-active .stepper__dot {
   background: var(--accent);
   border-color: transparent;
-  color: #0b0b0c;
+  color: var(--on-accent);
 }
 
 .stepper li.is-done .stepper__dot {
@@ -755,7 +1158,7 @@ button.primary {
   position: relative;
   width: 100%;
   background: #000;
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: 8px;
   overflow: hidden;
   margin-bottom: 0.5rem;
@@ -772,7 +1175,7 @@ button.primary {
 
 .align__hint {
   font-size: 0.7rem;
-  color: var(--muted);
+  color: var(--text-dim);
   letter-spacing: 0.06em;
 }
 
@@ -782,13 +1185,13 @@ button.primary {
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.4rem 0.75rem;
-  background: var(--surface-2);
+  background: var(--surface-raised);
   border-radius: 10px;
 }
 
 .align__row--all {
   background: transparent;
-  border: 1px dashed var(--border);
+  border: 1px dashed var(--line);
 }
 
 .align__side {
@@ -835,9 +1238,9 @@ button.primary {
   letter-spacing: 0.35em;
   text-indent: 0.35em;
   border-radius: 12px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   background: var(--surface);
-  color: var(--fg);
+  color: var(--text);
 }
 
 /* In der Einrichtung steht alles mittig – die Knopfreihe dann auch. */
@@ -862,8 +1265,8 @@ button.primary {
 }
 
 .device {
-  background: var(--surface-2);
-  border-radius: var(--radius);
+  background: var(--surface-raised);
+  border-radius: var(--radius-card);
   padding: 0.75rem;
 }
 
@@ -890,14 +1293,14 @@ button.primary {
   border-radius: 10px;
   border: 1px solid transparent;
   background: transparent;
-  color: var(--fg);
+  color: var(--text);
   font-size: 1rem;
   font-weight: 600;
   font-family: inherit;
 }
 
 .device__name:focus {
-  border-color: var(--border);
+  border-color: var(--line);
   background: var(--surface);
   outline: none;
 }
@@ -910,7 +1313,7 @@ button.primary {
   margin-right: 0.35rem;
   font-size: 0.75rem;
   color: var(--accent);
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: 999px;
   padding: 0.05rem 0.5rem;
 }

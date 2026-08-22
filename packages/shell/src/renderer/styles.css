@@ -638,8 +638,20 @@ body {
   flex: 1 1 auto;
 }
 
+/*
+ * Der rechte Kopf-Slot bekommt einen festen Anteil.
+ *
+ * Nicht `flex: 0 1 auto`: `.module` traegt `container-type: size`, also
+ * haengen die Schriftgroessen darin an der Breite des Blocks — und die haenge
+ * an seinem Inhalt zu lassen, ist ein Kreis, aus dem Flexbox mit Breite null
+ * herausgeht. Der Block verschwindet dann wortlos.
+ *
+ * 30 % ist der Anteil aus dem Design-System (300 von 994 px). Ein Slot, der
+ * weniger braucht, laesst den Rest leer — das ist billiger als ein Kopfband,
+ * dessen Aufteilung sich mit dem Inhalt aendert.
+ */
 .zone--head > .module:not(:first-child) {
-  flex: 0 1 auto;
+  flex: 0 0 30%;
   align-items: flex-end;
   text-align: right;
 }
@@ -1010,7 +1022,8 @@ body {
 /* 1 – die Kante */
 .clock,
 .weather,
-.spotify {
+.spotify,
+.feed {
   width: 100%;
   height: 100%;
   min-width: 0;
@@ -1735,10 +1748,10 @@ body {
 .feed {
   display: flex;
   flex-direction: column;
+  /* Gegen die Mittigkeit von `.module`: der Feed steht wie jeder andere Block
+     an der linken Kante, also an einer Rasterlinie. */
+  align-items: stretch;
   gap: var(--feed-gap);
-  width: 100%;
-  height: 100%;
-  min-width: 0;
   container-type: size;
 }
 
@@ -1791,6 +1804,7 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  align-items: flex-start;
   gap: 0.1em;
   border-radius: var(--mirror-radius-l);
   min-width: 0;
