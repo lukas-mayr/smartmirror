@@ -12,7 +12,17 @@ export type ModulePermission =
   /** Darf `ctx.secret(...)` lesen. */
   | 'secrets'
   /** Darf Kommandos von der Fernbedienung empfangen. */
-  | 'commands';
+  | 'commands'
+  /**
+   * Darf mit `ctx.notify(...)` in den Mitteilungsfeed melden.
+   *
+   * Getrennt vom Lesen, weil es zwei verschiedene Rollen sind: fast jedes
+   * Modul hat gelegentlich etwas zu melden, aber den gesammelten Strom aller
+   * Quellen soll nur bekommen, wer ihn anzeigt.
+   */
+  | 'notify'
+  /** Darf mit `ctx.onNotifications(...)` den gesammelten Feed hoeren. */
+  | 'notifications';
 
 export interface ModuleSecretDeclaration {
   key: string;
@@ -41,8 +51,18 @@ export interface ModuleManifest {
    * fuehrendem "*." fuer Subdomains. Ohne Eintrag ist `network` wirkungslos –
    * ein Modul kann sich also nicht selbst freischalten, indem es nur die
    * Permission setzt.
+   *
+   * `allowFromConfig` nennt Konfigurationsfelder, in denen der Nutzer selbst
+   * Adressen eintraegt: deren Hosts sind zusaetzlich erlaubt. Gebraucht von
+   * Modulen, deren Quelle niemand vorher kennen kann — ein Kalendermodul
+   * bekommt eine Adresse bei iCloud, eine bei der Gemeinde und eine beim
+   * Sportverein, und keine davon liesse sich im Manifest auffuehren.
+   *
+   * Das Prinzip bleibt gewahrt: freigeschaltet wird nur, was jemand am Handy
+   * eingetippt hat. Das Modul kann die Liste nicht selbst fuellen — die
+   * Konfiguration gehoert dem Nutzer, nicht dem Modul.
    */
-  network?: { allow: readonly string[] };
+  network?: { allow: readonly string[]; allowFromConfig?: readonly string[] };
 
   /** Beschreibt die Einstellungen. Die Remote-PWA baut daraus das Formular. */
   configSchema?: JsonSchema;
@@ -155,8 +175,36 @@ export function assertValidManifest(input: unknown, source: string): asserts inp
 }
 
 /** Prueft, ob ein Host von der Allowlist des Manifests abgedeckt ist. */
-export function hostAllowed(manifest: ModuleManifest, hostname: string): boolean {
-  const allow = manifest.network?.allow ?? [];
+/**
+ * Hosts, die der Nutzer selbst eingetragen hat.
+ *
+ * Gelesen wird nur aus den Feldern, die das Manifest in `allowFromConfig`
+ * nennt, und daraus nur, was tatsaechlich wie eine Adresse aussieht. Ein
+ * mehrzeiliges Feld darf dabei mehrere enthalten – so tippt man Kalender ein.
+ */
+export function hostsFromConfig(
+  manifest: ModuleManifest,
+  config: Readonly<Record<string, unknown>>,
+): string[] {
+  const fields = manifest.network?.allowFromConfig ?? [];
+  const hosts: string[] = [];
+  for (const field of fields) {
+    const value = config[field];
+    if (typeof value !== 'string') continue;
+    for (const match of value.matchAll(/https?:\/\/([^\s/|"']+)/gi)) {
+      const host = match[1]?.toLowerCase();
+      if (host) hosts.push(host.split('@').pop() as string);
+    }
+  }
+  return hosts;
+}
+
+export function hostAllowed(
+  manifest: ModuleManifest,
+  hostname: string,
+  config: Readonly<Record<string, unknown>> = {},
+): boolean {
+  const allow = [...(manifest.network?.allow ?? []), ...hostsFromConfig(manifest, config)];
   const host = hostname.toLowerCase();
   return allow.some((entry) => {
     const pattern = entry.toLowerCase();

@@ -1,0 +1,69 @@
+{
+  "id": "sbb",
+  "name": "Abfahrten",
+  "version": "0.1.0",
+  "description": "Naechste Abfahrten einer Haltestelle im oeffentlichen Verkehr der Schweiz, von der Fahrplanauskunft search.ch. Rechnet den Fussweg ein und meldet auf Wunsch die naechste Verbindung an den Mitteilungsblock.",
+  "author": "smartmirror",
+  "sizes": ["m", "l", "xl"],
+  "preferredSize": "l",
+  "permissions": ["network", "commands", "notify"],
+  "network": {
+    "allow": ["timetable.search.ch"]
+  },
+  "refreshInterval": "1m",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "stop": {
+        "type": "string",
+        "title": "Haltestelle",
+        "description": "So, wie man sie am Automaten eintippt: \"Bern\", \"Zuerich HB\", \"Luzern, Bahnhof\".",
+        "default": "",
+        "minLength": 2
+      },
+      "limit": {
+        "type": "integer",
+        "title": "Hoechstens so viele Abfahrten",
+        "minimum": 1,
+        "maximum": 12,
+        "default": 6
+      },
+      "walkMinutes": {
+        "type": "integer",
+        "title": "Fussweg (Minuten)",
+        "description": "Was in dieser Zeit nicht mehr zu erreichen ist, wird nicht gezeigt.",
+        "minimum": 0,
+        "maximum": 60,
+        "default": 0
+      },
+      "lines": {
+        "type": "string",
+        "title": "Nur diese Linien",
+        "description": "Kommagetrennt, z.B. \"S3, 10\". Leer heisst: alle.",
+        "default": ""
+      },
+      "notify": {
+        "type": "boolean",
+        "title": "Als Mitteilung",
+        "description": "Gibt die naechsten Abfahrten an den Mitteilungsblock weiter.",
+        "default": false
+      },
+      "notifyCount": {
+        "type": "integer",
+        "title": "Mitteilung: Hoechstens so viele",
+        "minimum": 1,
+        "maximum": 5,
+        "default": 1
+      },
+      "refreshSeconds": {
+        "type": "integer",
+        "title": "Aktualisierung (Sekunden)",
+        "description": "Die Auskunft erlaubt rund eine Abfrage pro Minute und Tag; darunter zu gehen bringt nichts.",
+        "minimum": 30,
+        "maximum": 600,
+        "default": 60
+      }
+    },
+    "required": ["stop"]
+  }
+}

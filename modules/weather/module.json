@@ -2,7 +2,7 @@
   "id": "weather",
   "name": "Wetter",
   "version": "0.5.0",
-  "description": "Aktuelles Wetter und Vorhersage von Open-Meteo, im großen Block Tag für Tag durchgeschaltet, im breiten mit Tagesverlauf. Ohne API-Schlüssel nutzbar.",
+  "description": "Aktuelles Wetter und Vorhersage von Open-Meteo, im großen Block Tag für Tag durchgeschaltet, im breiten mit Tagesverlauf. Dazu die Warnungen des nationalen Wetterdienstes über MeteoAlarm. Ohne API-Schlüssel nutzbar.",
   "author": "smartmirror",
   "sizes": [
     "s",
@@ -13,12 +13,14 @@
   "preferredSize": "l",
   "permissions": [
     "network",
-    "commands"
+    "commands",
+    "notify"
   ],
   "network": {
     "allow": [
       "api.open-meteo.com",
-      "geocoding-api.open-meteo.com"
+      "geocoding-api.open-meteo.com",
+      "feeds.meteoalarm.org"
     ]
   },
   "refreshInterval": "15m",
@@ -84,6 +86,24 @@
         "title": "Als Highlight zeigen",
         "description": "Der Block trägt die eine deckende Fläche der Anordnung. Höchstens ein Block pro Screen – zwei summieren sich hinter dem Glas zum Leuchtfeld.",
         "default": false
+      },
+      "warnings": {
+        "type": "boolean",
+        "title": "Wetterwarnungen",
+        "description": "Warnungen des nationalen Wetterdienstes über MeteoAlarm. Das Land ergibt sich aus dem Ort.",
+        "default": true
+      },
+      "warningRegion": {
+        "type": "string",
+        "title": "Nur Warnregion",
+        "description": "Zeigt nur Warnungen, deren Region diesen Text enthält, z.B. \"Bern\". Leer heißt: alle Warnungen des Landes.",
+        "default": ""
+      },
+      "warningsNotify": {
+        "type": "boolean",
+        "title": "Warnungen als Mitteilung",
+        "description": "Gibt Warnungen zusätzlich an den Mitteilungsblock weiter. Im Wetterblock stehen sie ohnehin.",
+        "default": true
       }
     },
     "required": [

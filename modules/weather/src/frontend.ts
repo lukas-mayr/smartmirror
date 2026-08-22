@@ -3,6 +3,7 @@ import { keyed } from 'lit/directives/keyed.js';
 import { defineFrontend, MOTION, type ModuleView } from '@mirror/sdk';
 import { icon } from '@mirror/icons';
 import { weatherGlyph } from './icons.js';
+import { URGENT_LEVEL } from './warnings.js';
 import {
   accentForTemperature,
   barHeight,
@@ -193,9 +194,33 @@ export default defineFrontend<WeatherState, WeatherConfig>({
        */
       const solid =
         config.highlight && !stale && !error && current !== null && current !== undefined;
+      /**
+       * Die Warnzeile ueber dem Wetter.
+       *
+       * Nur die ernsteste und nur ein Wort: der Block ist fuer die Temperatur
+       * da, die Warnung ist der Hinweis, dass daneben noch etwas gilt. Wer
+       * mehr wissen will, liest sie im Mitteilungsblock, wo sie ganz oben
+       * steht.
+       *
+       * Im kleinsten Block steht sie nicht: dort waere sie die zweite Zeile
+       * auf 148 px und damit unter 32 px hoch — lesbar ist das nicht mehr.
+       */
+      const warningRow = (): TemplateResult | typeof nothing => {
+        const warning = state.warnings?.[0];
+        if (!warning || form === 'badge') return nothing;
+        return html`<div
+          class="weather__warning ${warning.level >= URGENT_LEVEL ? 'weather__warning--severe' : ''}"
+        >
+          <span class="weather__warning-icon">${icon('triangle-alert', { size: '1em' })}</span>
+          <span class="weather__warning-text">${warning.event}</span>
+        </div>`;
+      };
+
       const shell = (body: TemplateResult, extra = ''): void => {
         render(
-          html`<div class="weather ${extra} ${solid ? 'box box--solid' : ''}">${body}</div>`,
+          html`<div class="weather ${extra} ${solid ? 'box box--solid' : ''}">
+            ${warningRow()}${body}
+          </div>`,
           host,
         );
       };

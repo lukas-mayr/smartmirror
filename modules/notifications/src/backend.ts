@@ -1,17 +1,20 @@
-import { defineBackend } from '@mirror/sdk';
-import { parseEntries, type Notification, type NotificationsConfig, type NotificationsState } from './shared.js';
+import { defineBackend, sortNotifications, type FeedNotification } from '@mirror/sdk';
+import { parseEntries, type NotificationsConfig, type NotificationsState } from './shared.js';
 
 /**
- * Wieviele Mitteilungen der Feed hoechstens haelt.
+ * Wieviele zugeschickte Mitteilungen der Feed hoechstens haelt.
  *
- * Nicht, weil mehr nicht in den Speicher passten, sondern weil ein Feed, durch
- * den man zwei Minuten blaettern muesste, keiner mehr ist. Wer zwanzig
- * Mitteilungen hat, hat kein Anzeigeproblem.
+ * Gilt nur fuer den Kommandoweg. Was die Module melden, begrenzt jedes Modul
+ * selbst — ein Kalender, der die naechsten sieben Tage meldet, weiss besser
+ * als diese Zahl, wieviele Termine das sind.
+ *
+ * Der aelteste faellt heraus und nicht der neueste: was zuletzt hereinkam, ist
+ * der Grund, warum ueberhaupt jemand hinsieht.
  */
-const MAX_ITEMS = 12;
+const MAX_PUSHED = 40;
 
 /**
- * Wie oft abgelaufene Mitteilungen aufgeraeumt werden.
+ * Wie oft abgelaufene zugeschickte Mitteilungen aufgeraeumt werden.
  *
  * Die Anzeige filtert ohnehin bei jedem Zeichnen, das hier ist nur die
  * Buchhaltung: sonst waechst die Liste im Zustand still weiter, und was einmal
@@ -28,10 +31,18 @@ interface PushPayload {
   /** Sekunden ab jetzt, oder ein ISO-Zeitstempel. */
   ttlSeconds?: unknown;
   expiresAt?: unknown;
+  at?: unknown;
 }
 
 function text(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value.trim() : fallback;
+}
+
+function isoOrNull(value: unknown): string | null {
+  const raw = text(value);
+  if (raw.length === 0) return null;
+  const parsed = Date.parse(raw);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : null;
 }
 
 /**
@@ -44,33 +55,49 @@ function text(value: unknown, fallback = ''): string {
 function expiryFrom(payload: PushPayload, now: Date): string | null {
   const ttl = Number(payload.ttlSeconds);
   if (Number.isFinite(ttl) && ttl > 0) return new Date(now.getTime() + ttl * 1000).toISOString();
-  const stamp = text(payload.expiresAt);
-  if (stamp.length > 0 && Number.isFinite(Date.parse(stamp))) return new Date(stamp).toISOString();
-  return null;
+  return isoOrNull(payload.expiresAt);
 }
 
 export default defineBackend<NotificationsConfig, NotificationsState>({
   async setup(ctx) {
     /**
-     * Feste Eintraege und zugeschickte liegen getrennt.
+     * Drei Herkuenfte, getrennt gehalten.
      *
-     * Sonst loeschte die naechste Konfigurationsaenderung alles, was inzwischen
-     * hereingekommen ist — und ein Feed, der beim Aendern einer Einstellung
-     * seine Mitteilungen vergisst, ist keiner.
+     * Feste Zeilen kommen aus der Konfiguration, `pushed` per Kommando, und
+     * `reported` ist das, was die anderen Module gemeldet haben. Getrennt,
+     * weil jede Herkunft ihren eigenen Lebenslauf hat: eine
+     * Konfigurationsaenderung darf das Zugeschickte nicht loeschen, und eine
+     * neue Meldung des Kalenders darf den Zettel an die Familie nicht
+     * mitnehmen.
      */
-    let pushed: Notification[] = [];
+    let pushed: FeedNotification[] = [];
+    let reported: readonly FeedNotification[] = [];
 
     const publish = (): void => {
-      ctx.setState({ items: [...parseEntries(ctx.config.entries), ...pushed] });
+      ctx.setState({
+        items: sortNotifications([...parseEntries(ctx.config.entries), ...pushed, ...reported]),
+      });
     };
 
-    /**
-     * Eine Mitteilung von aussen.
+    /*
+     * Der eigentliche Weg hinein.
      *
-     * Der Weg dorthin ist bewusst ein Kommando und keine eigene Datenquelle:
-     * was eine Mitteilung ist, weiss der Spiegel nicht — das weiss der
-     * Kalender, die Paketverfolgung oder das Skript, das den Muellkalender
-     * liest. Dieses Modul ist die Anzeige dafuer, nicht die Quelle.
+     * Dieses Modul ist die Flaeche, nicht die Quelle: was eine Mitteilung ist,
+     * weiss der Kalender, das Wetter oder die Abfahrtstafel. Sie melden es dem
+     * Host, der Host legt es zusammen, und hier kommt der fertige Stand an.
+     */
+    ctx.onNotifications((items) => {
+      reported = items;
+      publish();
+    });
+
+    /*
+     * Der Kommandoweg bleibt daneben bestehen.
+     *
+     * Er ist fuer alles, wofuer es kein Modul gibt und geben soll: ein Skript
+     * am Pi, eine Hausautomation, ein Kurzbefehl vom Telefon. Ein eigenes
+     * Modul zu schreiben, nur um einmal am Tag eine Zeile zu schicken, waere
+     * die falsche Antwort.
      */
     ctx.onCommand('push', (payload) => {
       const input = (typeof payload === 'object' && payload !== null ? payload : {}) as PushPayload;
@@ -82,20 +109,22 @@ export default defineBackend<NotificationsConfig, NotificationsState>({
 
       const now = new Date();
       const id = text(input.id) || `push-${now.getTime()}-${pushed.length}`;
-      const entry: Notification = {
+      const entry: FeedNotification = {
         id,
         label: text(input.label),
         title,
         meta: text(input.meta),
         urgent: input.urgent === true,
+        at: isoOrNull(input.at),
         expiresAt: expiryFrom(input, now),
+        source: 'notifications',
       };
 
       // Dieselbe Id ersetzt statt zu stapeln: "Bus 142 in 7 min" und "in 5 min"
       // sind dieselbe Mitteilung, nur spaeter.
       const existing = pushed.findIndex((item) => item.id === id);
       if (existing >= 0) pushed[existing] = entry;
-      else pushed = [...pushed, entry].slice(-MAX_ITEMS);
+      else pushed = [...pushed, entry].slice(-MAX_PUSHED);
 
       publish();
     });
@@ -133,13 +162,14 @@ export default defineBackend<NotificationsConfig, NotificationsState>({
    *
    * Ohne diese Methode wuerde der Modul-Host genau das tun – und mit dem
    * Neustart waeren alle zugeschickten Mitteilungen weg, nur weil jemand am
-   * Handy eine Zeile im Textfeld geaendert hat.
+   * Handy eine Zeile im Textfeld geaendert hat. Was gemeldet wurde, kaeme
+   * zwar zurueck, aber erst wenn die Quelle das naechste Mal meldet.
    */
   onConfigChange(ctx) {
     const current = ctx.getState().items ?? [];
     // Was aus der Konfiguration kam, traegt eine "entry-"-Id und wird neu
-    // gebaut; alles andere ist zugeschickt und bleibt.
-    const pushed = current.filter((item) => !item.id.startsWith('entry-'));
-    ctx.setState({ items: [...parseEntries(ctx.config.entries), ...pushed] });
+    // gebaut; alles andere ist zugeschickt oder gemeldet und bleibt.
+    const rest = current.filter((item) => !item.id.startsWith('entry-'));
+    ctx.setState({ items: sortNotifications([...parseEntries(ctx.config.entries), ...rest]) });
   },
 });

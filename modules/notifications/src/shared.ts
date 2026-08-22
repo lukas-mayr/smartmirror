@@ -1,18 +1,37 @@
-import { FEED } from '@mirror/sdk';
+import { FEED, type FeedNotification } from '@mirror/sdk';
 
 /**
  * Der Mitteilungsfeed.
  *
- * Er zeigt genau drei Eintraege: der oberste traegt die Flaeche und die volle
- * Groesse, die beiden darunter stehen frei und gedimmt als Ausblick. Damit
- * liest man aus 3 m nur die oberste Zeile und weiss trotzdem, dass mehr
- * wartet — der Rest ist kein Text, den man lesen soll, sondern die Auskunft
- * "da kommt noch was".
+ * Er zeigt eine Mitteilung gross und mit Flaeche und darunter so viele als
+ * Ausblick, wie in den Block passen. Damit liest man aus 3 m nur die oberste
+ * Zeile und weiss trotzdem, dass mehr wartet — der Rest ist kein Text, den man
+ * lesen soll, sondern die Auskunft "da kommt noch was".
+ *
+ * Dieses Modul ist eine Flaeche und keine Quelle. Es holt nichts: was eine
+ * Mitteilung ist, weiss der Kalender, das Wetter oder die Abfahrtstafel, und
+ * jedes dieser Module hat den Zustand ohnehin schon. Sie melden ihn mit
+ * `ctx.notify(...)`, der Host legt die Meldungen zusammen, und hier kommt der
+ * fertige Stand an. Dazu die festen Zeilen aus der Konfiguration und was per
+ * Kommando hereingereicht wird — mehr Wege gibt es nicht hinein.
+ *
+ * Wieviele Positionen es sind, entscheidet die Blockhoehe und nicht eine feste
+ * Zahl: durchgeschaltet wird ohnehin, und ob dabei drei oder sieben Eintraege
+ * gleichzeitig stehen, ist keine Frage der Gestaltung, sondern des Platzes.
  *
  * Ein leerer Feed heisst leere Hauptzone. Kein "Keine Mitteilungen": eine
  * leere Flaeche auf einem Spiegel ist ein Spiegel, ein Satz darueber ist eine
  * Meldung, dass nichts zu melden ist.
  */
+
+/**
+ * Der Eintragstyp kommt aus dem SDK.
+ *
+ * Er ist die gemeinsame Sprache zwischen Quelle und Anzeige und gehoert
+ * deshalb keiner der beiden Seiten. Hier liegt nur, was die Anzeige damit
+ * macht — und das Lesen der festen Zeilen aus der Konfiguration.
+ */
+export type { FeedNotification };
 
 export interface NotificationsConfig {
   /**
@@ -29,42 +48,30 @@ export interface NotificationsConfig {
   advanceSeconds: number;
   /** Ueberschrift ueber der Liste zeigen. */
   showHeading: boolean;
-}
-
-export interface Notification {
-  /** Stabil ueber die Lebensdauer – die Anzeige haengt die Einblendung daran. */
-  id: string;
-  /** Woher die Mitteilung kommt: "Termin · in 18 min", "Paket", "Bus 142". */
-  label: string;
-  /** Die Aussage in wenigen Woertern: "Standup", "Regen ab 16 Uhr". */
-  title: string;
-  /** Zweitzeile mit Zeit, Ort oder Wahrscheinlichkeit. */
-  meta: string;
   /**
-   * Dringendes rueckt sofort auf Position 1 und bekommt Sand statt Salbei.
+   * Wieviele Positionen der Feed besetzt. 0 heisst: so viele wie passen.
    *
-   * Bewusst ein Schalter und keine Prioritaetszahl: eine Skala von 1 bis 5
-   * beantwortet die Frage nicht, die auf einem Spiegel zaehlt — steht es ganz
-   * oben oder nicht. Und wer drei Stufen hat, vergibt irgendwann nur noch die
-   * hoechste.
+   * Die Voreinstellung ist die Null, weil der Platz die bessere Antwort gibt
+   * als eine Zahl, die jemand einmal eingestellt und beim naechsten Umbau der
+   * Anordnung vergessen hat. Die Einstellung gibt es trotzdem, weil "nur die
+   * naechste Sache, sonst nichts" ein legitimer Wunsch ist und kein Platzmangel.
    */
-  urgent: boolean;
-  /** ISO-Zeitstempel, ab dem die Mitteilung nicht mehr gezeigt wird. */
-  expiresAt: string | null;
+  visibleCount: number;
 }
 
 export interface NotificationsState {
-  items: Notification[];
+  items: FeedNotification[];
 }
 
 /**
- * Wieviele Mitteilungen gleichzeitig sichtbar sind.
+ * Grenzen der sichtbaren Positionen, aus dem Design-System.
  *
- * Aus dem Design-System und nicht als zweite Drei hier: die Zahl steht auch im
- * Stylesheet, das den drei Positionen ihre Groessen gibt, und zwei Dreien an
- * zwei Orten sind eine Dreiviertel-Aenderung, wenn jemand vier haben will.
+ * Ausdruecklich als `number` und nicht als das Literal, das aus dem `as const`
+ * des Design-Systems faellt: wer damit eine Zaehlvariable anlegt, bekaeme sonst
+ * eine Variable vom Typ `1`, die nie etwas anderes werden darf.
  */
-export const VISIBLE = FEED.visible;
+export const VISIBLE_MIN: number = FEED.visibleMin;
+export const VISIBLE_MAX: number = FEED.visibleMax;
 
 /** Voreingestellte Taktung in Sekunden, aus dem Design-System. */
 export const ADVANCE_SECONDS = FEED.advance / 1000;
@@ -78,7 +85,7 @@ export const ADVANCE_SECONDS = FEED.advance / 1000;
  *
  * Ein "!" am Zeilenanfang macht die Mitteilung dringend.
  */
-export function parseEntry(line: string, index: number): Notification | null {
+export function parseEntry(line: string, index: number): FeedNotification | null {
   const trimmed = line.trim();
   if (trimmed.length === 0) return null;
 
@@ -87,49 +94,89 @@ export function parseEntry(line: string, index: number): Notification | null {
 
   // Ein Teil heisst Titel, zwei heissen Label und Titel, drei heissen alles.
   const [first = '', second = '', third = ''] = parts;
-  const notification: Notification = {
+  const notification: FeedNotification = {
     id: `entry-${index}`,
     label: parts.length >= 2 ? first : '',
     title: parts.length >= 2 ? second : first,
     meta: parts.length >= 3 ? third : '',
     urgent,
+    at: null,
     expiresAt: null,
+    // Feste Zeilen sind die Ausnahme von der Regel "der Inhalt kommt aus den
+    // Modulen": ein Zettel an die Familie hat keine Datenquelle.
+    source: 'notifications',
   };
   return notification.title.length > 0 ? notification : null;
 }
 
-export function parseEntries(entries: string): Notification[] {
+export function parseEntries(entries: string): FeedNotification[] {
   return entries
     .split('\n')
     .map((line, index) => parseEntry(line, index))
-    .filter((entry): entry is Notification => entry !== null);
+    .filter((entry): entry is FeedNotification => entry !== null);
 }
 
 /**
- * Was gerade noch gilt, in der Reihenfolge, in der es gezeigt wird.
+ * Wieviele Positionen in eine Liste dieser Hoehe passen.
  *
- * Dringendes zuerst, sonst die Reihenfolge, in der es hereinkam. Abgelaufenes
- * faellt heraus: eine Mitteilung "Bus in 7 min" von vor einer Stunde ist keine
- * veraltete Information, sondern eine falsche.
+ * `listHeight` ist der Platz, der der Liste tatsaechlich bleibt (also ohne
+ * Ueberschrift), `blockHeight` die Hoehe des ganzen Blocks — an der haengen
+ * die `cqh`-Deckel der Positionen im Stylesheet, und deshalb muessen beide
+ * Masse herein. Gerechnet wird mit denselben Formeln wie dort: passte hier
+ * eine Position mehr als dort, waere die unterste angeschnitten.
+ *
+ * Angeschnitten wird nichts: was nicht ganz hineinpasst, wird nicht gezeigt.
+ * Eine halbe Zeile am unteren Rand liest sich als Fehler, nicht als Ausblick.
  */
-export function activeNotifications(
-  items: readonly Notification[],
-  now: Date = new Date(),
-): Notification[] {
-  const stamp = now.getTime();
-  const alive = items.filter((item) => {
-    if (!item.expiresAt) return true;
-    const expires = Date.parse(item.expiresAt);
-    return !Number.isFinite(expires) || expires > stamp;
-  });
+export function fitCount(listHeight: number, blockHeight: number): number {
+  if (!Number.isFinite(listHeight) || !Number.isFinite(blockHeight)) return VISIBLE_MIN;
 
-  // Ein stabiler Sortierlauf: gleich dringende behalten ihre Reihenfolge, und
-  // die Liste springt nicht bei jedem Zeichnen um.
-  return [...alive].sort((a, b) => Number(b.urgent) - Number(a.urgent));
+  const lead = Math.min(FEED.itemHeight, blockHeight * FEED.itemShare);
+  const rest = Math.min(FEED.itemHeightRest, blockHeight * FEED.itemShareRest);
+  if (rest <= 0) return VISIBLE_MIN;
+
+  // Jede weitere Position kostet ihre Hoehe plus den Abstand davor.
+  const room = listHeight - lead;
+  const extra = room <= 0 ? 0 : Math.floor(room / (rest + FEED.gap));
+  return Math.max(VISIBLE_MIN, Math.min(VISIBLE_MAX, 1 + extra));
 }
 
 /**
- * Die drei Positionen, so wie sie gerade besetzt sind.
+ * Wieviele Positionen der Feed besetzen soll.
+ *
+ * Die Einstellung gewinnt, wenn sie gesetzt ist, aber nur bis zu dem, was
+ * hineinpasst: wer acht Positionen einstellt und den Block danach auf die
+ * halbe Hoehe zieht, soll eine kuerzere Liste sehen und keine abgeschnittene.
+ */
+export function slotCount(configured: number, fits: number): number {
+  const wanted = Math.round(Number(configured));
+  if (!Number.isFinite(wanted) || wanted <= 0) return fits;
+  return Math.max(VISIBLE_MIN, Math.min(fits, wanted));
+}
+
+/**
+ * Deckkraft einer Ausblick-Position.
+ *
+ * `step` zaehlt ab 1 unterhalb der obersten, `total` ist die Zahl der
+ * Ausblick-Positionen. Die erste bekommt dim1, die letzte dim2, dazwischen
+ * wird linear verteilt — bei nur einer bleibt es bei dim1, weil sie sonst als
+ * "letzte" sofort auf den blassesten Wert fiele.
+ *
+ * Das rechnet die Anzeige und nicht das Stylesheet: eine Regel je Position
+ * ginge nur mit einer festen Zahl von Positionen, und genau die gibt es hier
+ * nicht mehr.
+ */
+export function restOpacity(step: number, total: number): number {
+  if (total <= 1) return FEED.dim1;
+  const share = Math.min(1, Math.max(0, (step - 1) / (total - 1)));
+  const value = FEED.dim1 + (FEED.dim2 - FEED.dim1) * share;
+  // Zwei Nachkommastellen: sonst aendert sich die Zahl bei jedem Zeichnen in
+  // der siebten Stelle und das Stylesheet wird ohne Grund neu gesetzt.
+  return Math.round(value * 100) / 100;
+}
+
+/**
+ * Die Positionen, so wie sie gerade besetzt sind.
  *
  * Der Rang steckt in der Position und nicht im Eintrag: ein Eintrag weiss
  * nicht, der wievielte er ist — er wird an eine Position gehaengt, und die
@@ -137,16 +184,18 @@ export function activeNotifications(
  * sich damit nur, welcher Eintrag an welcher Position haengt, und die Form der
  * Liste bleibt exakt dieselbe.
  *
- * Sind es weniger als drei, bleibt die Liste kuerzer, statt sich zu
- * wiederholen: derselbe Termin dreimal untereinander sieht nach einem Fehler
- * aus. Erst ab vier lohnt das Nachruecken ueberhaupt.
+ * Gibt es weniger Eintraege als Plaetze, bleibt die Liste kuerzer, statt sich
+ * zu wiederholen: derselbe Termin zweimal untereinander sieht nach einem
+ * Fehler aus. Erst ab einem Eintrag mehr als Plaetzen lohnt das Nachruecken
+ * ueberhaupt.
  */
 export function visibleWindow(
-  items: readonly Notification[],
+  items: readonly FeedNotification[],
   offset: number,
-): Notification[] {
-  if (items.length === 0) return [];
-  const count = Math.min(VISIBLE, items.length);
-  const start = items.length > VISIBLE ? ((offset % items.length) + items.length) % items.length : 0;
-  return Array.from({ length: count }, (_, step) => items[(start + step) % items.length] as Notification);
+  slots: number,
+): FeedNotification[] {
+  if (items.length === 0 || slots <= 0) return [];
+  const count = Math.min(slots, items.length);
+  const start = items.length > slots ? ((offset % items.length) + items.length) % items.length : 0;
+  return Array.from({ length: count }, (_, step) => items[(start + step) % items.length] as FeedNotification);
 }

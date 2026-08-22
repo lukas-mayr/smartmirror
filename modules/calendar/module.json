@@ -1,0 +1,71 @@
+{
+  "id": "calendar",
+  "name": "Kalender",
+  "version": "0.1.0",
+  "description": "Was ansteht, aus einem oder mehreren ICS-Kalendern: iCloud, Google, Muellkalender der Gemeinde. Zeitraum einstellbar von nur heute bis zwei Wochen, auf Wunsch zusaetzlich im Mitteilungsblock.",
+  "author": "smartmirror",
+  "sizes": ["m", "l", "xl"],
+  "preferredSize": "l",
+  "permissions": ["network", "commands", "notify"],
+  "network": {
+    "allow": [],
+    "allowFromConfig": ["calendars"]
+  },
+  "refreshInterval": "30m",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "calendars": {
+        "type": "string",
+        "title": "Kalender",
+        "description": "Eine Adresse je Zeile, wahlweise als \"Name | Adresse\". iCloud liefert sie unter \"Oeffentlicher Kalender\"; ein webcal://-Link darf so bleiben.",
+        "default": "",
+        "format": "textarea"
+      },
+      "days": {
+        "type": "integer",
+        "title": "Zeitraum (Tage)",
+        "description": "1 heisst nur heute, 2 heute und morgen, 7 die Woche.",
+        "minimum": 1,
+        "maximum": 14,
+        "default": 3
+      },
+      "maxEvents": {
+        "type": "integer",
+        "title": "Hoechstens so viele Termine",
+        "description": "Mehr als in den Block passen, werden ohnehin nicht gezeigt.",
+        "minimum": 1,
+        "maximum": 20,
+        "default": 8
+      },
+      "notify": {
+        "type": "boolean",
+        "title": "Als Mitteilung",
+        "description": "Gibt die naechsten Termine an den Mitteilungsblock weiter.",
+        "default": true
+      },
+      "notifyDays": {
+        "type": "integer",
+        "title": "Mitteilung: Zeitraum (Tage)",
+        "description": "Meist enger als der Block: dort die Woche, in der Mitteilung nur, was heute noch kommt.",
+        "minimum": 1,
+        "maximum": 14,
+        "default": 1
+      },
+      "notifyCount": {
+        "type": "integer",
+        "title": "Mitteilung: Hoechstens so viele",
+        "minimum": 1,
+        "maximum": 10,
+        "default": 3
+      },
+      "refreshMinutes": {
+        "type": "integer",
+        "title": "Aktualisierung (Minuten)",
+        "minimum": 5,
+        "maximum": 180,
+        "default": 30
+      }
+    }
+  }
+}

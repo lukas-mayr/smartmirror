@@ -20,6 +20,9 @@ import {
   type ModuleInstance,
   type ModuleManifest,
   type ModuleStateEnvelope,
+  type FeedNotification,
+  normalizeNotification,
+  sortNotifications,
 } from '@mirror/sdk';
 import { createLogger } from './logger.js';
 import { modulesDir } from './paths.js';
@@ -44,6 +47,10 @@ interface RunningInstance {
   abort: AbortController;
   timers: Set<NodeJS.Timeout>;
   commands: Map<string, (payload: unknown) => void | Promise<void>>;
+  /** Was diese Instanz zuletzt in den Feed gemeldet hat. */
+  notifications: FeedNotification[];
+  /** Wer den gesammelten Feed hoert. Hoechstens einer je Instanz. */
+  onNotifications: ((items: readonly FeedNotification[]) => void) | null;
   state: Record<string, unknown>;
   error: string | null;
   action: ModuleAction | null;
@@ -257,6 +264,13 @@ export class ModuleHost extends EventEmitter {
     const running = this.#instances.get(instanceId);
     if (!running) return;
     this.#instances.delete(instanceId);
+    // Erst austragen, dann verteilen: was eine gestoppte Instanz gemeldet hat,
+    // steht sonst bis zum naechsten Zufall im Feed. Ein geloeschter
+    // Kalenderblock nimmt seine Termine mit.
+    const contributed = running.notifications.length > 0;
+    running.notifications = [];
+    running.onNotifications = null;
+    if (contributed) this.#publishNotifications();
     running.abort.abort();
     for (const timer of running.timers) clearTimeout(timer);
     running.timers.clear();
@@ -278,6 +292,8 @@ export class ModuleHost extends EventEmitter {
       abort,
       timers: new Set(),
       commands: new Map(),
+      notifications: [],
+      onNotifications: null,
       state: {},
       error: null,
       action: null,
@@ -366,7 +382,10 @@ export class ModuleHost extends EventEmitter {
         if (url.protocol !== 'https:' && url.hostname !== 'localhost' && url.hostname !== '127.0.0.1') {
           throw new Error(`Nur HTTPS erlaubt (angefragt: ${url.protocol}//${url.host})`);
         }
-        if (!hostAllowed(manifest, url.hostname)) {
+        // Die Konfiguration kommt mit: Module, deren Quelle niemand vorher
+        // kennen kann, duerfen die Adressen nutzen, die der Nutzer selbst
+        // eingetragen hat — und nur die.
+        if (!hostAllowed(manifest, url.hostname, config)) {
           throw new Error(
             `Host "${url.hostname}" steht nicht in network.allow von "${manifest.id}"`,
           );
@@ -400,9 +419,68 @@ export class ModuleHost extends EventEmitter {
         running.commands.set(name, handler);
         return () => running.commands.delete(name);
       },
+
+      notify: (items) => {
+        if (!permissions.has('notify')) {
+          throw new Error(`Modul "${manifest.id}" hat keine Permission "notify"`);
+        }
+        const now = new Date();
+        const next = items
+          .map((item, index) => normalizeNotification(item, manifest.id, instance.id, index, now))
+          .filter((item): item is FeedNotification => item !== null);
+        // Nichts tun, wenn sich nichts geaendert hat: eine Abfahrtstafel meldet
+        // jede Minute, und meistens steht dasselbe darin. Ohne den Vergleich
+        // zeichnete die Anzeige jedes Mal neu und die oberste Zeile blendete
+        // ohne Anlass wieder ein.
+        if (JSON.stringify(next) === JSON.stringify(running.notifications)) return;
+        running.notifications = next;
+        this.#publishNotifications();
+      },
+
+      onNotifications: (handler) => {
+        if (!permissions.has('notifications')) {
+          throw new Error(`Modul "${manifest.id}" hat keine Permission "notifications"`);
+        }
+        running.onNotifications = handler;
+        // Sofort mit dem aktuellen Stand: die meldenden Instanzen sind
+        // moeglicherweise laengst gestartet, und der Feed soll nicht bis zur
+        // naechsten Aenderung leer bleiben.
+        handler(this.#collectNotifications());
+        return () => {
+          running.onNotifications = null;
+        };
+      },
     };
 
     return ctx;
+  }
+
+  /**
+   * Der Stand aller meldenden Instanzen, in Anzeigereihenfolge.
+   *
+   * Gefiltert wird hier nicht: was abgelaufen ist, faellt in der Anzeige
+   * heraus, und die zeichnet ohnehin im Sekundentakt. Der Host muesste dafuer
+   * einen eigenen Zeitgeber laufen lassen, der nichts weiter taete, als eine
+   * Liste zu kuerzen, die niemand ansieht.
+   */
+  #collectNotifications(): readonly FeedNotification[] {
+    const all: FeedNotification[] = [];
+    for (const running of this.#instances.values()) all.push(...running.notifications);
+    return sortNotifications(all);
+  }
+
+  #publishNotifications(): void {
+    const items = this.#collectNotifications();
+    for (const running of this.#instances.values()) {
+      if (!running.onNotifications) continue;
+      try {
+        running.onNotifications(items);
+      } catch (error) {
+        // Ein Feed-Modul, das beim Zustellen wirft, darf die Quelle nicht
+        // mitreissen: die hat ihre Arbeit getan.
+        log.warn(`Zustellen der Mitteilungen an "${running.instance.id}" hat geworfen`, error);
+      }
+    }
   }
 
   #emitState(instanceId: string, patch: Record<string, unknown>, error: string | null, updatedAt?: string): void {

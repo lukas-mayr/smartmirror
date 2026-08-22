@@ -35,9 +35,11 @@ packages/
   icons/     Flache Strichsymbole, aus Lucide generiert
 modules/
   clock/         Uhrzeit und Datum (rein im Frontend)
-  weather/       Open-Meteo, mit Cache, Tagesverlauf und Offline-Zustand
+  weather/       Open-Meteo, mit Cache, Tagesverlauf und Warnungen von MeteoAlarm
   spotify/       Was gerade läuft, mit eigener Spotify-App
-  notifications/ Feed aus drei Mitteilungen, gefüttert per Kommando
+  calendar/      ICS-Kalender (iCloud, Gemeinde, Schule), Zeitraum einstellbar
+  sbb/           Abfahrten einer Haltestelle, von der Fahrplanauskunft search.ch
+  notifications/ Die Fläche für Mitteilungen; den Inhalt melden die Module
 deploy/      systemd-Units, Compositor-Start, Installer, Drehung
 scripts/     Build-, Bundle- und Generator-Skripte
 ```
@@ -241,7 +243,7 @@ sondern eine Aussage über den Inhalt: eine Uhrzeit passt in ein einzelnes Feld,
 eine Wochenvorhersage braucht eine Reihe. Ein Modul zählt im Manifest auf, was
 es kann — `"sizes": ["m", "l", "xl"]` —, und am Handy sind die übrigen Größen gar
 nicht erst antippbar. Ohne Angabe kann ein Modul alle vier; die Mitteilungen
-lassen S und M aus, weil drei Zeilen darin unter 32 px fielen.
+lassen S und M aus, weil schon ihre oberste Zeile darin unter 32 px fiele.
 
 Als Faustregel gilt: **höchstens zwei Boxen nebeneinander** und **höchstens
 sechs der zehn Zeilen belegt**. 994 px auf vier Boxen erzwingen Schrift unter
