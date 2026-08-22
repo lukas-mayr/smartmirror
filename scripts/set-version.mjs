@@ -13,6 +13,12 @@
  * Ersetzt wird im Text und nicht ueber JSON.parse/stringify, damit im Diff nur
  * die Versionszeilen stehen und nicht die halbe Datei neu formatiert ist.
  *
+ * Aufgerufen wird das Skript vom Ablauf "Release nach Merge", nicht von Hand:
+ * die naechste Nummer kommt aus dem letzten v*-Tag, und wer sie im Zweig schon
+ * selbst setzt, nimmt dem Ablauf die Aenderung weg, die er als Versions-Commit
+ * ablegen will. Von Hand gebraucht wird es nur, um eine Nummer zu reparieren,
+ * die aus einem abgebrochenen Lauf schief steht.
+ *
  * Aufruf: node scripts/set-version.mjs 0.7.0
  */
 import { glob, readFile, writeFile } from 'node:fs/promises';
