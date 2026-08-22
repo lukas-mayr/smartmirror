@@ -9,7 +9,7 @@
  * eine abgeschlossene Einheit ohne eigenes node_modules – das ist die
  * Voraussetzung dafuer, Module spaeter einzeln nachinstallieren zu koennen.
  */
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { basename, resolve } from 'node:path';
 import { build } from 'esbuild';
@@ -30,15 +30,19 @@ const targets = [
     platform: 'browser',
     target: 'es2022',
   },
-  // Optional: was sich Backend und Frontend teilen. Nur damit reine
-  // Hilfsfunktionen eines Moduls geprueft werden koennen – in den beiden
-  // Bundles oben stecken sie mit drin und waeren von aussen nicht erreichbar.
-  {
-    entry: resolve(moduleDir, 'src/shared.ts'),
-    outfile: resolve(moduleDir, 'dist/shared.js'),
-    platform: 'neutral',
-    target: 'es2022',
-  },
+  // Dazu jede weitere Datei aus src/ einzeln. Sie steckt in den beiden
+  // Bundles oben ohnehin mit drin und waere von aussen nicht erreichbar – als
+  // eigene Datei laesst sie sich pruefen. Das ist der einzige Grund dafuer:
+  // ein Modul, dessen reine Rechnungen niemand testen kann, faellt erst auf
+  // dem fertigen Spiegel auf.
+  ...readdirSync(resolve(moduleDir, 'src'))
+    .filter((file) => file.endsWith('.ts') && !['backend.ts', 'frontend.ts'].includes(file))
+    .map((file) => ({
+      entry: resolve(moduleDir, 'src', file),
+      outfile: resolve(moduleDir, 'dist', file.replace(/\.ts$/, '.js')),
+      platform: 'neutral',
+      target: 'es2022',
+    })),
 ];
 
 let built = 0;

@@ -965,11 +965,17 @@ body {
  * Die Punktreihe kuendigt an, dass mehr kommt.
  *
  * Ohne sie waere ein Wechsel eine Ueberraschung: man liest im Vorbeigehen
- * "Heute 18°" und weiss nicht, dass gleich "Morgen 19°" dasteht. Der breite
+ * "Heute 18°" und weiss nicht, dass gleich "Morgen 19°" dasteht. Der lange
  * Punkt ist die aktuelle Karte.
+ *
+ * Sie steht senkrecht: waagerecht unter der Karte braeuchte sie eine eigene
+ * Zeile, und die schoebe die Karte aus der Linie mit dem Block daneben. An der
+ * Kante hoch kostet sie nur einen Streifen Breite, den ohnehin niemand fuer
+ * Text benutzt.
  */
 .dots {
   display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 10px;
 }
@@ -980,11 +986,11 @@ body {
   border-radius: var(--mirror-radius-pill);
   background: var(--mirror-accent);
   opacity: 0.3;
-  transition: width var(--motion-swap-duration) ease, opacity var(--motion-swap-duration) ease;
+  transition: height var(--motion-swap-duration) ease, opacity var(--motion-swap-duration) ease;
 }
 
 .dots i.is-active {
-  width: 34px;
+  height: 34px;
   opacity: 1;
 }
 
@@ -1405,7 +1411,7 @@ body {
 }
 
 /*
- * Die Punktreihe sitzt an der Unterkante des Blocks und nicht unter der Karte.
+ * Die Punktreihe steht an der rechten Blockkante und nicht unter der Karte.
  *
  * Sie gehoert dem Block und nicht dem Tag: sie sagt, dass hier weitergeschaltet
  * wird, und das gilt fuer jede Karte gleich. Aus dem Fluss genommen ist sie
@@ -1418,7 +1424,7 @@ body {
   /*
    * Absolut positioniert wird gegen die Polsterkante, nicht gegen den Inhalt.
    * Traegt der Block die deckende Flaeche, muss die Reihe deshalb um deren
-   * Innenabstand einruecken – sonst klebte sie in der abgerundeten Ecke.
+   * Innenabstand einruecken – sonst klebte sie an der abgerundeten Kante.
    * Nachts faellt die Flaeche weg und der Abstand mit ihr.
    */
   --deck-inset: 0px;
@@ -1434,8 +1440,15 @@ body {
 
 .weather--deck > .dots {
   position: absolute;
-  left: var(--deck-inset);
-  bottom: var(--deck-inset);
+  right: var(--deck-inset);
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* Der Streifen, in dem die Punktreihe steht, gehoert ihr allein — sonst liefe
+   der Kurztext darunter durch. */
+.weather--deck > .weather__deck {
+  padding-right: 26px;
 }
 
 /*
@@ -1631,14 +1644,13 @@ body {
 
 /*
  * Die Wettersymbole des Moduls sind von Hand gezeichnet (modules/weather/src/
- * icons.ts) und tragen Klassen an den Teilen, die sich bewegen duerfen. Was
+ * glyphs.ts) und tragen Klassen an den Teilen, die sich bewegen duerfen. Was
  * sich bewegt, entscheidet dort die Form; wie schnell, steht hier.
  *
- * Langsam ist der ganze Punkt. Eine Sonnenumdrehung dauert ueber eine Minute,
- * die Wolke driftet um weniger als einen Millimeter, und Tropfen fallen im
- * Takt eines Regens, den man nicht zaehlt. Ein Symbol, das im Augenwinkel
- * zappelt, macht genau das, was ein Spiegel nicht tun soll — es zieht den
- * Blick auf sich, obwohl sich nichts geaendert hat.
+ * Die Zahlen hier und die in REACH (glyphs.ts) gehoeren zusammen: dort steht,
+ * wieviel Platz eine Bewegung braucht, hier, wie weit sie geht. Wer eine davon
+ * aendert, muss die andere mitnehmen — ein Test rechnet nach, dass kein Symbol
+ * dabei an den Rand seines Feldes stoesst.
  *
  * Bewegt wird nie das ganze Symbol, sondern immer nur ein Teil davon: sonst
  * waere es ein wackelndes Bild und keine Wolke, die zieht.
@@ -1651,52 +1663,87 @@ body {
 
 .weather__glyph.is-alive .weather__rays {
   transform-origin: 12px 12px;
-  animation: weather-spin 72s linear infinite;
+  animation: weather-spin 22s linear infinite;
 }
 
+/*
+ * Die Wolke zieht, und alles an ihr zieht mit: Tropfen, Flocken und Blitze
+ * stehen mit ihr in einer Gruppe. Vorher driftete die Wolke und der Regen
+ * blieb stehen — was man nicht sofort benennt, aber sieht.
+ */
 .weather__glyph.is-alive .weather__sky {
-  animation: weather-drift 14s ease-in-out infinite;
+  animation: weather-drift 7s ease-in-out infinite;
+}
+
+/*
+ * Die hintere Wolke bei "bedeckt" zieht in eigenem Takt und rueckwaerts.
+ * Aus zwei Linien, die sich gleich bewegen, wird eine Zeichnung; aus zweien,
+ * die sich verschieden bewegen, ein Himmel mit Tiefe.
+ */
+.weather__glyph.is-alive .weather__behind {
+  animation: weather-drift 11s ease-in-out infinite reverse;
 }
 
 .weather__glyph.is-alive .weather__pulse {
   transform-origin: 12px 12px;
-  animation: weather-pulse 7s ease-in-out infinite;
+  animation: weather-pulse 4.5s ease-in-out infinite;
 }
 
 /*
  * Tropfen und Flocken fallen versetzt. Im Gleichschritt waeren sie ein
  * Vorhang, der auf und ab geht. Gezaehlt wird ueber `nth-child`, weil die
  * fallenden Teile je nach Symbol Pfade, Kreise oder Gruppen sind – ihre
- * Reihenfolge ist in allen dieselbe, ihr Elementname nicht.
+ * Reihenfolge in der Wolkengruppe ist in allen dieselbe, ihr Elementname nicht.
  */
 .weather__glyph.is-alive .weather__fall {
-  animation: weather-fall 2600ms linear infinite;
+  animation: weather-fall 1500ms linear infinite;
 }
 
 .weather__glyph.is-alive .weather__fall:nth-child(3) {
-  animation-delay: 850ms;
+  animation-delay: 500ms;
 }
 
 .weather__glyph.is-alive .weather__fall:nth-child(4) {
-  animation-delay: 1700ms;
+  animation-delay: 1000ms;
+}
+
+/* Eine Flocke faellt nicht nur, sie taumelt. */
+.weather__glyph.is-alive .weather__tumble {
+  animation: weather-tumble 4s linear infinite;
 }
 
 .weather__glyph.is-alive .weather__haze {
-  animation: weather-haze 9s ease-in-out infinite;
+  animation: weather-haze 5s ease-in-out infinite;
 }
 
 .weather__glyph.is-alive .weather__haze:nth-child(3) {
-  animation-delay: 1200ms;
+  animation-delay: 700ms;
 }
 
 .weather__glyph.is-alive .weather__haze:nth-child(4) {
-  animation-delay: 2400ms;
+  animation-delay: 1400ms;
 }
 
-/* Der Blitz schlaegt selten und kurz – ein Blinken im Sekundentakt waere ein
-   Defekt und kein Gewitter. */
+/*
+ * Ein Blitz ist nur da, wenn er schlaegt.
+ *
+ * Die drei haben verschiedene Dauern und starten mitten im Takt (negative
+ * Verzoegerung), damit sie nie zusammen einschlagen und sich das Muster erst
+ * nach Minuten wiederholt. Dicht genug, dass fast immer irgendwo einer zuckt —
+ * sonst laese man "bewoelkt" statt "Gewitter".
+ */
 .weather__glyph.is-alive .weather__bolt {
-  animation: weather-bolt 7s ease-in-out infinite;
+  animation: weather-bolt 2300ms steps(1, end) infinite;
+}
+
+.weather__glyph.is-alive .weather__bolt:nth-child(3) {
+  animation-duration: 2900ms;
+  animation-delay: -700ms;
+}
+
+.weather__glyph.is-alive .weather__bolt:nth-child(4) {
+  animation-duration: 3700ms;
+  animation-delay: -1900ms;
 }
 
 @keyframes weather-spin {
@@ -1708,10 +1755,10 @@ body {
 @keyframes weather-drift {
   0%,
   100% {
-    transform: translateX(-0.45px);
+    transform: translate(-1.1px, 0.25px);
   }
   50% {
-    transform: translateX(0.45px);
+    transform: translate(1.1px, -0.25px);
   }
 }
 
@@ -1721,56 +1768,94 @@ body {
     transform: scale(1);
   }
   50% {
-    transform: scale(1.04);
+    transform: scale(1.08);
   }
 }
 
 /*
  * Die Deckkraft steht nur in den Bildern und nicht am Element: steht die
- * Bewegung still (nachts, oder bei reduzierter Bewegung), soll der Tropfen
- * sichtbar bleiben und nicht verschwinden.
+ * Bewegung still (nachts, bei reduzierter Bewegung, in der Vorschaureihe),
+ * bleiben Tropfen und Blitze sichtbar – sonst waere das Gewittersymbol dort
+ * eine leere Wolke.
+ *
+ * Der Fallweg ist kurz gehalten. Ein Tropfen wird erst am Ende ganz
+ * durchsichtig, ist aber schon vorher halb da – und was halb sichtbar unten
+ * aus dem Feld laeuft, sieht man abgeschnitten trotzdem.
  */
 @keyframes weather-fall {
   0% {
     opacity: 0;
-    transform: translateY(-1.4px);
+    transform: translateY(-1.6px);
   }
-  20% {
+  14% {
     opacity: 1;
   }
-  76% {
+  70% {
     opacity: 1;
   }
   100% {
     opacity: 0;
-    transform: translateY(3.2px);
+    transform: translateY(2.4px);
+  }
+}
+
+@keyframes weather-tumble {
+  to {
+    transform: rotate(360deg);
   }
 }
 
 @keyframes weather-haze {
   0%,
   100% {
-    transform: translateX(-0.9px);
+    transform: translateX(-1.8px);
   }
   50% {
-    transform: translateX(0.9px);
+    transform: translateX(1.8px);
   }
 }
 
+/*
+ * Ein Einschlag ist kein einzelnes Aufblitzen, sondern ein kurzes Flackern:
+ * hell, aus, hell, halten, Nachzucker. Hart geschaltet (`steps`), weil ein
+ * weicher Verlauf aussieht, als ginge irgendwo eine Lampe an. Und der Strich
+ * wird dabei dicker – eine weisse Linie kann nicht heller werden als weiss.
+ */
 @keyframes weather-bolt {
-  0%,
-  84%,
-  100% {
-    opacity: 1;
+  0% {
+    opacity: 0;
+    stroke-width: 2.2;
   }
-  88% {
-    opacity: 0.25;
+  70% {
+    opacity: 0;
+  }
+  72% {
+    opacity: 1;
+    stroke-width: 2.8;
+  }
+  76% {
+    opacity: 0;
+    stroke-width: 2.2;
+  }
+  79% {
+    opacity: 1;
+    stroke-width: 2.4;
   }
   92% {
     opacity: 1;
   }
-  96% {
-    opacity: 0.45;
+  95% {
+    opacity: 0;
+  }
+  97% {
+    opacity: 1;
+    stroke-width: 2.2;
+  }
+  99% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
   }
 }
 

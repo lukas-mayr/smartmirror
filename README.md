@@ -451,25 +451,53 @@ Der Aufbau der Karte bleibt bei jedem Tag derselbe; nur der Inhalt wechselt,
 damit aus dem Weiterschalten eine ruhige Bewegung wird und kein Umbau. Sind die
 Werte veraltet, hört das Weiterschalten auf: eine Durchschaltung, die alte Tage
 durchblättert, sieht lebendiger aus, als die Daten sind. Eine Punktreihe an der
-Unterkante kündigt den Wechsel an — ohne sie liest man im Vorbeigehen
-„Heute 18°" und weiß nicht, dass gleich „Morgen 19°" dasteht. Im XL-Block bleibt
-der Tagesverlauf stehen, weil dort alles gleichzeitig lesbar groß ist.
+rechten Kante kündigt den Wechsel an — ohne sie liest man im Vorbeigehen
+„Heute 18°" und weiß nicht, dass gleich „Morgen 19°" dasteht. Sie steht
+senkrecht: waagerecht unter der Karte bräuchte sie eine eigene Zeile, und die
+schöbe die Karte aus der Linie mit dem Block daneben. Im XL-Block bleibt der
+Tagesverlauf stehen, weil dort alles gleichzeitig lesbar groß ist.
 
-**Die Wettersymbole zeichnet das Modul selbst** (`modules/weather/src/icons.ts`)
-statt sie aus der Bibliothek zu nehmen, und sie bewegen sich. In 155 px fällt
-auf, dass Bibliotheksformen für 24 px gedacht sind: „bedeckt" ist dort dieselbe
-einzelne Wolke wie „bewölkt", und der Blitz ein Haken, den man neben der Wolke
-kaum findet. Der eigene Satz gibt „bedeckt" eine zweite Wolke und dem Gewitter
-einen Blitz, der dicker ist als jede andere Linie im Satz.
+**Die Wettersymbole zeichnet das Modul selbst** statt sie aus der Bibliothek zu
+nehmen, und sie bewegen sich. In 155 px fällt auf, dass Bibliotheksformen für
+24 px gedacht sind: „bedeckt" ist dort dieselbe einzelne Wolke wie „bewölkt",
+und der Blitz ein Haken, den man neben der Wolke kaum findet. Der eigene Satz
+gibt „bedeckt" eine zweite Wolke — die in eigenem Takt zieht, damit aus zwei
+Linien ein Himmel mit Tiefe wird — und dem Gewitter drei kleine Blitze, die
+unabhängig voneinander einschlagen.
 
 Bewegt wird immer nur ein Teil und nie das ganze Symbol: Strahlen drehen, Wolken
-driften, Tropfen und Flocken fallen versetzt, der Blitz schlägt selten und kurz.
-Und alles sehr langsam — eine Sonnenumdrehung dauert über eine Minute, die Wolke
-driftet um weniger als einen Millimeter. Nachts steht alles still, und
-`prefers-reduced-motion` schaltet es ebenfalls ab: wer um drei Uhr aufsteht, will
-eine Uhrzeit lesen und nicht von einer tropfenden Wolke geweckt werden. In der
-Vorschaureihe stehen dieselben Symbole still — eine Reihe driftender Wolken in
-Fußnotengröße ist Flimmern und keine Auskunft.
+driften, Tropfen und Flocken fallen versetzt, Flocken taumeln dabei. Was zu
+einer Wolke gehört, liegt in *einer* Gruppe und zieht mit ihr — sonst wanderte
+die Wolke davon und der Regen bliebe in der Luft hängen.
+
+**Ein Blitz ist nur da, wenn er schlägt**, und ein Einschlag ist kein einzelnes
+Aufblitzen, sondern ein kurzes Flackern: hell, aus, hell, halten, Nachzucker.
+Die drei haben verschiedene Dauern (2,3 / 2,9 / 3,7 s) und starten mitten im
+Takt, also schlagen sie nie zusammen ein und das Muster wiederholt sich erst
+nach Minuten. Dicht genug, dass fast immer irgendwo einer zuckt — sonst läse man
+„bewölkt" statt „Gewitter".
+
+Nachts steht alles still, und `prefers-reduced-motion` schaltet es ebenfalls ab:
+wer um drei Uhr aufsteht, will eine Uhrzeit lesen und nicht von einer tropfenden
+Wolke geweckt werden. In der Vorschaureihe stehen dieselben Symbole still — eine
+Reihe driftender Wolken in Fußnotengröße ist Flimmern und keine Auskunft. Dass
+Tropfen und Blitze dort trotzdem sichtbar sind, liegt daran, dass ihre
+Deckkraft ausschließlich in den Animationsbildern steht und nicht am Element.
+
+**Zwei Dinge sind an diesem Satz ungewöhnlich, und beide stehen dort, weil sie
+beim ersten Anlauf schiefgingen.** Erstens werden die Wolken aus Kreisen
+*gerechnet* (`src/glyphs.ts`) und nicht aus Bögen geraten: SVG vergrößert einen
+zu kleinen Bogenradius stillschweigend, und die rechte Kuppe blähte sich dadurch
+weiter auf als beabsichtigt — die Wolken standen über der Kante ihres Feldes und
+waren abgeschnitten, schon im Stillstand. Zweitens kennt jede Form ihren
+**Bewegungsraum**: Zeichnung plus halbe Strichstärke plus größter Ausschlag
+ihrer Animation. Ein Test hält diesen Raum gegen das Feld, damit nie wieder
+etwas an den Rand stößt, das sich bewegt.
+
+Deshalb liegt die Geometrie in `src/glyphs.ts` und das Zeichnen in
+`src/icons.ts`: der Schnitt läuft entlang der Frage, wer einen Browser braucht.
+Die Rechnung nicht, das Zeichnen schon — und nur so lässt sich die Rechnung
+prüfen.
 
 ### Bewegung
 
