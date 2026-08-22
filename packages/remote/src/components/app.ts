@@ -1,5 +1,6 @@
 import { LitElement, html, nothing, type TemplateResult } from 'lit';
 import {
+  isNightIn,
   adjustAllInsets,
   adjustInset,
   clampScreenDuration,
@@ -189,15 +190,26 @@ export class MirrorRemote extends LitElement {
     return this;
   }
 
+  /*
+   * Die App zeichnet sonst nur neu, wenn der Spiegel etwas schickt. Eine
+   * Aussage ueber die Uhrzeit veraltet aber von selbst – ohne diesen Takt
+   * stuende "Laeuft gerade" auch noch um zehn Uhr morgens da.
+   */
+  #tick: ReturnType<typeof setInterval> | null = null;
+
   override connectedCallback(): void {
     super.connectedCallback();
     store.addEventListener('change', this.#onChange);
+    this.#tick = setInterval(() => this.requestUpdate(), 30_000);
   }
 
   override disconnectedCallback(): void {
     store.removeEventListener('change', this.#onChange);
+    if (this.#tick !== null) clearInterval(this.#tick);
+    this.#tick = null;
     super.disconnectedCallback();
   }
+
 
   #onChange = (): void => {
     const before = this.snapshot;
@@ -1462,6 +1474,7 @@ export class MirrorRemote extends LitElement {
     if (!config) return html``;
     const display = config.display;
     const power = config.power;
+    const night = display.nightMode;
 
     const patchDisplay = (patch: Partial<typeof display>): void =>
       store.send({ t: 'admin:setSettings', patch: { display: { ...display, ...patch } } });
@@ -1518,6 +1531,66 @@ export class MirrorRemote extends LitElement {
             @change=${(event: Event) => patchDisplay({ brightness: Number((event.target as HTMLInputElement).value) })}
           />
         </label>
+
+        <!--
+          Die Nachtabsenkung gab es von Anfang an in der Konfiguration, aber
+          nirgends zum Anfassen. Wer nachts vor dem Spiegel stand und sich
+          wunderte, wo die Farbe hin ist, hatte keine Stelle, an der das
+          dranstand – und keine, an der es sich abschalten liess.
+        -->
+        <label class="field field--switch">
+          <span class="field__label">
+            Nachtabsenkung
+            <span class="field__hint">
+              Nachts eine Stufe dunkler: kein Akzent, keine Flaeche, keine Bewegung – und das Wetter
+              schaltet nicht weiter.
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            .checked=${night.enabled}
+            @change=${(event: Event) =>
+              patchDisplay({
+                nightMode: { ...night, enabled: (event.target as HTMLInputElement).checked },
+              })}
+          />
+        </label>
+
+        ${night.enabled
+          ? html`
+              <div class="rule">
+                <div class="rule__times">
+                  <label>
+                    von
+                    <input
+                      type="time"
+                      .value=${night.from}
+                      @change=${(event: Event) =>
+                        patchDisplay({
+                          nightMode: { ...night, from: (event.target as HTMLInputElement).value },
+                        })}
+                    />
+                  </label>
+                  <label>
+                    bis
+                    <input
+                      type="time"
+                      .value=${night.to}
+                      @change=${(event: Event) =>
+                        patchDisplay({
+                          nightMode: { ...night, to: (event.target as HTMLInputElement).value },
+                        })}
+                    />
+                  </label>
+                </div>
+              </div>
+              ${isNightIn(night, config.timezone)
+                ? html`<p class="banner banner--hint">
+                    Laeuft gerade – der Spiegel ist abgesenkt.
+                  </p>`
+                : nothing}
+            `
+          : nothing}
 
         <label class="field field--switch">
           <span class="field__label">
