@@ -7,7 +7,7 @@ import { createScreen, type MirrorScreen } from './screens.js';
 import { createDefaultSetup, type SetupState } from './setup.js';
 
 /** Aktuelle Version des Config-Formats. Erhoehen = Migration schreiben. */
-export const CONFIG_SCHEMA_VERSION = 5;
+export const CONFIG_SCHEMA_VERSION = 6;
 
 export interface ModuleInstance {
   /** Stabil ueber die Lebensdauer der Instanz, z.B. "weather-1". */
@@ -29,6 +29,20 @@ export interface ModuleInstance {
   zone: Zone;
   size: WidgetSize;
   enabled: boolean;
+  /**
+   * Belegt der Block einen Platz auf dem Screen?
+   *
+   * Getrennt von `enabled`, weil es zwei verschiedene Fragen sind: ob die
+   * Instanz laeuft und ob man sie sieht. Ein Kalender, der nur Mitteilungen
+   * liefern soll, muss laufen — aber er soll keinen Block belegen, und in
+   * einem vollen Raster ist ohnehin keiner mehr frei.
+   *
+   * Ein eigener Schalter und nicht "kein Screen" oder "keine Koordinaten":
+   * Platz, Groesse und Band bleiben stehen, damit ein Block beim
+   * Wiedereinblenden dorthin zurueckkehrt, wo er lag. Dieselbe Ueberlegung wie
+   * bei `zone` neben `x`/`y`.
+   */
+  visible: boolean;
   config: Record<string, unknown>;
 }
 
@@ -243,6 +257,7 @@ export function createDefaultConfig(): MirrorConfig {
         zone: 'head',
         size: 'l',
         enabled: true,
+        visible: true,
         config: {},
       },
       {
@@ -254,6 +269,7 @@ export function createDefaultConfig(): MirrorConfig {
         zone: 'main',
         size: 'l',
         enabled: true,
+        visible: true,
         config: {},
       },
     ],

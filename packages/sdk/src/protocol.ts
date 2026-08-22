@@ -31,6 +31,8 @@ export interface LayoutPatch {
   zone?: Zone;
   size?: WidgetSize;
   enabled?: boolean;
+  /** Blendet den Block ein oder aus, ohne die Instanz zu stoppen. */
+  visible?: boolean;
 }
 
 /** Die PWA ("remote") darf konfigurieren, die Anzeige ("shell") nur lesen. */
@@ -138,6 +140,14 @@ export type ClientMessage =
       x?: number;
       y?: number;
       zone?: Zone;
+      /**
+       * `false` legt die Instanz an, ohne ihr einen Platz zu geben.
+       *
+       * Sie laeuft dann und meldet, was sie zu melden hat, belegt aber keinen
+       * Block. Deshalb scheitert das Anlegen in diesem Fall auch nicht an
+       * einem vollen Raster: es wird ja nichts belegt.
+       */
+      visible?: boolean;
     }
   | { t: 'admin:removeInstance'; instanceId: string }
   | { t: 'admin:addScreen'; name?: string }

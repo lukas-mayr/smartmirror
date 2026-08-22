@@ -154,6 +154,25 @@ export const migrations: readonly Migration[] = [
       };
     },
   },
+  {
+    from: 5,
+    describe: 'instances.visible ergaenzt',
+    migrate: (config) => {
+      const instances = Array.isArray(config.instances) ? config.instances : [];
+      return {
+        ...config,
+        // Was bisher lief, war sichtbar – etwas anderes gab es nicht. Wer den
+        // Spiegel eingerichtet hat, findet nach dem Update dieselbe Anordnung
+        // vor. Einen vorhandenen Wert nicht ueberschreiben: nach einem
+        // zurueckgerollten Update steht die Versionsnummer wieder tiefer, die
+        // Entscheidung "nur als Mitteilung" aber schon in der Datei.
+        instances: instances.map((entry) => {
+          const instance = (entry ?? {}) as Record<string, unknown>;
+          return { ...instance, visible: instance.visible !== false };
+        }),
+      };
+    },
+  },
 ];
 
 export function migrateToLatest(

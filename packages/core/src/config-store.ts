@@ -133,8 +133,32 @@ function normalize(input: Record<string, unknown>): MirrorConfig {
       // Handy-App nicht mehr erreichbar – er kommt auf den ersten Screen.
       const screenId = screenIds.has(entry.screenId) ? entry.screenId : screens[0]!.id;
       const size = normalizeWidgetSize(entry.size);
+      const visible = entry.visible !== false;
       const taken = occupied.get(screenId) ?? [];
       let rect = rectFor({ x: entry.x, y: entry.y, size }, display.grid);
+
+      /*
+       * Wer keinen Platz belegt, braucht auch keinen zugewiesen zu bekommen.
+       *
+       * Ein ausgeblendeter Block behaelt seine Koordinaten fuer den Tag, an
+       * dem er wieder eingeblendet wird — aber er darf keinem sichtbaren den
+       * Platz wegnehmen und nicht vor einem Ueberlappen ausweichen, das es auf
+       * dem Schirm gar nicht gibt.
+       */
+      if (!visible) {
+        return {
+          id: entry.id,
+          moduleId: entry.moduleId,
+          screenId,
+          x: rect.x,
+          y: rect.y,
+          zone: normalizeZone(entry.zone),
+          size,
+          enabled: entry.enabled !== false,
+          visible,
+          config: typeof entry.config === 'object' && entry.config !== null ? entry.config : {},
+        };
+      }
 
       if (taken.some((other) => rectsOverlap(other, rect))) {
         // Ueblicher Fall: jemand hat das Raster verkleinert, und zwei Bloecke
@@ -157,6 +181,7 @@ function normalize(input: Record<string, unknown>): MirrorConfig {
         zone: normalizeZone(entry.zone),
         size,
         enabled: entry.enabled !== false,
+        visible,
         config: typeof entry.config === 'object' && entry.config !== null ? entry.config : {},
       };
     });

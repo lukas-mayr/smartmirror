@@ -182,3 +182,39 @@ test('laesst eine schon gesetzte Anordnung und ein gesetztes Band stehen', () =>
   assert.equal(config.instances[0].zone, 'foot');
   assert.deepEqual(config.display.nightMode, { enabled: false, from: '23:00', to: '05:30' });
 });
+
+test('macht bestehende Bloecke sichtbar', () => {
+  // Was bisher lief, war sichtbar – etwas anderes gab es nicht. Wer den
+  // Spiegel eingerichtet hat, findet nach dem Update dieselbe Anordnung vor.
+  const { config } = migrateToLatest(
+    {
+      schemaVersion: 5,
+      screens: [{ id: 'screen-1', name: 'Screen 1', durationSeconds: 20, layout: 'grid' }],
+      instances: [
+        { id: 'clock-1', moduleId: 'clock', screenId: 'screen-1', x: 0, y: 0, zone: 'head' },
+        { id: 'weather-1', moduleId: 'weather', screenId: 'screen-1', x: 2, y: 0, zone: 'main' },
+      ],
+    },
+    silent,
+  );
+  assert.deepEqual(
+    config.instances.map((entry) => entry.visible),
+    [true, true],
+  );
+});
+
+test('laesst ein schon gesetztes "nur als Mitteilung" stehen', () => {
+  // Nach einem zurueckgerollten Update steht die Versionsnummer wieder auf 5,
+  // die Entscheidung aber schon in der Datei.
+  const { config } = migrateToLatest(
+    {
+      schemaVersion: 5,
+      screens: [{ id: 'screen-1', name: 'Screen 1', durationSeconds: 20, layout: 'grid' }],
+      instances: [
+        { id: 'calendar-1', moduleId: 'calendar', screenId: 'screen-1', x: 0, y: 0, zone: 'main', visible: false },
+      ],
+    },
+    silent,
+  );
+  assert.equal(config.instances[0].visible, false);
+});
