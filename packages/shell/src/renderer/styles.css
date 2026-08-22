@@ -2104,6 +2104,70 @@ body {
   justify-content: center;
 }
 
+/* ------------------------------ Wetterwarnung ----------------------------- */
+
+/*
+ * Eine Zeile ueber dem Wetter, nicht mehr.
+ *
+ * Sie traegt Sand und keine Flaeche: eine Warnung ist ein Hinweis und kein
+ * Alarm, und hinter der Spiegelfolie leuchtet jede Flaeche. Rot gibt es hier
+ * nicht — im Design-System ist Rot ausschliesslich fuer Zerstoerendes
+ * reserviert, und ein Gewitter zerstoert nichts, was der Spiegel verwaltet.
+ *
+ * Der Text steht in einer Zeile und wird abgeschnitten, statt umzubrechen: was
+ * hier nicht hineinpasst, steht vollstaendig im Mitteilungsblock.
+ */
+.weather__warning {
+  display: flex;
+  align-items: center;
+  gap: 0.45em;
+  flex: none;
+  align-self: flex-start;
+  max-width: 100%;
+  font-size: min(3.6cqh, 2.4cqw);
+  font-weight: var(--mirror-weight-label);
+  letter-spacing: var(--mirror-track-label-wide);
+  text-transform: uppercase;
+  color: var(--mirror-fg-mute);
+  animation: mirror-swap var(--motion-swap) both;
+}
+
+/* Ab Stufe orange traegt sie den warmen Akzent. Darunter bleibt sie grau:
+   eine gelbe Warnung ist die Auskunft "denk dran", keine Nachricht. */
+.weather__warning--severe {
+  color: var(--mirror-accent-warm);
+}
+
+.weather__warning-icon {
+  display: inline-flex;
+  flex: none;
+}
+
+.weather__warning-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Auf der deckenden Flaeche nimmt sie deren Textfarbe an – der warme Akzent
+   auf Salbei waere zwei Farben, die um dieselbe Flaeche streiten. */
+.box--solid .weather__warning,
+.box--solid .weather__warning--severe {
+  color: color-mix(in srgb, var(--mirror-on-accent) 70%, transparent);
+}
+
+/* Nachts gilt dieselbe Regel wie ueberall: kein Akzent, nur Grau. */
+[data-night='1'] .weather__warning--severe {
+  color: var(--mirror-fg-mute);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .weather__warning {
+    animation: none;
+  }
+}
+
 /* ----------------------------- Mitteilungsfeed ---------------------------- */
 
 /*

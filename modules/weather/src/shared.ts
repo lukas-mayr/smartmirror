@@ -1,4 +1,5 @@
 import type { IconName } from '@mirror/icons';
+import type { WeatherWarning } from './warnings.js';
 
 export interface WeatherConfig {
   location: string;
@@ -17,6 +18,12 @@ export interface WeatherConfig {
    */
   highlight: boolean;
   refreshMinutes: number;
+  /** Wetterwarnungen von MeteoAlarm holen und im Block zeigen. */
+  warnings: boolean;
+  /** Nur Warnungen, deren Region diesen Text enthaelt. Leer heisst alle. */
+  warningRegion: string;
+  /** Warnungen zusaetzlich in den Mitteilungsfeed melden. */
+  warningsNotify: boolean;
 }
 
 export interface CurrentWeather {
@@ -58,6 +65,8 @@ export interface WeatherState {
   /** Zeitpunkt der letzten erfolgreichen Abfrage – die Anzeige braucht ihn,
    *  um veraltete Werte als solche kenntlich zu machen. */
   fetchedAt: string | null;
+  /** Was gerade gewarnt wird, die ernsteste zuerst. */
+  warnings: WeatherWarning[];
 }
 
 /**

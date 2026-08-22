@@ -1,8 +1,27 @@
 import { defineBackend } from '@mirror/sdk';
 import type { ForecastDay, HourlyPoint, WeatherConfig, WeatherState } from './shared.js';
+import { meteoAlarmUrl, parseWarnings, selectWarnings, warningNotifications } from './warnings.js';
+
+/**
+ * Wie oft nach Warnungen gesehen wird.
+ *
+ * Ein eigener Takt und nicht der des Wetters: die Aktualisierung des Wetters
+ * darf jemand auf drei Stunden stellen, eine Sturmwarnung drei Stunden spaeter
+ * zu zeigen waere aber der Sinn der Sache verfehlt. Umgekehrt aendern sich
+ * Warnungen selten genug, dass zehn Minuten reichen.
+ */
+const WARNING_INTERVAL_MS = 10 * 60_000;
 
 interface GeocodeResponse {
   results?: { name: string; country_code?: string; admin1?: string; latitude: number; longitude: number }[];
+}
+
+/** Koordinaten samt Land – das Land waehlt den Warnfeed. */
+interface Place {
+  latitude: number;
+  longitude: number;
+  label: string;
+  country: string;
 }
 
 interface ForecastResponse {
@@ -29,9 +48,9 @@ interface ForecastResponse {
 export default defineBackend<WeatherConfig, WeatherState>({
   async setup(ctx) {
     const metric = ctx.config.units === 'metric';
-    let coordinates: { latitude: number; longitude: number; label: string } | null = null;
+    let coordinates: Place | null = null;
 
-    const geocode = async (): Promise<typeof coordinates> => {
+    const geocode = async (): Promise<Place> => {
       const url = new URL('https://geocoding-api.open-meteo.com/v1/search');
       url.searchParams.set('name', ctx.config.location);
       url.searchParams.set('count', '1');
@@ -48,7 +67,15 @@ export default defineBackend<WeatherConfig, WeatherState>({
         .filter((part, index) => !parts.some((other, otherIndex) => otherIndex < index && other.includes(part)))
         .filter((part, index) => index === 0 || !part.includes(parts[0] as string))
         .join(', ');
-      return { latitude: hit.latitude, longitude: hit.longitude, label };
+      return {
+        latitude: hit.latitude,
+        longitude: hit.longitude,
+        label,
+        // Das Land kommt aus derselben Antwort und waehlt den Warnfeed. So
+        // passt die Warnung immer zum eingestellten Ort, ohne dass jemand ein
+        // zweites Feld pflegen muss.
+        country: hit.country_code ?? '',
+      };
     };
 
     const refresh = async (): Promise<void> => {
@@ -129,14 +156,75 @@ export default defineBackend<WeatherConfig, WeatherState>({
       ctx.log.debug(`Wetter fuer ${coordinates.label} aktualisiert.`);
     };
 
+    /**
+     * Zeitpunkt einer Warnung, wie er in der Zweitzeile steht.
+     *
+     * Nur die Uhrzeit, solange es heute ist, sonst mit Wochentag davor: "ab
+     * 14:00" liest man ohne Nachdenken, "ab 22.08. 14:00" nicht.
+     */
+    const formatWarningTime = (stamp: string): string => {
+      const date = new Date(stamp);
+      const today = new Date().toLocaleDateString(ctx.locale, { timeZone: ctx.timezone });
+      const sameDay = date.toLocaleDateString(ctx.locale, { timeZone: ctx.timezone }) === today;
+      return date.toLocaleTimeString(ctx.locale, {
+        timeZone: ctx.timezone,
+        hour: '2-digit',
+        minute: '2-digit',
+        ...(sameDay ? {} : { weekday: 'short' }),
+      });
+    };
+
+    /**
+     * Warnungen holen, zeigen und melden.
+     *
+     * Faengt seine Fehler selbst: eine Warnquelle, die den ganzen Block rot
+     * faerbt, waere das falsche Ergebnis – die Temperatur stimmt ja weiterhin.
+     * Was hier schiefgeht, steht im Log und sonst nirgends.
+     */
+    const refreshWarnings = async (): Promise<void> => {
+      if (!ctx.config.warnings) {
+        ctx.setState({ warnings: [] });
+        if (ctx.config.warningsNotify) ctx.notify([]);
+        return;
+      }
+
+      try {
+        coordinates ??= await geocode();
+        const url = meteoAlarmUrl(coordinates.country);
+        if (!url) {
+          // Lieber keine Warnungen als die eines anderen Landes.
+          ctx.log.warn(`Fuer "${coordinates.country}" gibt es keinen bekannten Warnfeed.`);
+          ctx.setState({ warnings: [] });
+          if (ctx.config.warningsNotify) ctx.notify([]);
+          return;
+        }
+
+        const response = await ctx.fetch(url);
+        if (!response.ok) throw new Error(`Warnungen nicht abrufbar (HTTP ${response.status})`);
+        const warnings = selectWarnings(parseWarnings(await response.text()), ctx.config.warningRegion);
+
+        ctx.setState({ warnings });
+        // Der Schalter entscheidet nur ueber den Feed. Im eigenen Block steht
+        // die Warnung immer – wer sie abbestellen will, schaltet sie ganz ab.
+        if (ctx.config.warningsNotify) {
+          ctx.notify(warningNotifications(warnings, formatWarningTime));
+        }
+        ctx.log.debug(`${warnings.length} Warnung(en) fuer ${coordinates.label}.`);
+      } catch (error) {
+        ctx.log.warn(`Warnungen konnten nicht geholt werden: ${String(error)}`);
+      }
+    };
+
     // Faellt eine Abfrage aus, wirft sie – der Modul-Host haelt den letzten
     // Stand und markiert die Instanz als fehlerhaft. Genau so soll es sein:
     // ein veralteter Wert mit Hinweis ist besser als ein leerer Spiegel.
     ctx.every(ctx.config.refreshMinutes * 60_000, refresh);
+    ctx.every(WARNING_INTERVAL_MS, refreshWarnings);
 
     ctx.onCommand('refresh', async () => {
       ctx.log.info('Aktualisierung per Fernbedienung angefordert.');
       await refresh();
+      await refreshWarnings();
     });
   },
 });
