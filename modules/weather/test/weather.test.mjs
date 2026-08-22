@@ -98,11 +98,13 @@ test('zaehlt Tage ueber Monatsgrenzen hinweg', () => {
   assert.ok(Number.isNaN(daysBetween('unsinn', '2026-08-22')));
 });
 
-test('nennt die naechsten Tage beim Namen und danach beim Wochentag', () => {
+test('nennt zwei Tage beim Namen und danach den Wochentag', () => {
   const label = (iso) => dayLabel(iso, '2026-08-22', 'de-DE', 'Europe/Vienna');
   assert.equal(label('2026-08-22'), 'Heute');
   assert.equal(label('2026-08-23'), 'Morgen');
-  assert.equal(label('2026-08-24'), 'Uebermorgen');
+  // Und dann sofort der Wochentag: "Uebermorgen" ist zwar ein Wort, aber keine
+  // Auskunft – man muss erst zwei Tage weiterzaehlen.
+  assert.equal(label('2026-08-24'), 'Montag');
   assert.equal(label('2026-08-25'), 'Dienstag');
 });
 
@@ -114,7 +116,7 @@ test('stellt heute vor die Vorhersage', () => {
   });
   assert.deepEqual(
     slides.map((slide) => slide.label),
-    ['Heute', 'Morgen', 'Uebermorgen', 'Dienstag'],
+    ['Heute', 'Morgen', 'Montag', 'Dienstag'],
   );
   // Heute die gemessene Temperatur, spaeter der Tageshoechstwert.
   assert.deepEqual(
@@ -129,7 +131,7 @@ test('gibt jeder Karte denselben Kurztext-Aufbau', () => {
     timeZone: 'Europe/Vienna',
     now: NOW,
   });
-  assert.equal(slides[0].note, 'Teilweise bewoelkt \u00b7 9 km/h');
+  assert.equal(slides[0].note, 'Teilweise bewölkt \u00b7 9 km/h');
   assert.equal(slides[1].note, 'Klar \u00b7 Tief 12\u00b0');
 });
 
@@ -139,7 +141,7 @@ test('laesst den Wind weg, wenn er abgeschaltet ist', () => {
     timeZone: 'Europe/Vienna',
     now: NOW,
   });
-  assert.equal(slides[0].note, 'Teilweise bewoelkt');
+  assert.equal(slides[0].note, 'Teilweise bewölkt');
 });
 
 test('faerbt jede Karte nach ihrer eigenen Temperatur', () => {
