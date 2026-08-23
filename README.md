@@ -569,12 +569,46 @@ einem hängenden Bildschirm. Der Berg wächst dabei gedämpft (`DIG.growth`), we
 der Block nicht mitwächst: zehn Minuten liegen bei knapp der halben Höhe, eine
 halbe Stunde bei zwei Dritteln, zwei Stunden füllen ihn ganz.
 
-Jeder Eimer nimmt einen sichtbaren Bissen aus dem Berg, und zwischen zwei
-Eimern steht er still: der Berg wird kleiner, *weil* gegraben wurde, und nicht,
-weil Zeit vergeht. Damit Bissen und Schwenk zusammenfallen, bekommt die
-Bewegung einen Versatz mit (`--dig-phase`, eine negative `animation-delay`) —
-sie beginnt dort, wo sie nach der verstrichenen Zeit stehen müsste, und nicht
-dort, wo die Anzeige gerade das Bild aufgebaut hat.
+**Abgebaut wird von der Seite, nicht kleiner gezoomt.** Der Berg bekommt eine
+Abbaukante — eine gerade Böschung, die sich in den Haufen frisst — und darüber
+eine Sohle, die tiefer wird. Was übrig bleibt, ist das Kleinste dreier Geraden:
+das ursprüngliche Profil, die Sohle und die Böschung. Genau daraus entsteht die
+Form, die eine angegrabene Halde hat, und genau so verschwindet sie: erst eine
+Wand, dann eine Bank, dann nichts.
+
+Jeder Eimer nimmt dabei gleich viel **Fläche** weg — nicht gleich viel Höhe und
+nicht gleich viel Breite. Wie viel davon Kante und wie viel Sohle ist, fällt aus
+der Rechnung (`tauForShare`) und nicht aus einer Schätzung. Daraus folgt auch,
+dass die Kante am Ende schneller wandert als am Anfang: aus einer hohen Wand
+holt ein Eimer viel Menge auf kurzem Weg, aus einer flachen Lage dieselbe Menge
+erst auf langer Strecke. Wer schon einmal eine Grube hat fertig machen sehen,
+kennt genau dieses Tempo.
+
+**Deshalb fährt der Bagger.** Die Wand wandert nach rechts, also folgt er ihr —
+einmal je Lastwagen, mit einem kurzen Ruck, und der Wagen fährt mit, weil er
+dort steht, wo geladen wird. Über einen langen Timer arbeitet sich die Maschine
+so sichtbar in den Berg hinein. Die Schaufel greift dabei immer zwei Einheiten
+hinter der Zehe der Kante; dass das in jeder Größe und bei jedem Stand stimmt,
+prüft ein Test.
+
+Zwischen zwei Eimern steht der Berg still: er wird kleiner, *weil* gegraben
+wurde, und nicht, weil Zeit vergeht. Damit Bissen und Schwenk zusammenfallen,
+bekommt die Bewegung einen Versatz mit (`--dig-phase`, eine negative
+`animation-delay`) — sie beginnt dort, wo sie nach der verstrichenen Zeit stehen
+müsste, und nicht dort, wo die Anzeige gerade das Bild aufgebaut hat.
+
+**Der Wagen fährt erst, wenn die Schaufel leer ist.** Das letzte Kippen einer
+Ladung endet bei 89 % ihrer Dauer, er zieht bei 92 % an, und der nächste steht
+bei 8 % — lange vor dem ersten Kippen bei 10 %. Andersherum fällt eine Ladung
+neben die Mulde, und das sieht man sofort. Die vier Zahlen stehen als
+`DIG.dump` und `DIG.swap` im Design-System, und ein Test rechnet ihre
+Reihenfolge nach.
+
+**Man sieht nicht in eine Mulde hinein.** Von der Seite ist eine Ladung erst
+sichtbar, wenn sie über die Bordwand steht: die ersten beiden Eimer
+verschwinden im Wagen, der dritte lugt hervor, der vierte häuft sich. Aus
+demselben Grund ist in der Schaufel nichts zu sehen — sie ist von der Seite
+zu, und was man sieht, ist der Stoff, der beim Kippen fällt.
 
 **Bewegt wird im Stylesheet, gerechnet wird im Modul.** Der Takt ist fest, und
 ein fester Takt ist genau das, was CSS-Keyframes gut können: sie laufen im
@@ -589,12 +623,29 @@ gesehen wird er dabei erst schmal und steht dann andersherum. Die Raupe bleibt
 stehen — daran erkennt man, dass sich der Oberwagen dreht und nicht die
 Maschine kippt.
 
-Was dabei zusammenpassen muss, prüfen Tests ohne Browser (`src/scene.ts`): dass
-der Zahn der Schaufel den Fuß des Berges überstreicht (dort schrumpft der Berg
-hin, also trifft der Bagger ihn bis zum letzten Eimer), dass die Ladung nach der
-Drehung über der Mulde und nicht daneben landet, und dass kein Gelenk aus dem
-Feld stößt. Dieselbe Trennung wie bei den Wettersymbolen: die Rechnung braucht
-keinen Browser, das Zeichnen schon.
+**Gezeichnet wird in Körpern und nicht in Strichen.** Ein Ausleger ist ein
+Kastenträger: am Fuß dick, am Knick schlank, mit einem Bauch im Rücken. Ein
+Zylinder ist ein dicker Strich mit einer dünnen Stange darin. Ein Rad hat eine
+Nabe, eine Kette einen Gurt mit Leitrad, Turas und Laufrollen, ein Kipper eine
+Stirnwand, ein Bordwandprofil und ein Fahrerhaus, das höher steht als beide. Aus
+drei Metern sieht man von alldem nur die Silhouette — und genau deshalb muss sie
+stimmen: eine Reihe gleich dicker Striche liest sich als Diagramm, ein Umriss
+als Maschine. Im flachen M-Block fällt das Beiwerk weg und die Silhouette bleibt;
+dort würde es zu einem Grieseln, das die Form verdeckt.
+
+Der Hubzylinder des Auslegers fehlt als einziges Teil mit Absicht: er sitzt mit
+einem Ende am Oberwagen und mit dem anderen am Ausleger und *fährt aus*, während
+gehoben wird. Mit einer Drehung allein ist das nicht nachzubauen, und ein
+Zylinder, der beim Heben mitwandert statt auszufahren, fällt mehr auf als einer,
+den es nicht gibt.
+
+Was zusammenpassen muss, prüfen Tests ohne Browser (`src/scene.ts`): dass jeder
+Eimer gleich viel Fläche wegnimmt, dass der Zahn der Schaufel bei jedem Stand
+und in jeder Berggröße in der Wand steht, dass die Ladung nach der Drehung über
+der Mulde und nicht daneben landet, dass der Wagen erst nach dem letzten Kippen
+anfährt und dass auch ganz vorgerückt nichts aus dem Feld stößt. Dieselbe
+Trennung wie bei den Wettersymbolen: die Rechnung braucht keinen Browser, das
+Zeichnen schon.
 
 **Gesetzt wird der Timer in der Handy-App** — Dauer und ein Schalter, mehr
 nicht. Ein Modul hat dort keine eigene Oberfläche, und jede

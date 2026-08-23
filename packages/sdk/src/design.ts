@@ -469,6 +469,24 @@ export const DIG = {
    * sieht, ohne dass die kurzen Timer zu einem Kruemel werden.
    */
   growth: 0.3,
+  /**
+   * Wann im Eimer gekippt wird, als Anteil seiner Dauer.
+   *
+   * `from` ist der Moment, in dem die Schaufel aufgeht, `to` der, in dem der
+   * letzte Stoff unten angekommen ist. Danach ist die Schaufel leer — und erst
+   * danach darf der Wagen anfahren.
+   */
+  dump: { from: 0.4, to: 0.56 },
+  /**
+   * Wann der Wagen wechselt, als Anteil einer Ladung.
+   *
+   * `leave` ist die Abfahrt des vollen, `ready` der Moment, in dem der naechste
+   * steht. Beide Zahlen haben genau eine Aufgabe: der volle Wagen faehrt erst
+   * los, wenn der letzte Eimer ausgeschuettet ist, und der neue steht, bevor
+   * der naechste kippt. Sonst faellt eine Ladung neben die Mulde — und das
+   * sieht man sofort.
+   */
+  swap: { leave: 0.92, ready: 0.08 },
 } as const;
 
 /* ------------------------------ Schriftgroesse ----------------------------- */

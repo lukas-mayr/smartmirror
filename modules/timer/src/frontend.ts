@@ -1,15 +1,6 @@
 import { html, render, svg, nothing, type TemplateResult } from 'lit';
-import { defineFrontend, type ModuleView } from '@mirror/sdk';
-import {
-  ARM,
-  FIELD,
-  GROUND,
-  SLEW_X,
-  TRACK,
-  TRUCK,
-  cargoPath,
-  mountainPath,
-} from './scene.js';
+import { defineFrontend, DIG, type ModuleView } from '@mirror/sdk';
+import { ARM, FIELD, GROUND, SLEW_X, TRACK, TRUCK, cargoPath, mountainPath, siteShift } from './scene.js';
 import {
   digPhaseMs,
   formatRemaining,
@@ -34,15 +25,19 @@ import {
  * einem festen Takt, und ein fester Takt ist genau das, was CSS-Keyframes gut
  * koennen: sie laufen im Compositor, kosten kein JavaScript und stehen bei
  * `prefers-reduced-motion` und nachts von selbst still. Hier wird nur
- * ausgerechnet, wie gross der Berg noch ist — viermal je Sekunde, damit die
- * Ziffern stimmen und der Bissen nicht eine halbe Sekunde neben dem Schwenk
- * liegt.
+ * ausgerechnet, wie der Berg gerade aussieht und wo die Maschine steht.
  *
- * Damit beides zusammenfaellt, bekommt die Bewegung einen Versatz mit auf den
- * Weg (`--dig-phase`, als negative `animation-delay`): sie beginnt nicht,
- * wenn die Anzeige das Bild aufbaut, sondern dort, wo sie nach der verstrichenen
- * Zeit stehen muesste. Ohne das faenge ein Spiegel, der um 18:03 neu startet,
- * mitten in der Ladung einen frischen Schwenk an.
+ * Damit Bissen und Schwenk zusammenfallen, bekommt die Bewegung einen Versatz
+ * mit auf den Weg (`--dig-phase`, als negative `animation-delay`): sie beginnt
+ * dort, wo sie nach der verstrichenen Zeit stehen muesste, und nicht dort, wo
+ * die Anzeige gerade das Bild aufgebaut hat.
+ *
+ * **Gezeichnet wird in Koerpern und nicht in Strichen.** Ein Ausleger ist ein
+ * Kastentraeger und keine Linie: er ist am Fuss dicker als am Knick, hat einen
+ * Knick im Ruecken und einen Zylinder, der ihn haelt. Dasselbe beim Wagen —
+ * Rahmen, Mulde, Stirnwand, Raeder mit Nabe. Aus drei Metern sieht man von
+ * alldem nur die Silhouette, und genau deshalb muss sie stimmen: eine Reihe
+ * gleich dicker Striche liest sich als Diagramm, ein Umriss als Maschine.
  *
  * Laeuft kein Timer, bleibt der Block leer. Kein "kein Timer": eine leere
  * Flaeche auf einem Spiegel ist ein Spiegel, ein Satz darueber ist eine
@@ -56,7 +51,7 @@ import {
  * Es geht auch nicht um die Ziffern, sondern um den Bissen: ein Eimer dauert
  * fuenf Sekunden, und wenn der Berg erst eine halbe Sekunde spaeter kleiner
  * wird, sieht man den Zusammenhang nicht mehr. Gezeichnet wird dabei fast
- * nichts — ein Pfad und zwei Textknoten, alles andere steht.
+ * nichts — ein Pfad, eine Verschiebung und zwei Textknoten.
  */
 const TICK_MS = 250;
 
@@ -92,30 +87,48 @@ export default defineFrontend<TimerState, TimerConfig>({
     /* --------------------------------- Bilder -------------------------------- */
 
     /**
-     * Der Lastwagen.
+     * Der Kipper.
      *
      * Fahrerhaus links, Mulde rechts: er faehrt nach links ab, und ein
      * Lastwagen, der rueckwaerts aus dem Bild rollt, sieht nicht nach
-     * Abtransport aus. Die Mulde liegt damit auf der Baggerseite und der Weg
-     * der Schaufel wird kurz.
+     * Abtransport aus. Die Stirnwand steht hoeher als die Seitenwand und das
+     * Fahrerhaus hoeher als beide — ohne diesen Absatz wird aus Kipper und
+     * Kabine ein einziger langer Kasten, und der sieht aus wie ein Anhaenger.
+     *
+     * Die Ladung sitzt auf der Bordwand und nicht in der Mulde: von der Seite
+     * schaut niemand hinein. Sichtbar wird sie erst, wenn sie oben ueber steht.
      */
     const truck = (): TemplateResult => svg`
       <g class="dig__truck">
-        <path class="dig__frame" d=${`M8 ${TRUCK.floor}H${TRUCK.bed.right}`} />
-        <path class="dig__cab" d=${`M8 ${TRUCK.floor}V52L14 44H32V${TRUCK.floor}`} />
-        <path class="dig__pane" d="M17 47H30V53H17Z" />
+        <path class="dig__frame" d=${`M8 ${TRUCK.frame - 1}H88V${TRUCK.frame + 1.5}H8Z`} />
+
+        <path class="dig__body" d="M8 63V43Q8 40 11.5 40H29Q32 40 32 43.5V63Z" />
+        <path class="dig__pane" d="M11 43.5H22V51H11Z" />
+        <path class="dig__trim" d="M25.5 44V63" />
+        <path class="dig__ram" d="M8.2 44L6.8 41.6" />
+        <path class="dig__trim" d="M8 59.5H6.2" />
+
         <path
-          class="dig__bed"
-          d=${`M${TRUCK.bed.left} ${TRUCK.rim}V${TRUCK.floor}H${TRUCK.bed.right}V${TRUCK.rim}`}
+          class="dig__body"
+          d=${`M34 ${TRUCK.floor}V${TRUCK.headboard}H37V${TRUCK.rim}H${TRUCK.bed.right}V${TRUCK.floor}Z`}
         />
         <path
           class="dig__cargo"
           d=${cargoPath()}
-          style=${`transform-origin:65px ${TRUCK.floor}px`}
+          style=${`transform-origin:${(TRUCK.bed.left + TRUCK.bed.right) / 2}px ${TRUCK.rim}px`}
         />
-        <circle class="dig__wheel" cx="18" cy="74" r="6" />
-        <circle class="dig__wheel" cx="60" cy="74" r="6" />
-        <circle class="dig__wheel" cx="78" cy="74" r="6" />
+        <path class="dig__trim" d=${`M37 ${TRUCK.rim + 2.5}H${TRUCK.bed.right}`} />
+        <path class="dig__trim" d=${`M85 ${TRUCK.rim}V${TRUCK.floor}`} />
+        <path class="dig__trim" d="M50 51.5V60.5" />
+        <path class="dig__trim" d="M62 51.5V60.5" />
+        <path class="dig__trim" d="M74 51.5V60.5" />
+
+        <circle class="dig__wheel" cx="17" cy="73.5" r="6.5" />
+        <circle class="dig__hub" cx="17" cy="73.5" r="2.3" />
+        <circle class="dig__wheel" cx="57" cy="73.5" r="6.5" />
+        <circle class="dig__hub" cx="57" cy="73.5" r="2.3" />
+        <circle class="dig__wheel" cx="73" cy="73.5" r="6.5" />
+        <circle class="dig__hub" cx="73" cy="73.5" r="2.3" />
       </g>
     `;
 
@@ -129,43 +142,67 @@ export default defineFrontend<TimerState, TimerConfig>({
      * und nicht ins Stylesheet, wo er eine Zahl waere, die zur Zeichnung passen
      * muss und es irgendwann nicht mehr tut.
      *
-     * Die Raupe bleibt aussen vor: sie dreht sich nicht mit. Genau daran
+     * Das Fahrwerk bleibt aussen vor: es dreht sich nicht mit. Genau daran
      * erkennt man, dass sich der Oberwagen dreht und nicht die Maschine kippt.
      */
     const excavator = (): TemplateResult => svg`
       <g class="dig__machine">
-        <rect
-          class="dig__track"
-          x=${TRACK.left}
-          y=${TRACK.top}
-          width=${TRACK.right - TRACK.left}
-          height=${GROUND - TRACK.top}
-          rx="6"
-        />
-        <circle class="dig__roller" cx="104" cy="74" r="2.5" />
-        <circle class="dig__roller" cx="119" cy="74" r="2.5" />
-        <circle class="dig__roller" cx="134" cy="74" r="2.5" />
+        <!-- Kette: Gurt, Leitrad, Turas, Laufrollen. -->
+        <path class="dig__body" d="M104 67H134A6.5 6.5 0 0 1 134 80H104A6.5 6.5 0 0 1 104 67Z" />
+        <circle class="dig__trim" cx="104" cy="73.5" r="4.2" />
+        <circle class="dig__trim" cx="134" cy="73.5" r="4.2" />
+        <circle class="dig__hub" cx="112" cy="77" r="1.9" />
+        <circle class="dig__hub" cx="119" cy="77" r="1.9" />
+        <circle class="dig__hub" cx="126" cy="77" r="1.9" />
+        <path class="dig__ram" d=${`M${TRACK.left + 12} ${TRACK.top}H${TRACK.right - 12}`} />
 
         <g class="dig__house" style=${`transform-origin:${SLEW_X}px 60px`}>
-          <path class="dig__body" d="M100 68V58Q100 55 103 55H110V46H124V55H134Q137 55 137 58V68Z" />
-          <path class="dig__pane" d="M113 49H121V54H113Z" />
+          <!-- Kontergewicht, Kabine mit geneigter Scheibe, Motorhaube. -->
+          <path
+            class="dig__body"
+            d="M100 65V56Q100 51.5 104.5 51.5H110V43Q110 40 113 40H121Q123 40 124 41.6L127.5 50H133Q137 50 137 54V65Z"
+          />
+          <path class="dig__pane" d="M112.5 43H121L124 49.5H112.5Z" />
+          <path class="dig__trim" d="M131 50V46.5" />
+          <circle class="dig__hub" cx=${ARM.foot.x} cy=${ARM.foot.y} r="1.8" />
 
           <g class="dig__boom" style=${`transform-origin:${ARM.foot.x}px ${ARM.foot.y}px`}>
-            <path
-              class="dig__bar"
-              d=${`M${ARM.foot.x} ${ARM.foot.y}L136 44L${ARM.knuckle.x} ${ARM.knuckle.y}`}
-            />
+            <!--
+              Der Ausleger: am Fuss dick, am Knick schlank, mit Bauch — ein
+              Kastentraeger und keine Linie.
+
+              Der Hubzylinder fehlt mit Absicht. Er sitzt mit dem einen Ende am
+              Oberwagen und mit dem anderen am Ausleger, faehrt also aus, waehrend
+              der Ausleger hebt. Das laesst sich mit einer Drehung allein nicht
+              nachbauen, und ein Zylinder, der beim Heben mitwandert statt
+              auszufahren, faellt mehr auf als einer, den es nicht gibt.
+            -->
+            <path class="dig__body" d="M125 55.3L135.8 45L146.2 34.4L149.8 37.6L141.7 50.4L131 60.7Z" />
+
+            <!-- Stielzylinder: Gehaeuse und Kolbenstange, beide am Ausleger. -->
+            <path class="dig__ram" d="M135.4 45.6L143.6 40.6" />
+            <path class="dig__rod" d="M143.6 40.6L148.2 37.6" />
+
             <g class="dig__stick" style=${`transform-origin:${ARM.knuckle.x}px ${ARM.knuckle.y}px`}>
-              <path
-                class="dig__bar"
-                d=${`M${ARM.knuckle.x} ${ARM.knuckle.y}L${ARM.pin.x} ${ARM.pin.y}`}
-              />
+              <!-- Der Stiel: gerade, gleichmaessig verjuengt. -->
+              <path class="dig__body" d="M145 37L154.1 60.6L157.9 59.4L151 35Z" />
+              <circle class="dig__hub" cx=${ARM.knuckle.x} cy=${ARM.knuckle.y} r="1.6" />
+
+              <!-- Schaufelzylinder, am Stiel; sein Ende sitzt dicht am Bolzen. -->
+              <path class="dig__ram" d="M148.8 42.4L152.4 52" />
+              <path class="dig__rod" d="M152.4 52L154.4 57.4" />
+
               <g class="dig__bucket" style=${`transform-origin:${ARM.pin.x}px ${ARM.pin.y}px`}>
+                <!-- Die Schaufel: Ruecken, Bauch, Schneide mit drei Zaehnen. -->
                 <path
-                  class="dig__scoop"
-                  d=${`M${ARM.pin.x} ${ARM.pin.y}L163 66Q162.5 72.5 154.5 74.5L${ARM.tip.x} ${ARM.tip.y}Z`}
+                  class="dig__body"
+                  d=${`M155.6 58.6L163.4 65.2Q164 71.4 158.6 73.8L${ARM.tip.x} ${ARM.tip.y}Z`}
                 />
-                <path class="dig__haul" d="M154.5 67Q158 63.5 161 66.5" />
+                <path class="dig__rod" d="M154.6 57.6L157.4 61.6" />
+                <path class="dig__trim" d=${`M${ARM.tip.x} ${ARM.tip.y}l-1.6 1.6`} />
+                <path class="dig__trim" d="M154.4 74.1l-1.5 1.6" />
+                <path class="dig__trim" d="M156.8 73.9l-1.4 1.6" />
+                <circle class="dig__hub" cx=${ARM.pin.x} cy=${ARM.pin.y} r="1.5" />
               </g>
             </g>
           </g>
@@ -183,14 +220,25 @@ export default defineFrontend<TimerState, TimerConfig>({
      */
     const spill = (): TemplateResult => svg`
       <g class="dig__spill">
-        <path d="M83 40V44" />
-        <path d="M87 42V45" />
-        <path d="M80 43V46" />
+        <path d="M83 36V40" />
+        <path d="M87 38V41" />
+        <path d="M79.5 39V42" />
       </g>
     `;
 
-    /** Die Baustelle. `share` ist, was vom Berg noch steht. */
-    const scene = (size: number, share: number, digging: boolean): TemplateResult => {
+    /**
+     * Die Baustelle.
+     *
+     * `share` ist, was vom Berg noch steht, `shift`, wie weit der Bagger der
+     * Abbaukante schon nachgefahren ist. Beide kommen aus derselben Rechnung,
+     * damit die Schaufel dort greift, wo gegraben wird.
+     */
+    const scene = (
+      size: number,
+      share: number,
+      shift: number,
+      digging: boolean,
+    ): TemplateResult => {
       const path = mountainPath(size, share);
       return html`
         <svg
@@ -200,7 +248,7 @@ export default defineFrontend<TimerState, TimerConfig>({
           style=${phaseStyle}
           fill="none"
           stroke="currentColor"
-          stroke-width="1.6"
+          stroke-width="1.5"
           stroke-linecap="round"
           stroke-linejoin="round"
           role="presentation"
@@ -208,7 +256,9 @@ export default defineFrontend<TimerState, TimerConfig>({
         >
           <path class="dig__ground" d=${`M0 ${GROUND}H${FIELD.width}`} />
           ${path ? svg`<path class="dig__mountain" d=${path} />` : nothing}
-          ${truck()} ${spill()} ${excavator()}
+          <g class="dig__site" style=${`transform:translateX(${shift.toFixed(1)}px)`}>
+            ${truck()} ${spill()} ${excavator()}
+          </g>
         </svg>
       `;
     };
@@ -239,6 +289,20 @@ export default defineFrontend<TimerState, TimerConfig>({
       const label = timerLabel(config.label);
       const size = host.dataset.size ?? 'l';
       const share = done ? 0 : remainingShare(elapsed, total);
+      const scale = mountainSize(total);
+
+      /*
+       * Vorgerueckt wird einmal je Ladung und nicht laufend.
+       *
+       * Ein Bagger faehrt, wenn er Platz braucht, und nicht im Millimetertakt
+       * neben der Wand entlang. Nach jedem Wagen ist der Moment dafuer: die
+       * Schaufel ist leer, der naechste Wagen noch nicht da. Gerechnet wird der
+       * Stand deshalb zum Beginn der laufenden Ladung.
+       */
+      const loadMs = DIG.bucket * DIG.perLoad;
+      const settled = Math.floor(elapsed / loadMs) * loadMs;
+      const shift = siteShift(scale, done ? 0 : remainingShare(settled, total));
+
       /*
        * Die Zeichenzahl geht als Rechengroesse ins Stylesheet — dieselbe
        * Ueberlegung wie bei der Uhr: "07:12" ist schmaler als "1:07:12", und
@@ -254,7 +318,7 @@ export default defineFrontend<TimerState, TimerConfig>({
               <div class="timer__eyebrow">${label}</div>
               <div class="timer__value" style=${`--timer-chars:${value.length}`}>${value}</div>
             </div>
-            ${scene(mountainSize(total), share, !done)}
+            ${scene(scale, share, shift, !done)}
           </div>
         `,
         host,

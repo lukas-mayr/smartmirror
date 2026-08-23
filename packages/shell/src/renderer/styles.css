@@ -2982,36 +2982,20 @@ body {
 /* ------------------------------- Die Baustelle ----------------------------- */
 
 /*
- * Die Baustelle sitzt auf der Unterkante des Blocks (`preserveAspectRatio`
- * steht auf `xMinYMax`): der Boden der Zeichnung ist damit auch die Kante des
- * Blocks, und zwei Bloecke nebeneinander stehen auf derselben Linie.
+ * Gezeichnet wird in Koerpern und nicht in Strichen.
  *
- * Im quadratischen Block bekommt sie ihr eigenes Seitenverhaeltnis und der Rest
- * der Hoehe gehoert der Zeit — sonst bliebe zwischen Ziffern und Boden ein
- * Streifen Leere stehen, den niemand fuellt. In den flachen Bloecken steht sie
- * daneben und nimmt, was die Zeit uebriglaesst.
+ * Ein Ausleger ist ein Kastentraeger und keine Linie, eine Mulde ein Kasten mit
+ * Stirnwand und ein Rad hat eine Nabe. Aus drei Metern sieht man von alldem nur
+ * die Silhouette — und genau deshalb muss sie stimmen: eine Reihe gleich dicker
+ * Striche liest sich als Diagramm, ein Umriss als Maschine.
+ *
+ * Drei Staerken, drei Rollen: der Umriss traegt die Form, das Beiwerk
+ * (Zylinder, Rollen, Rippen, Zaehne) macht sie erkennbar, Scheiben und Naben
+ * stehen ganz zurueck. Ohne diese Ordnung waere jede Linie gleich wichtig, und
+ * das ist der Grund, warum eine Strichzeichnung flach aussieht.
  */
 .dig {
   color: var(--mirror-fg-dim);
-}
-
-.timer--l .timer__head {
-  flex: 1 1 auto;
-}
-
-.timer--l .dig {
-  flex: 0 0 auto;
-  width: 100%;
-  aspect-ratio: 220 / 58;
-}
-
-.timer--m .dig,
-.timer--xl .dig {
-  flex: 1 1 auto;
-  min-width: 0;
-  align-self: end;
-  aspect-ratio: 220 / 58;
-  max-height: 100%;
 }
 
 /* Der Boden ist eine Kante und kein Bauteil: er steht so weit zurueck wie eine
@@ -3034,32 +3018,100 @@ body {
   fill: var(--mirror-box-accent);
 }
 
+/*
+ * Die Ladung sitzt auf der Bordwand, nicht in der Mulde: von der Seite schaut
+ * niemand in einen Kipper hinein. Sichtbar wird sie erst, wenn sie oben ueber
+ * steht — und dann traegt sie den Ton des Berges, denn sie ist der Berg.
+ */
 .dig__cargo {
   stroke: var(--mirror-accent);
+  stroke-width: 1.6;
   fill: var(--mirror-box-accent);
-}
-
-/*
- * Was in der Schaufel liegt und was beim Kippen faellt, ist derselbe Stoff wie
- * der Berg — und traegt denselben Ton.
- *
- * Beide sind unsichtbar, solange sie nichts zu zeigen haben: die Deckkraft
- * steht ausschliesslich in den Animationsbildern. Steht die Baustelle still —
- * nachts, bei `prefers-reduced-motion` oder wenn die Zeit um ist —, haengt
- * damit kein Stoff in der Luft und keine Ladung in einer leeren Schaufel.
- */
-.dig__haul,
-.dig__spill {
-  stroke: var(--mirror-accent);
   opacity: 0;
 }
 
-/* Scheiben und Laufrollen sind Beiwerk: sie machen die Form erkennbar und
-   sollen sie nicht mittragen. */
+/* Was beim Kippen faellt. Die Deckkraft steht ausschliesslich in den
+   Animationsbildern: steht die Baustelle still, haengt nichts in der Luft. */
+.dig__spill {
+  stroke: var(--mirror-accent);
+  stroke-width: 1.4;
+  opacity: 0;
+}
+
+/* Der Umriss: Aufbauten, Kette, Ausleger, Stiel, Schaufel, Raeder. */
+.dig__body,
+.dig__wheel {
+  stroke: var(--mirror-fg-dim);
+  stroke-width: 1.8;
+}
+
+/* Beiwerk: Laufrollen, Rippen, Zaehne, Bordwandprofil. Es macht die Form
+   erkennbar und soll sie nicht mittragen. */
+.dig__trim {
+  stroke: var(--mirror-fg-mute);
+  stroke-width: 1.1;
+}
+
+/*
+ * Zylinder und Kolbenstangen.
+ *
+ * Als dicker und duenner Strich und nicht als Umriss: ein Hydraulikzylinder
+ * *ist* ein Rohr mit einer Stange darin, und zwei Staerken sagen das in zwei
+ * Linien. Ein gezeichneter Umriss haette an dieser Groesse mehr Ecken als
+ * Aussage.
+ */
+.dig__ram {
+  stroke: var(--mirror-fg-mute);
+  stroke-width: 3;
+}
+
+.dig__rod {
+  stroke: var(--mirror-fg-mute);
+  stroke-width: 1.2;
+}
+
+/* Der Rahmen, auf dem die Mulde sitzt. */
+.dig__frame {
+  stroke: var(--mirror-fg-dim);
+  stroke-width: 1.2;
+}
+
+/* Scheiben und Naben stehen ganz zurueck — sie sind Loecher in der Form. */
 .dig__pane,
-.dig__roller {
+.dig__hub {
   stroke: var(--mirror-fg-mute);
   stroke-width: 1;
+}
+
+/*
+ * Im flachen Block bleibt die Silhouette.
+ *
+ * Was nicht hineinpasst, faellt weg — es staucht sich nicht. Ein M-Block ist
+ * halb so hoch wie ein L, und darin werden Scheiben, Naben, Zylinder und
+ * Bordwandprofile zu einem Grieseln, das die Form eher verdeckt als erklaert.
+ * Uebrig bleibt, was die Maschine ausmacht: ihr Umriss.
+ */
+.timer--m .dig__trim,
+.timer--m .dig__hub,
+.timer--m .dig__pane,
+.timer--m .dig__ram,
+.timer--m .dig__rod {
+  display: none;
+}
+
+/*
+ * Der Vorschub.
+ *
+ * Die Abbaukante wandert nach rechts, also faehrt der Bagger ihr nach — und
+ * der Wagen steht dort, wo geladen wird, also faehrt er mit. Verschoben wird
+ * die ganze Baustelle und nicht jedes Teil einzeln: sie ist *ein* Ort.
+ *
+ * Der Wert kommt aus dem Modul und springt einmal je Ladung; der Uebergang
+ * macht daraus eine kurze Fahrt. Ohne ihn stuende die Maschine ploetzlich
+ * einen Schritt weiter rechts, und niemand haette sie fahren sehen.
+ */
+.dig__site {
+  transition: transform 900ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* --------------------------------- Bewegung -------------------------------- */
@@ -3067,19 +3119,19 @@ body {
 /*
  * Ein Eimer, in Prozent seiner Dauer:
  *
- *   0 – 7    ausheben: der Zahn faehrt in die Flanke und zieht nach unten durch
+ *   0 – 7    ausheben: der Zahn faehrt in die Wand und zieht nach unten durch
  *   7 – 15   zuziehen: die Schaufel rollt ein und ist voll
  *  15 – 26   heben
  *  26 – 40   schwenken: der Oberwagen dreht sich zur Mulde
- *  40 – 52   kippen
- *  52 – 66   zurueckschwenken
- *  66 – 82   senken
+ *  40 – 56   kippen; ab 56 ist die Schaufel leer
+ *  56 – 66   ausschwingen
+ *  66 – 82   zurueckschwenken und senken
  *  82 – 100  stehen, bevor es von vorn losgeht
  *
- * Dieselben Winkel stehen als POSE in modules/timer/src/scene.ts. Doppelt
- * gefuehrt, weil hier keine Rechnung moeglich ist und dort kein Browser — und
- * dort wird nachgerechnet, dass der Zahn den Berg trifft und die Ladung in die
- * Mulde faellt.
+ * Die Winkel stehen als POSE in modules/timer/src/scene.ts, das Ende des
+ * Kippens als DIG.dump im Design-System — daran haengt, wann der Wagen fahren
+ * darf. Doppelt gefuehrt, weil hier keine Rechnung moeglich ist und dort kein
+ * Browser; ein Test rechnet die Reihenfolge nach.
  */
 .dig.is-digging .dig__house {
   animation: dig-slew var(--dig-bucket) ease-in-out var(--dig-phase) infinite;
@@ -3097,10 +3149,6 @@ body {
   animation: dig-bucket var(--dig-bucket) ease-in-out var(--dig-phase) infinite;
 }
 
-.dig.is-digging .dig__haul {
-  animation: dig-haul var(--dig-bucket) linear var(--dig-phase) infinite;
-}
-
 .dig.is-digging .dig__spill {
   animation: dig-spill var(--dig-bucket) linear var(--dig-phase) infinite;
 }
@@ -3112,7 +3160,7 @@ body {
  * Versatz, der fuer sie stimmt, fuer den Eimer mit.
  */
 .dig.is-digging .dig__truck {
-  animation: dig-haul-away var(--dig-load) ease-in-out var(--dig-phase) infinite;
+  animation: dig-haul-away var(--dig-load) linear var(--dig-phase) infinite;
 }
 
 .dig.is-digging .dig__cargo {
@@ -3196,99 +3244,88 @@ body {
   }
 }
 
-/* Was in der Schaufel liegt, ist da, sobald sie zu ist, und weg, sobald sie
-   kippt. Ein Bagger, der eine leere Schaufel schwenkt, arbeitet nicht. */
-@keyframes dig-haul {
-  0%,
-  12% {
-    opacity: 0;
-  }
-  15%,
-  44% {
-    opacity: 1;
-  }
-  48%,
-  100% {
-    opacity: 0;
-  }
-}
-
 /* Der Stoff faellt nur waehrend des Kippens — und er faellt, er schwebt nicht. */
 @keyframes dig-spill {
   0%,
-  44% {
+  40% {
     opacity: 0;
     transform: translateY(0);
   }
-  47% {
+  43% {
     opacity: 1;
     transform: translateY(0);
   }
-  56% {
+  54% {
     opacity: 1;
-    transform: translateY(12px);
+    transform: translateY(9px);
   }
-  58%,
+  56%,
   100% {
     opacity: 0;
-    transform: translateY(14px);
+    transform: translateY(11px);
   }
 }
 
 /*
- * Die Ladung waechst in vier Stufen, eine je Eimer.
+ * Die Ladung waechst in Stufen — aber erst, wenn man sie sehen kann.
  *
- * Jede Stufe steht, bis der naechste Eimer kippt — deshalb je zwei Marken mit
- * demselben Wert. Ein stufenloses Wachsen waere eine Fuellstandsanzeige und
- * kein Verladen: was steigt, ohne dass jemand etwas hineinschuettet, kommt aus
- * dem Nichts.
+ * Die ersten beiden Eimer verschwinden in der Mulde: von der Seite schaut
+ * niemand hinein. Der dritte steht knapp ueber der Bordwand, der vierte haeuft
+ * sich. Jede Stufe springt, statt zu wachsen: was steigt, ohne dass jemand
+ * etwas hineinschuettet, kommt aus dem Nichts.
+ *
+ * Die Marken sitzen jeweils am *Ende* eines Kippens (14, 39, 64, 89 %) und
+ * nicht an seinem Anfang: vorher ist der Stoff noch in der Luft.
  */
 @keyframes dig-fill {
   0%,
-  12% {
-    transform: scaleY(0.06);
+  64% {
+    opacity: 0;
+    transform: scale(0.82, 0.15);
   }
-  13%,
-  25% {
-    transform: scaleY(0.3);
+  64.01%,
+  89% {
+    opacity: 1;
+    transform: scale(0.82, 0.38);
   }
-  26%,
-  50% {
-    transform: scaleY(0.55);
+  89.01%,
+  96% {
+    opacity: 1;
+    transform: scale(1, 1);
   }
-  51%,
-  75% {
-    transform: scaleY(0.78);
-  }
-  76%,
-  92% {
-    transform: scaleY(1);
-  }
-  93%,
+  96.01%,
   100% {
-    transform: scaleY(0.06);
+    opacity: 0;
+    transform: scale(0.82, 0.15);
   }
 }
 
 /*
  * Der volle Wagen faehrt ab, ein leerer kommt.
  *
- * Dass es derselbe ist, sieht niemand: der Sprung von "draussen links" zurueck
- * auf denselben Punkt liegt ausserhalb des Feldes. Er faehrt nach links, weil
- * das Fahrerhaus nach links zeigt — ein Lastwagen, der rueckwaerts aus dem Bild
+ * Er faehrt erst los, wenn die Schaufel leer ist — das letzte Kippen endet bei
+ * 89 %, er zieht bei 92 % an. Andersherum faellt eine Ladung neben die Mulde,
+ * und das sieht man sofort. Der naechste steht bei 8 %, also lange vor dem
+ * ersten Kippen bei 10 %.
+ *
+ * Dass es derselbe Wagen ist, sieht niemand: der Sprung von "draussen links"
+ * zurueck liegt ausserhalb des Feldes. Er faehrt nach links, weil das
+ * Fahrerhaus nach links zeigt — ein Lastwagen, der rueckwaerts aus dem Bild
  * rollt, sieht nicht nach Abtransport aus.
  */
 @keyframes dig-haul-away {
-  0%,
-  86% {
+  0% {
+    transform: translateX(-180px);
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  8%,
+  92% {
     transform: translateX(0);
+    animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.45);
   }
-  93%,
-  95% {
-    transform: translateX(-140px);
-  }
+  97%,
   100% {
-    transform: translateX(0);
+    transform: translateX(-180px);
   }
 }
 
@@ -3304,18 +3341,27 @@ body {
  * Stelle, an der alle haengen.
  *
  * Bei einer Dauer von null steht jedes Teil auf seinem Ausgangswert: der Arm
- * in der Grabstellung, die Schaufel leer, der Wagen an seinem Platz. Der Berg
- * bleibt dabei richtig gross — er ist Inhalt und keine Bewegung.
+ * in der Grabstellung, die Mulde leer, der Wagen an seinem Platz. Der Berg
+ * bleibt dabei richtig gross und der Vorschub an der richtigen Stelle — beides
+ * ist Inhalt und keine Bewegung.
  */
 [data-night='1'] {
   --dig-bucket: 0s;
   --dig-load: 0s;
 }
 
+[data-night='1'] .dig__site {
+  transition: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   :root {
     --dig-bucket: 0s;
     --dig-load: 0s;
+  }
+
+  .dig__site {
+    transition: none;
   }
 }
 
