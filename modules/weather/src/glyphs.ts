@@ -42,9 +42,8 @@ export const FIELD = 24;
 /** Abstand zum Rand, den jede Form auch in voller Bewegung haelt. */
 export const SAFE_MARGIN = 0.3;
 
-/** Strichstaerken. Der Blitz rechnet mit seiner dicksten Stufe. */
+/** Strichstaerke des ganzen Satzes – auch der Blitz haelt sie ein. */
 const STROKE = 1.5;
-const BOLT_STROKE = 2.8;
 
 /**
  * Groesster Ausschlag jeder Bewegung, in Feldeinheiten.
@@ -355,7 +354,7 @@ function bolts(): Piece[] {
     d: `M${round(x + 1)} ${top}L${round(x - 0.9)} ${middle}H${round(x + 0.7)}L${round(x - 1)} ${bottom}`,
     cls: 'weather__bolt',
     moves: ['drift'] as const,
-    stroke: BOLT_STROKE,
+    stroke: STROKE,
     box: box(x - 1, top, x + 1, bottom),
   }));
 }
