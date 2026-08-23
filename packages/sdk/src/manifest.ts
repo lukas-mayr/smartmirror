@@ -199,6 +199,11 @@ export function assertValidManifest(input: unknown, source: string): asserts inp
  * Gelesen wird nur aus den Feldern, die das Manifest in `allowFromConfig`
  * nennt, und daraus nur, was tatsaechlich wie eine Adresse aussieht. Ein
  * mehrzeiliges Feld darf dabei mehrere enthalten – so tippt man Kalender ein.
+ *
+ * `webcal://` zaehlt mit: iCloud und Google geben einen Kalender genau so
+ * heraus, das Kalendermodul macht daraus vor dem Laden ein `https://`, und
+ * ohne diese Zeile stuende der Host trotzdem nicht auf der Allowlist – der
+ * eingetragene Kalender bliebe stumm, obwohl er richtig eingetragen ist.
  */
 export function hostsFromConfig(
   manifest: ModuleManifest,
@@ -209,7 +214,7 @@ export function hostsFromConfig(
   for (const field of fields) {
     const value = config[field];
     if (typeof value !== 'string') continue;
-    for (const match of value.matchAll(/https?:\/\/([^\s/|"']+)/gi)) {
+    for (const match of value.matchAll(/(?:https?|webcal):\/\/([^\s/|"']+)/gi)) {
       const host = match[1]?.toLowerCase();
       if (host) hosts.push(host.split('@').pop() as string);
     }

@@ -75,7 +75,33 @@ export interface EventInstance {
  * gilt.
  */
 export function toInstant(time: WallTime, fallbackZone: string): number {
-  return instantOf(time, time.zone ?? fallbackZone);
+  const zone = time.zone ?? fallbackZone;
+  return instantOf(time, usableZone(zone) ? zone : fallbackZone);
+}
+
+/** Zonen, nach denen schon gefragt wurde – `Intl` kostet pro Aufruf. */
+const knownZones = new Map<string, boolean>();
+
+/**
+ * Kennt `Intl` diese Zone?
+ *
+ * Nicht jeder TZID ist eine IANA-Zone: ein Kalender, in den einmal ein
+ * Outlook-Termin eingeladen wurde, traegt dessen "W. Europe Standard Time"
+ * mit, und `Intl` wirft darauf. Ohne diese Frage risse ein einziger solcher
+ * Termin die ganze Quelle mit – die Zone des Spiegels ist die bessere
+ * Antwort als gar kein Kalender.
+ */
+function usableZone(zone: string): boolean {
+  const known = knownZones.get(zone);
+  if (known !== undefined) return known;
+  let ok = true;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: zone });
+  } catch {
+    ok = false;
+  }
+  knownZones.set(zone, ok);
+  return ok;
 }
 
 /** Schluessel eines Startzeitpunkts, um Ausnahmen zu erkennen. */
@@ -110,7 +136,7 @@ function unescape(value: string): string {
   return value
     .replace(/\\n/gi, ' ')
     .replace(/\\,/g, ',')
-    .replace(/\;/g, ';')
+    .replace(/\\;/g, ';')
     .replace(/\\\\/g, '\\')
     .replace(/\s+/g, ' ')
     .trim();
