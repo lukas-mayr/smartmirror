@@ -42,6 +42,17 @@ node -e '
 chown "$SERVICE_USER:$SERVICE_USER" "$CONFIG"
 chmod 600 "$CONFIG"
 
+# Der Startbildschirm von Plymouth muss mitdrehen.
+#
+# Er ist ein fertiges Bild und kann sich nicht selbst drehen – welche der vier
+# Fassungen gilt, entscheidet mirror-bootlook.sh anhand genau des Feldes, das
+# gerade geschrieben wurde. Faellt das aus, ist nur das Wortzeichen beim Booten
+# quer; die Anzeige selbst dreht sich unabhaengig davon.
+if [[ -x "$INSTALL_ROOT/current/deploy/mirror-bootlook.sh" || -f "$INSTALL_ROOT/current/deploy/mirror-bootlook.sh" ]]; then
+  bash "$INSTALL_ROOT/current/deploy/mirror-bootlook.sh" >/dev/null 2>&1 \
+    || echo "Hinweis: Der Startbildschirm beim Booten bleibt in der alten Drehung." >&2
+fi
+
 # Der Core haelt die Konfiguration im Speicher und schreibt sie bei der
 # naechsten Aenderung zurueck. Ohne Neustart waere die Drehung also nicht nur
 # unwirksam, sondern demnaechst auch wieder aus der Datei verschwunden.

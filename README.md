@@ -20,15 +20,18 @@ Drei Prozesse, bewusst getrennt:
 | **Anzeige** | `mirror-shell.service` | Electron unter [`cage`](https://github.com/cage-kiosk/cage), einem Wayland-Compositor für genau ein Fenster. Kein Desktop, keine Browser-Bedienelemente. |
 | **Updater** | `mirror-updater.service` + `.timer` + `.path` | Prüft GitHub Releases, verifiziert Signaturen, tauscht Symlinks, rollt bei fehlgeschlagenem Healthcheck zurück. Der Timer prüft regelmäßig, die Path-Unit startet ihn sofort, wenn die App darum bittet. |
 | **Neustart** | `mirror-system.service` + `.path` | Startet auf Anforderung aus der App die Dienste neu oder bootet das Gerät. Kennt genau diese zwei Aufträge. |
+| **Startbild** | `mirror-bootlook.service` | Sorgt bei jedem Start dafür, dass beim Booten der Spiegel zu sehen ist und nicht der Pi: Firmware-Splash aus, Textkonsole auf ein unsichtbares Terminal, Plymouth mit dem Wortzeichen. Ändert nur, was fehlt. |
 
 Der Updater ist ein eigener Dienst, weil er genau die Dateien ersetzt, aus
 denen der Core läuft, und ihn danach neu startet — im selben Prozess würde er
 sich selbst unter den Füßen wegziehen.
 
-Die beiden letzten sind die einzigen Teile mit Root-Rechten, und beide werden
-über eine Datei angestoßen statt über einen Aufruf: der Core läuft
-unprivilegiert und soll das auch bleiben (siehe
-[Neustart aus der Handy-App](#neustart-aus-der-handy-app)).
+Die drei letzten sind die einzigen Teile mit Root-Rechten. Der Core läuft
+unprivilegiert und soll das bleiben: was er anstoßen können muss, stößt er über
+eine Datei an und nicht über einen Aufruf (siehe
+[Neustart aus der Handy-App](#neustart-aus-der-handy-app)). `mirror-bootlook`
+fragt niemand — es läuft beim Start und richtet ein, was außerhalb des Releases
+liegt (siehe [Der Startbildschirm](#der-startbildschirm)).
 
 ```
 packages/
@@ -46,7 +49,8 @@ modules/
   calendar/      ICS-Kalender (iCloud, Gemeinde, Schule), Zeitraum einstellbar
   sbb/           Abfahrten einer Haltestelle, von der Fahrplanauskunft search.ch
   notifications/ Die Fläche für Mitteilungen; den Inhalt melden die Module
-deploy/      systemd-Units, Compositor-Start, Installer, Drehung, Neustart
+deploy/      systemd-Units, Compositor-Start, Installer, Drehung, Neustart,
+             Plymouth-Thema fuer den Start
 scripts/     Build-, Bundle- und Generator-Skripte
 ```
 
@@ -580,7 +584,7 @@ und das mitten in der Partitions- und Systemkonfiguration.
 Der Installer legt den Dienstbenutzer an, installiert `cage`, Node und die
 systemd-Units, holt den Signierschlüssel und das neueste Release, setzt
 `vc4-kms-v3d` in der `config.txt` und den Hostnamen auf `smartmirror`, und er
-legt die Textkonsole auf ein unsichtbares Terminal (siehe
+richtet ein, wie der Start aussieht (siehe
 [Der Startbildschirm](#der-startbildschirm)). Ein zweiter Lauf aktualisiert nur,
 was sich geändert hat, und lässt Konfiguration und Kopplungen unberührt.
 
@@ -676,55 +680,120 @@ kurze Kante.
 ### Der Startbildschirm
 
 Zwischen Einschalten und dem ersten Bild vergehen auf einem Pi gut zwanzig
-Sekunden. Bis Version 0.16 war in dieser Zeit das zu sehen, was jeder Linux
-zeigt: das Regenbogenquadrat der Firmware, danach Kernel- und systemd-Zeilen und
-zuletzt eine Anmeldeaufforderung, die stehen blieb, bis die Anzeige startete.
+Sekunden. Ohne Zutun zeigt Linux darin, was jeder Linux zeigt: das
+Regenbogenquadrat der Firmware, danach Kernel- und systemd-Zeilen und zuletzt
+eine Anmeldeaufforderung, die stehen bleibt, bis die Anzeige startet.
 
 Hinter halbdurchlässigem Glas ist das das Auffälligste am ganzen Gerät. Der
 Spiegel soll aussehen wie ein Spiegel — und ausgerechnet beim Einschalten, dem
-einzigen Moment, in dem jemand hinsieht, buchstabierte er, dass dahinter ein
+einzigen Moment, in dem jemand hinsieht, buchstabiert er, dass dahinter ein
 Rechner hängt.
 
-Jetzt zeigt er stattdessen sich selbst: schwarze Fläche, das Wort
-**Smartmirror** in Grau und drei atmende Punkte. Kein Fortschritt in Prozent und
-kein Kreisel — beides behauptet, jemand stünde davor und warte. Sobald der erste
-Schnappschuss des Cores da ist, blendet der Startbildschirm über in den Inhalt.
+Stattdessen zeigt er von Anfang an sich selbst: schwarze Fläche, das Wort
+**Smartmirror** in Grau, drei Punkte. Kein Fortschritt in Prozent und kein
+Kreisel — beides behauptet, jemand stünde davor und warte.
 
-Dafür sind vier Dinge nötig, drei davon macht der Installer:
+**In zwei Etappen, die ineinander übergehen.** Bis die Anzeige läuft, zeichnet
+Plymouth das Bild; danach zeichnet die Anzeige es selbst weiter. Dass gewechselt
+wurde, ist nur daran zu erkennen, dass die drei Punkte anfangen zu atmen. Damit
+zwischen beiden kein Schwarz aufblitzt, endet Plymouth erst nach dem Start der
+Anzeige und mit `--retain-splash`: das letzte Bild bleibt stehen, bis `cage`
+darüber zeichnet.
+
+Nötig sind dafür vier Dinge, und drei davon liegen außerhalb des Releases:
 
 - **`disable_splash=1`** in der `config.txt`. Das Regenbogenquadrat ist die
   einzige große helle Fläche im ganzen Startvorgang.
-- **`console=tty3`** in der `cmdline.txt`. Die Konsole wandert als Ganzes auf ein
-  Terminal, das nie angezeigt wird. Das ist gründlicher als `quiet`: es trifft
-  auch die Meldungen, die `quiet` durchlässt — Warnungen, Fehler, Dateisystemprüfungen.
+- **`console=tty3`** in der `cmdline.txt`. Die Konsole wandert als Ganzes auf
+  ein Terminal, das nie angezeigt wird. Das ist gründlicher als `quiet`: es
+  trifft auch die Meldungen, die `quiet` durchlässt — Warnungen, Fehler,
+  Dateisystemprüfungen.
 - **Die Anmeldeaufforderung zieht mit** auf `tty3`. Sie ganz abzuschalten wäre
   kürzer, nähme aber den letzten Weg auf ein Gerät, dessen Netzwerk nicht mehr
   geht. Mit Bildschirm und Tastatur führt **Alt+F3** weiterhin zur Anmeldung.
 - **Die Anzeige startet sofort**, ohne auf den Core zu warten. Vorher wartete sie
   bis zu 30 Sekunden auf dessen `/healthz`, damit der Spiegel nicht kurz „keine
-  Verbindung“ zeigt — und genau diese halbe Minute war das Fenster, in dem
+  Verbindung" zeigt — und genau diese halbe Minute war das Fenster, in dem
   stattdessen die Konsole zu sehen war. Den Hinweis blendet sie jetzt aus,
   solange der Startbildschirm liegt: dass die Verbindung beim Start noch nicht
   steht, ist kein Fehler, sondern die Reihenfolge.
 
-Drehung und Nachtabsenkung stehen in der Konfiguration des Cores, und die ist
-beim allerersten Bild noch nicht da. Die Anzeige schreibt beide Werte deshalb
-mit und holt sie beim nächsten Start hervor — sonst läge das Wortzeichen auf
-einem hochkant aufgehängten Spiegel quer, und ein Update um drei Uhr nachts
-ließe ihn in voller Helligkeit aufleuchten. Nur beim allerersten Start nach der
-Installation fehlt der gemerkte Wert; danach stimmt er.
+#### Warum das ein Dienst ist und nicht nur ein Teil des Installers
 
-Auf einem Spiegel, der schon hängt, kommen die drei System-Änderungen nicht per
-Update: der Updater fasst die Startdateien des Systems bewusst nicht an — er
-tauscht ein Release aus und nicht die Einrichtung des Geräts. Den eigenen
-Startbildschirm bringt das Update trotzdem mit; wer auch die Konsole loswerden
-will, lässt einmal den Installer erneut laufen.
+Ein Spiegel hängt an der Wand, oft im Bad, und wer ihn bedient, hat ein Handy in
+der Hand und kein Terminal. Änderungen an `/boot` kämen über ein Update nie an —
+der Updater tauscht ein Release aus und nicht die Einrichtung des Geräts. Wer
+nicht per SSH drankommt, bliebe also dauerhaft bei der Textkonsole.
 
-Die Änderungen an `config.txt` und `cmdline.txt` greifen erst nach einem
-Neustart. Wer sie gar nicht will — etwa weil der Pi noch für etwas anderes
-benutzt wird —, ruft den Installer mit `--skip-boot-config` auf; dann bleiben
-beide Dateien und die Konsole unberührt, und nur der Startbildschirm der Anzeige
-kommt dazu.
+Deshalb erledigt das **`mirror-bootlook.service`**, ein Dienst, der bei jedem
+Start nachsieht und nur ändert, was fehlt. Er kommt als Teil des Releases mit,
+und der Updater aktiviert neue Units von selbst — ein Update und ein Neustart
+genügen. Der Installer ruft dasselbe Skript auf; es gibt nur eine Fassung davon,
+und damit keine zweite, die irgendwann die falsche wäre.
+
+Fehlt Plymouth auf dem Gerät, installiert der Dienst es nach — höchstens dreimal,
+danach nicht mehr, damit ein Pi ohne Netz nicht bei jedem Start apt bemüht. Klappt
+es nicht, bleibt der Bildschirm bis zur Anzeige schwarz. Das ist kein Fehler, nur
+weniger: schwarz sieht hinter einem Spiegel immer noch richtig aus.
+
+#### Was dabei schiefgehen könnte
+
+Der Dienst schreibt an der Datei, mit der der Pi bootet. Eine kaputte
+`cmdline.txt` heißt: das Gerät startet nicht mehr — und genau der Fall, kein
+Terminal in Reichweite, ist der Grund, warum es ihn gibt. Vier Vorkehrungen:
+
+- Es wird nur ergänzt, nie entfernt. `console=tty1` wird ersetzt; steht dort
+  schon ein anderes Terminal, wurde die Zeile von Hand angepasst und bleibt
+  unberührt.
+- Vor dem Schreiben wird gegengelesen: fehlt danach `root=` oder `console=`,
+  passiert nichts.
+- Die erste Fassung wird einmalig als `cmdline.txt.smartmirror-orig` gesichert.
+- Geschrieben wird daneben und dann umbenannt — ein Stromausfall mitten im
+  Schreiben hinterlässt keine halbe Kernel-Zeile.
+
+#### Der Neustart, der noch fehlt
+
+`config.txt` und `cmdline.txt` wirken erst beim nächsten Start. Wer nicht ans
+Terminal kann, sähe nirgends, dass etwas geändert wurde und nur noch der Neustart
+fehlt — deshalb steht es in der App: unter **System → Neustart** erscheint der
+Hinweis direkt über dem Knopf, der ihn erledigt.
+
+Ob ein Neustart aussteht, lässt sich nicht am Dateiinhalt ablesen. Der Dienst
+merkt sich stattdessen, in welcher Sitzung er zuletzt etwas geändert hat
+(`/proc/sys/kernel/random/boot_id`). Ist das die laufende, steht der Neustart
+noch aus; ist es eine frühere, ist alles längst wirksam und der Hinweis
+verschwindet von selbst.
+
+#### Drehung und Nachtabsenkung
+
+Beide stehen in der Konfiguration des Cores, und die ist beim allerersten Bild
+noch nicht da. Die Anzeige schreibt sie deshalb mit und holt sie beim nächsten
+Start hervor — sonst läge das Wortzeichen auf einem hochkant aufgehängten
+Spiegel quer, und ein Update um drei Uhr nachts ließe ihn in voller Helligkeit
+aufleuchten.
+
+Plymouth kann die Konfiguration gar nicht lesen. Sein Bild liegt deshalb fertig
+gedreht in vier Fassungen bei (`deploy/plymouth/splash-<grad>.png`); welche gilt,
+legt `mirror-bootlook.sh` an die Stelle, die das Thema lädt — und `rotate.sh`
+zieht sie mit, wenn sich die Drehung ändert. Fertig gedreht und nicht zur
+Laufzeit, weil eine Drehung um ein Vielfaches von 90 Grad dann pixelgenau bleibt.
+
+Die Bilder entstehen mit `scripts/generate-splash.mjs` aus derselben Schrift und
+denselben Werten wie der Startbildschirm der Anzeige — sonst spränge das Bild
+beim Übergang. Das Skript läuft von Hand und nicht in der CI: es braucht einen
+Browser, und die vier Dateien ändern sich nur, wenn sich das Wortzeichen ändert.
+
+#### Abschalten
+
+Wer den Start gar nicht angefasst haben will — etwa weil der Pi noch für etwas
+anderes benutzt wird:
+
+```bash
+sudo systemctl disable --now mirror-bootlook.service
+```
+
+Beim Installieren tut `--skip-boot-config` dasselbe. Die gesicherte
+`cmdline.txt.smartmirror-orig` liegt daneben, falls die alte Zeile zurück soll.
 
 ### Was der Installer mit dem Signierschlüssel macht
 

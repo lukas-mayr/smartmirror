@@ -357,7 +357,8 @@ log "Release $BUNDLE_VERSION nach $TARGET installieren"
 rm -rf "$TARGET"
 mkdir -p "$TARGET"
 cp -a "$STAGING/." "$TARGET/"
-chmod +x "$TARGET/deploy/cage-session.sh" "$TARGET/deploy/rotate.sh" "$TARGET/deploy/mirror-system.sh" 2>/dev/null || true
+chmod +x "$TARGET/deploy/cage-session.sh" "$TARGET/deploy/rotate.sh" \
+  "$TARGET/deploy/mirror-system.sh" "$TARGET/deploy/mirror-bootlook.sh" 2>/dev/null || true
 chmod +x "$TARGET/shell/smartmirror-shell" 2>/dev/null || true
 
 # Electrons Sandbox-Helfer braucht setuid-root, sonst startet die Anwendung mit
@@ -446,87 +447,42 @@ if [[ "$SKIP_BOOT_CONFIG" == "no" && -f "$BOOT_CONFIG" ]]; then
   if ! grep -qE '^\s*disable_overscan=1' "$BOOT_CONFIG"; then
     printf 'disable_overscan=1\n' >> "$BOOT_CONFIG"
   fi
-  # Das Regenbogenquadrat der Firmware ist das erste Bild nach dem Einschalten
-  # und die einzige grosse helle Flaeche im ganzen Startvorgang.
-  if ! grep -qE '^\s*disable_splash=1' "$BOOT_CONFIG"; then
-    printf 'disable_splash=1\n' >> "$BOOT_CONFIG"
-  fi
 fi
 
-# Die Textkonsole verschwinden lassen.
+# Aussehen des Starts einrichten.
 #
-# Zwischen Einschalten und dem ersten Bild des Spiegels liefen bisher
+# Zwischen Einschalten und dem ersten Bild des Spiegels liefen frueher
 # Kernel-Meldungen, systemd-Zeilen und am Ende eine Anmeldeaufforderung ueber
 # den Bildschirm. Hinter halbdurchlaessigem Glas ist das das Auffaelligste am
 # ganzen Geraet: weisse Textzeilen auf Schwarz, eine halbe Minute lang.
 #
-# Statt sie einzeln stummzuschalten wandert die Konsole als Ganzes auf tty3 –
-# ein Terminal, das nie angezeigt wird. Das ist gruendlicher als "quiet": es
-# trifft auch Meldungen, die "quiet" durchlaesst (Warnungen, Fehler, fsck), und
-# es kostet nichts, weil auf diesem Geraet ohnehin niemand mitliest.
-#
-# Was der Spiegel in diesen Sekunden zeigt, kommt jetzt aus der Anzeige selbst:
-# ein schwarzer Startbildschirm mit Wortzeichen (packages/shell).
-CMDLINE="/boot/firmware/cmdline.txt"
-[[ -f "$CMDLINE" ]] || CMDLINE="/boot/cmdline.txt"
+# Was dagegen zu tun ist, steht nicht hier, sondern in mirror-bootlook.sh – und
+# zwar aus einem Grund, der wichtiger ist als die Ersparnis an Zeilen: dasselbe
+# Skript laeuft als Dienst bei jedem Start. Ein Spiegel haengt an der Wand,
+# oft ohne dass jemand kurzfristig per SSH drankommt; wer nicht ans Terminal
+# kann, bekaeme Aenderungen an /boot sonst nie zu sehen, denn der Updater
+# tauscht das Release und nichts sonst. Stuende die Logik hier, gaebe es zwei
+# Fassungen davon, und die zweite waere irgendwann die falsche.
+if [[ "$SKIP_BOOT_CONFIG" == "no" ]]; then
+  log "Aussehen des Starts einrichten"
 
-# Steht am Ende im Abschlussbericht. Der Ausgangswert gilt, wenn die Konsole
-# unangetastet bleibt – dann laeuft sie beim Booten weiter ueber den Bildschirm,
-# und das soll dort stehen und nicht verschwiegen werden.
-CONSOLE_SUMMARY="  Startbildschirm Die Textkonsole bleibt unveraendert und laeuft beim Booten
-                  weiter ueber den Bildschirm."
+  # Plymouth zeigt das Wortzeichen des Spiegels, waehrend das System hochfaehrt
+  # – die zwanzig Sekunden, in denen die Anzeige noch startet. Ohne Plymouth
+  # bleibt der Bildschirm in dieser Zeit schwarz; das ist kein Fehler, nur
+  # weniger. Deshalb hier versuchen und nicht darauf bestehen.
+  apt-get install -y --no-install-recommends plymouth >/dev/null 2>&1 \
+    || warn "Plymouth nicht installierbar – der Start bleibt bis zur Anzeige schwarz."
 
-if [[ "$SKIP_BOOT_CONFIG" == "no" && -f "$CMDLINE" ]]; then
-  log "Textkonsole ruhigstellen ($CMDLINE)"
-  CMDLINE_BEFORE="$(cat "$CMDLINE")"
+  MIRROR_INSTALL_ROOT="$INSTALL_ROOT" MIRROR_DATA_DIR="$INSTALL_ROOT/data" \
+    MIRROR_SERVICE_USER="$SERVICE_USER" \
+    bash "$INSTALL_ROOT/current/deploy/mirror-bootlook.sh" \
+    || warn "Der Startbildschirm liess sich nicht einrichten – der Spiegel laeuft trotzdem."
 
-  # Alle Parameter stehen in einer einzigen Zeile, durch Leerzeichen getrennt.
-  # Deshalb Wort fuer Wort pruefen und nur Fehlendes anhaengen: so bleibt ein
-  # zweiter Lauf folgenlos, und von Hand Eingetragenes bleibt stehen.
-  cmdline_add() {
-    local key="${1%%=*}"
-    grep -qE "(^|[[:space:]])${key}(=|[[:space:]]|\$)" "$CMDLINE" && return 0
-    sed -i "1 s|\$| $1|" "$CMDLINE"
-  }
-
-  # tty1 ist das Terminal, das beim Booten sichtbar ist. Steht dort schon ein
-  # anderes, wurde die Zeile von Hand angepasst – dann nicht hineinregieren.
-  if grep -qE '(^|[[:space:]])console=tty1([[:space:]]|$)' "$CMDLINE"; then
-    sed -i -E '1 s/(^|[[:space:]])console=tty1([[:space:]]|$)/\1console=tty3\2/' "$CMDLINE"
-  else
-    cmdline_add console=tty3
-  fi
-
-  # Der Rest deckt ab, was vor der Konsole kommt oder neben ihr laeuft:
-  # die Raspberry-Logos zeichnet der Framebuffer selbst, der Blinkcursor haengt
-  # am Terminal, und der Bildschirmschoner der Konsole wuerde spaeter mitten in
-  # den Betrieb hinein abdunkeln.
-  cmdline_add logo.nologo
-  cmdline_add vt.global_cursor_default=0
-  cmdline_add consoleblank=0
-  cmdline_add quiet
-
-  # Die Anmeldeaufforderung zieht mit.
-  #
-  # Sie ganz abzuschalten waere kuerzer, nimmt aber den letzten Weg auf ein
-  # Geraet, dessen Netzwerk nicht mehr geht: Bildschirm und Tastatur anstecken
-  # und sich anmelden. Auf tty3 bleibt genau das moeglich – mit Alt+F3 –, nur
-  # sieht es beim Booten niemand mehr.
-  if systemctl is-enabled getty@tty1.service >/dev/null 2>&1; then
-    systemctl disable --now getty@tty1.service >/dev/null 2>&1 \
-      || warn "getty auf tty1 liess sich nicht abschalten – beim Booten bleibt die Anmeldezeile sichtbar."
-  fi
-  systemctl enable --now getty@tty3.service >/dev/null 2>&1 \
-    || warn "getty auf tty3 liess sich nicht einrichten – eine lokale Anmeldung am Bildschirm gibt es dann nicht mehr."
-  log "Anmeldung am Bildschirm liegt auf tty3 (Alt+F3)."
-  # Die Kernel-Zeile liest nur der Bootloader – geaenderte Parameter greifen
-  # deshalb erst beim naechsten Start, anders als die getty-Umstellung.
-  if [[ "$CMDLINE_BEFORE" != "$(cat "$CMDLINE")" ]]; then
-    warn "Startdateien geaendert – die stille Konsole greift nach einem Neustart."
-  fi
-  CONSOLE_SUMMARY="  Startbildschirm Die Textkonsole liegt auf tty3 und ist beim Booten nicht
-                  mehr zu sehen – der Spiegel zeigt stattdessen seinen eigenen
-                  Startbildschirm. Anmeldung am Bildschirm: Alt+F3."
+  CONSOLE_SUMMARY="  Startbildschirm Textkonsole auf tty3, beim Booten unsichtbar; Plymouth zeigt
+                  das Wortzeichen bis die Anzeige da ist. Anmeldung: Alt+F3."
+else
+  CONSOLE_SUMMARY="  Startbildschirm Unveraendert (--skip-boot-config): beim Booten laeuft
+                  weiterhin die Textkonsole ueber den Bildschirm."
 fi
 
 if [[ "$(hostname)" != "smartmirror" ]]; then
@@ -548,7 +504,7 @@ systemctl daemon-reload
 # die er schreibt. Der Timer bleibt die regelmaessige Pruefung.
 # mirror-system.path gehoert dazu: ohne sie bleiben die Neustart-Knoepfe in der
 # App wirkungslos – der Core schreibt seine Auftragsdatei, und niemand liest sie.
-systemctl enable mirror-guard.service mirror-core.service mirror-shell.service mirror-updater.timer mirror-updater.path mirror-system.path >/dev/null
+systemctl enable mirror-guard.service mirror-core.service mirror-shell.service mirror-updater.timer mirror-updater.path mirror-system.path mirror-bootlook.service >/dev/null
 systemctl restart mirror-core.service
 systemctl restart mirror-shell.service
 systemctl start mirror-updater.timer
