@@ -25,6 +25,8 @@ const WANTED = [
   'wind', 'snowflake', 'droplets', 'thermometer', 'sunrise', 'sunset',
   // Musik
   'music', 'pause',
+  // Verkehr
+  'train-front',
   // Allgemein
   'clock', 'calendar-days', 'bell', 'triangle-alert', 'wifi-off', 'refresh-cw',
 ];

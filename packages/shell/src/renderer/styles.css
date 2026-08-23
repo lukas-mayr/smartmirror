@@ -148,11 +148,13 @@
 
   /* ---------------------------------- Feed --------------------------------- */
 
-  --feed-item-h: 232px;
-  --feed-item-h-rest: 148px;
-  --feed-gap: var(--mirror-gap);
-  --feed-title: 72px;
-  --feed-title-rest: 56px;
+  --feed-item-h: 84px;
+  --feed-item-h-rest: 64px;
+  /* Die Haelfte des Blockabstands – und derselbe Wert wie FEED.gap im
+     Design-System: die Anzeige rechnet mit ihm aus, wieviele Zeilen passen. */
+  --feed-gap: 1rem;
+  --feed-title: 30px;
+  --feed-title-rest: 26px;
   --feed-dim-1: 0.8;
   --feed-dim-2: 0.45;
 
@@ -2384,13 +2386,20 @@ body {
 /* ----------------------------- Mitteilungsfeed ---------------------------- */
 
 /*
- * Der Feed zeigt eine Mitteilung gross und darunter so viele als Ausblick, wie
- * in den Block passen.
+ * Der Feed ist eine Liste schmaler Zeilen: Symbol, Titel, Beschreibung.
  *
- * Die oberste traegt die Flaeche und die volle Groesse, die darunter stehen
- * frei und nach unten hin blasser. Damit liest man aus 3 m nur die oberste
- * Zeile und weiss trotzdem, dass mehr wartet — der Rest ist kein Text, den man
- * lesen soll, sondern die Auskunft "da kommt noch was".
+ * Die oberste traegt die Flaeche, die darunter stehen frei und nach unten hin
+ * blasser. Damit liest man aus 3 m nur die oberste Zeile und weiss trotzdem,
+ * dass mehr wartet — der Rest ist kein Text, den man lesen soll, sondern die
+ * Auskunft "da kommt noch was".
+ *
+ * Klein gesetzt, und zwar mit Absicht. Bis 0.13 stand die oberste Mitteilung
+ * in 72 px auf 232 px Hoehe; das ist die Groesse einer Temperatur oder einer
+ * Uhrzeit — eines Wertes also, fuer den man hinsieht. Eine Mitteilung ist
+ * keiner: man ueberfliegt sie im Vorbeigehen. Sie steht deshalb jetzt in den
+ * kleinen Stufen des Design-Systems, naeher an den Wochentagen der Vorschau
+ * im Wetterblock als an der Temperatur darueber — und in dieselbe Hauptzone
+ * passen statt drei Meldungen acht.
  *
  * Wieviele Positionen es sind, rechnet die Anzeige aus der Blockhoehe aus. Das
  * Stylesheet kennt deshalb nur zwei Rollen — die oberste und der Rest — und
@@ -2409,6 +2418,24 @@ body {
   align-items: stretch;
   gap: var(--feed-gap);
   container-type: size;
+  /*
+   * Die Groesse der ganzen Liste haengt an einer Zahl, alles darin ist ein
+   * Vielfaches davon.
+   *
+   * Der Pixelwert steht vorn und deckelt: die Masse des Design-Systems gelten
+   * fuer 1080 x 1920, und auf einem groesseren Bildschirm soll eine Mitteilung
+   * eine Mitteilung bleiben und nicht zur Ueberschrift wachsen. Darunter
+   * entscheiden Hoehe und Breite des Blocks — in einem schmalen Block gewinnt
+   * die Breite, sonst waere die Zeile abgeschnitten statt kleiner.
+   *
+   * Als eigene Eigenschaft und nicht nur als `font-size`, weil das Raster der
+   * Zeile nicht mitschrumpfen darf: die Ausblick-Positionen setzen ihren Text
+   * eine Stufe kleiner, und waeren Innenabstand und Symbolspalte in `em`
+   * gerechnet, ruecken sie mit — die Titel begaennen dann auf jeder Position
+   * an einer anderen Kante.
+   */
+  --feed-size: min(var(--feed-title), 8cqh, 6cqw);
+  font-size: var(--feed-size);
 }
 
 .feed__head {
@@ -2416,7 +2443,7 @@ body {
   align-items: center;
   gap: 0.8em;
   flex: none;
-  font-size: min(4cqh, 2.6cqw);
+  font-size: 0.62em;
   font-weight: var(--mirror-weight-label);
   letter-spacing: var(--mirror-track-label-wide);
   text-transform: uppercase;
@@ -2457,21 +2484,25 @@ body {
  * gehaengt, und die Position bestimmt Groesse, Flaeche und Deckkraft. Beim
  * Nachruecken aendert sich damit nur, welcher Eintrag an welcher Position
  * haengt, und die Form der Liste bleibt exakt dieselbe.
+ *
+ * Der Innenabstand steht auf jeder Position und nicht nur auf der obersten,
+ * obwohl nur die eine Flaeche traegt: sonst begaenne die oberste Zeile weiter
+ * rechts als alle darunter, und eine Liste mit einem Knick in der Textkante
+ * liest sich als Fehler. Die Flaeche selbst beginnt weiterhin an der Kante des
+ * Blocks — sie ist es, die auf der Rasterlinie steht.
  */
 .feed__item {
   display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: flex-start;
-  gap: 0.1em;
-  border-radius: var(--mirror-radius-l);
+  align-items: center;
+  gap: calc(0.5 * var(--feed-size));
+  padding: 0 calc(0.9 * var(--feed-size));
+  border-radius: var(--mirror-radius-m);
   min-width: 0;
   flex: none;
 }
 
 .feed__item--lead {
-  min-height: min(var(--feed-item-h), 30cqh);
-  padding: 0 var(--mirror-box-pad);
+  min-height: min(var(--feed-item-h), 12cqh);
   background: var(--mirror-accent);
   color: var(--mirror-on-accent);
   animation: mirror-swap var(--motion-swap) both;
@@ -2486,55 +2517,79 @@ body {
 /*
  * Die Ausblick-Positionen.
  *
- * Die Deckkraft steht als Ausgangswert hier und wird beim Zeichnen je Position
+ * Eine Stufe kleiner als die oberste — dieselbe Zeile, nur leiser. Die
+ * Deckkraft steht als Ausgangswert hier und wird beim Zeichnen je Position
  * gesetzt: sie verteilt sich von --feed-dim-1 bis --feed-dim-2 auf so viele
  * Positionen, wie gerade besetzt sind. Bei drei Eintraegen kommt derselbe
  * Verlauf heraus wie frueher, bei sechs verteilt er sich eben auf sechs.
  */
 .feed__item--rest {
-  min-height: min(var(--feed-item-h-rest), 19cqh);
+  min-height: min(var(--feed-item-h-rest), 9cqh);
+  font-size: min(var(--feed-title-rest), 7cqh, 5.2cqw);
   color: var(--mirror-fg);
   opacity: var(--feed-dim-1);
 }
 
-.feed__label {
-  font-size: min(3.6cqh, 2.4cqw);
-  font-weight: var(--mirror-weight-label);
-  letter-spacing: var(--mirror-track-label-wide);
-  text-transform: uppercase;
+/*
+ * Das Symbol traegt die Herkunft.
+ *
+ * Bis 0.13 stand dort ein Wort in Versalien — "TERMIN", "BUS 142" — und
+ * brauchte dafuer eine eigene Zeile ueber dem Titel. Ein Kalenderblatt sagt
+ * dasselbe in einer Spalte, und erkannt ist es, bevor man zu lesen anfaengt.
+ *
+ * Die Spalte hat eine feste Breite, damit alle Titel an derselben Kante
+ * beginnen: eine Liste mit einer Kante ueberfliegt man, eine ohne muss man
+ * Zeile fuer Zeile abtasten.
+ */
+.feed__icon {
+  flex: none;
+  display: inline-flex;
+  justify-content: center;
+  width: calc(1.5 * var(--feed-size));
+  font-size: calc(1.15 * var(--feed-size));
+  line-height: 0;
   color: var(--mirror-accent);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.feed__item--lead .feed__label {
-  color: color-mix(in srgb, var(--mirror-on-accent) 62%, transparent);
+.feed__item--lead .feed__icon {
+  color: color-mix(in srgb, var(--mirror-on-accent) 85%, transparent);
 }
 
-.feed__item--lead.feed__item--urgent .feed__label {
-  color: color-mix(in srgb, var(--mirror-on-accent-warm) 62%, transparent);
+.feed__item--lead.feed__item--urgent .feed__icon {
+  color: color-mix(in srgb, var(--mirror-on-accent-warm) 85%, transparent);
 }
 
+.feed__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05em;
+  min-width: 0;
+}
+
+/*
+ * Der Titel ist halbfett und nicht duenn.
+ *
+ * Schnitt 300 gilt fuer Werte in 240 px, wo allein die Groesse die Hierarchie
+ * traegt. In 30 px verschwindet er hinter der Spiegelfolie – hier traegt die
+ * Schrift, was vorher die Groesse getragen hat.
+ */
 .feed__title {
-  font-weight: var(--mirror-weight-value);
-  line-height: 1.05;
+  font-weight: var(--mirror-weight-label-soft);
+  line-height: 1.15;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.feed__item--lead .feed__title {
-  font-size: min(9.4cqh, 6.6cqw);
-}
-
-.feed__item--rest .feed__title {
-  font-size: min(7.3cqh, 5.2cqw);
-}
-
-.feed__meta {
-  font-size: min(3.8cqh, 2.6cqw);
-  font-weight: var(--mirror-weight-value);
+/*
+ * Die Beschreibung: Herkunft und Zusatz in einer Zeile.
+ *
+ * "Termin · 09:30 · Kueche" beantwortet in einer Zeile, wofuer frueher zwei
+ * dastanden. Sie darf fehlen — eine Mitteilung ohne Zusatz ist ein Titel und
+ * keine halbe Zeile.
+ */
+.feed__desc {
+  font-size: 0.72em;
   line-height: 1.2;
   color: var(--mirror-fg-dim);
   white-space: nowrap;
@@ -2542,30 +2597,31 @@ body {
   text-overflow: ellipsis;
 }
 
-.feed__item--lead .feed__meta {
+.feed__item--lead .feed__desc {
   color: color-mix(in srgb, var(--mirror-on-accent) 70%, transparent);
 }
 
-.feed__item--lead.feed__item--urgent .feed__meta {
+.feed__item--lead.feed__item--urgent .feed__desc {
   color: color-mix(in srgb, var(--mirror-on-accent-warm) 70%, transparent);
 }
 
 /*
  * Nachts traegt auch die oberste Position keine Flaeche mehr — dieselbe Regel
- * wie fuer jedes andere Highlight. Uebrig bleibt eine Liste in Grau.
+ * wie fuer jedes andere Highlight. Uebrig bleibt eine Liste in Grau. Der
+ * Innenabstand bleibt stehen: ohne ihn spraenge die oberste Zeile beim
+ * Umschalten auf Nacht um ein Stueck nach links.
  */
 [data-night='1'] .feed__item--lead {
   background: transparent;
   color: inherit;
-  padding: 0;
   animation: none;
 }
 
-[data-night='1'] .feed__item--lead .feed__label {
+[data-night='1'] .feed__item--lead .feed__icon {
   color: var(--mirror-accent);
 }
 
-[data-night='1'] .feed__item--lead .feed__meta {
+[data-night='1'] .feed__item--lead .feed__desc {
   color: var(--mirror-fg-dim);
 }
 
