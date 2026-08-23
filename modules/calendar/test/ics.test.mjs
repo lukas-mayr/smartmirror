@@ -68,6 +68,31 @@ test('macht aus escapten Zeichen wieder Text', () => {
   assert.equal(event.summary, 'Essen, Trinken und mehr');
 });
 
+test('nimmt auch dem Strichpunkt seinen Schraegstrich', () => {
+  // iCloud schreibt Adressen als "Strasse\; Ort"; blieb der Schraegstrich
+  // stehen, stuende er an der Wand.
+  const [event] = parseIcs(
+    wrap(
+      'BEGIN:VEVENT\r\nUID:e\r\nSUMMARY:Znacht\r\nLOCATION:Baeckerstrasse 1\\; Bern\r\n' +
+        'DTSTART:20260824T170000Z\r\nEND:VEVENT',
+    ),
+  );
+  assert.equal(event.location, 'Baeckerstrasse 1; Bern');
+});
+
+test('faellt bei einer unbekannten Zone auf die des Spiegels zurueck', () => {
+  // Ein Termin, der einmal durch Outlook gegangen ist, traegt "W. Europe
+  // Standard Time" mit; `Intl` wirft darauf, und ohne Rueckfall risse dieser
+  // eine Termin die ganze Quelle mit.
+  const [event] = parseIcs(
+    wrap(
+      'BEGIN:VEVENT\r\nUID:f\r\nSUMMARY:Sitzung\r\n' +
+        'DTSTART;TZID=W. Europe Standard Time:20260824T093000\r\nEND:VEVENT',
+    ),
+  );
+  assert.equal(new Date(toInstant(event.start, ZONE)).toISOString(), '2026-08-24T07:30:00.000Z');
+});
+
 /* --------------------------------- Serien --------------------------------- */
 
 const serie = (rule, extra = '') =>

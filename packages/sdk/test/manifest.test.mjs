@@ -91,6 +91,17 @@ test('erlaubt genau die Hosts, die in der Konfiguration stehen', () => {
   assert.equal(hostAllowed(manifest, 'p42-calendars.icloud.com', {}), false);
 });
 
+test('erlaubt einen Kalender, der als webcal eingetragen ist', () => {
+  // iCloud gibt einen veroeffentlichten Kalender als webcal-Link heraus, und
+  // genau so traegt man ihn ein. Das Modul macht daraus vor dem Laden ein
+  // https – stuende der Host hier nicht auf der Allowlist, bliebe der
+  // richtig eingetragene Kalender stumm.
+  const manifest = { ...base, network: { allow: [], allowFromConfig: ['calendars'] } };
+  const config = { calendars: 'Familie | webcal://p42-caldav.icloud.com/published/2/abc' };
+  assert.equal(hostAllowed(manifest, 'p42-caldav.icloud.com', config), true);
+  assert.equal(hostAllowed(manifest, 'boese.example', config), false);
+});
+
 test('liest keine Felder, die das Manifest nicht benennt', () => {
   // Sonst koennte ein Modul sich ueber ein beliebiges Textfeld freischalten.
   const manifest = { ...base, network: { allow: [], allowFromConfig: ['calendars'] } };
