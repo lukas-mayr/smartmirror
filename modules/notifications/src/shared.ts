@@ -156,6 +156,7 @@ const SOURCE_ICONS: Readonly<Record<string, IconName>> = {
   weather: 'cloud',
   sbb: 'train-front',
   spotify: 'music',
+  timer: 'timer',
   notifications: 'bell',
 };
 

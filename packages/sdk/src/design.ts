@@ -413,6 +413,64 @@ export const BOARD = {
   textSize: 40,
 } as const;
 
+/* --------------------------------- Aushub ---------------------------------- */
+
+/**
+ * Der Timer als Baustelle: ein Bagger traegt einen Berg ab.
+ *
+ * Ein Timer auf einem Spiegel hat ein Problem, das eine Sanduhr nicht hat: man
+ * geht daran vorbei. Eine Zahl, die herunterzaehlt, beantwortet "wieviel noch"
+ * erst, wenn man sie liest — ein Berg, der kleiner geworden ist, beantwortet es
+ * im Vorbeigehen. Deshalb zeigt dieses Modul die Restzeit zweimal: als Ziffern
+ * fuer den, der hinsieht, und als Berg fuer den, der nur vorbeigeht.
+ *
+ * Die Zahlen hier tragen die eine Regel, an der die ganze Darstellung haengt:
+ * **der Bagger arbeitet immer gleich schnell.** Ein Eimer dauert `bucket`, egal
+ * ob der Timer auf drei Minuten oder auf zwei Stunden steht. Was sich mit der
+ * Dauer aendert, ist der Berg — er ist bei einem langen Timer groesser und
+ * braucht deshalb mehr Eimer. Andersherum waere es falsch: ein Bagger, der bei
+ * einer Stunde in Zeitlupe schwenkt, sieht nicht nach viel Arbeit aus, sondern
+ * nach einem haengenden Bildschirm.
+ *
+ * Die Taktung steht doppelt: hier als Zahl und im Stylesheet als Dauer der
+ * Keyframes. Das Modul braucht sie, um auszurechnen, aus wievielen Eimern ein
+ * Berg besteht; das Stylesheet braucht sie, um den Arm zu bewegen. Ein Test
+ * haelt beide Seiten gegeneinander.
+ */
+export const DIG = {
+  /** Ein Eimer: ausheben, heben, schwenken, kippen, zurueck. In ms. */
+  bucket: 5000,
+  /** Eimer, die auf einen Lastwagen gehen. Danach faehrt er, und der naechste kommt. */
+  perLoad: 4,
+  /**
+   * Zahl der Ladungen, ab der der Berg den Block ganz ausfuellt.
+   *
+   * 360 Ladungen sind zwei Stunden — die laengste Dauer, die sich einstellen
+   * laesst. Der Berg waechst also ueber den ganzen Bereich und stoesst erst
+   * ganz oben an: waere die Grenze frueher erreicht, saehen eine halbe und
+   * eine ganze Stunde gleich aus.
+   */
+  fullLoads: 360,
+  /**
+   * Kleinster Berg, als Anteil der vollen Groesse.
+   *
+   * Auch drei Minuten brauchen einen Berg, den man als Berg erkennt. Ohne
+   * diese Untergrenze waere er ein Strich auf dem Boden, und der Bagger
+   * schaufelte sichtbar an nichts.
+   */
+  minSize: 0.25,
+  /**
+   * Wie stark die Zahl der Ladungen auf die Groesse durchschlaegt.
+   *
+   * Kleiner als 1, weil der Block nicht mitwaechst: bei linearem Zusammenhang
+   * waere ein Zehn-Minuten-Berg ein Kruemel neben dem Zwei-Stunden-Berg. Mit
+   * 0,3 liegen zehn Minuten bei knapp der Haelfte, eine halbe Stunde bei zwei
+   * Dritteln und eine ganze bei gut vier Fuenfteln — Unterschiede, die man
+   * sieht, ohne dass die kurzen Timer zu einem Kruemel werden.
+   */
+  growth: 0.3,
+} as const;
+
 /* ------------------------------ Schriftgroesse ----------------------------- */
 
 /**

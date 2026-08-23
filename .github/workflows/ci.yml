@@ -36,6 +36,7 @@ jobs:
           npx tsc --noEmit -p modules/sbb
           npx tsc --noEmit -p modules/spotify
           npx tsc --noEmit -p modules/notifications
+          npx tsc --noEmit -p modules/timer
 
       - name: Tests
         run: npm test

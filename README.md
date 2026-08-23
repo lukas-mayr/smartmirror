@@ -40,6 +40,7 @@ modules/
   calendar/      ICS-Kalender (iCloud, Gemeinde, Schule), Zeitraum einstellbar
   sbb/           Abfahrten einer Haltestelle, von der Fahrplanauskunft search.ch
   notifications/ Die Fläche für Mitteilungen; den Inhalt melden die Module
+  timer/         Ein Bagger trägt einen Berg ab; ist er weg, ist die Zeit um
 deploy/      systemd-Units, Compositor-Start, Installer, Drehung
 scripts/     Build-, Bundle- und Generator-Skripte
 ```
@@ -529,6 +530,72 @@ blendet über (`--motion-swap`, 500 ms), Fortschritt wächst als Breite
 gleichzeitig zwei Elemente, nie Position und Größe zusammen. Im dunklen Raum
 zieht jede Animation den Blick auf sich, und ein Spiegel, der den Blick zieht,
 ist kaputt. `prefers-reduced-motion` schaltet alles ab.
+
+Zwei Blöcke weichen bewusst ab, und beide aus demselben Grund: bei ihnen *ist*
+die Bewegung die Auskunft. Die Wettersymbole ziehen, tropfen und blitzen, weil
+eine stehende Wolke nur eine Form ist und eine ziehende ein Wetter. Der Timer
+gräbt, weil ein Bagger, der stillsteht, keine Zeit vergehen lässt. Beide halten
+sich dafür an die andere Hälfte der Regel: nachts steht alles still, und wer
+Bewegung abbestellt hat, bekommt keine — beim Timer, indem sein Takt auf null
+geht (`--dig-bucket`), also an der einen Stelle, an der alle Teile hängen.
+
+### Ein Timer als Baustelle
+
+Ein Timer auf einem Spiegel hat ein Problem, das eine Sanduhr nicht hat: man
+geht an ihm vorbei. Eine Zahl, die herunterzählt, beantwortet „wie viel noch?"
+erst, wenn man sie liest — ein Berg, der kleiner geworden ist, beantwortet es im
+Vorbeigehen. Deshalb steht die Restzeit im Timer-Block zweimal: als Ziffern für
+den, der hinsieht, und als Berg für den, der nur vorbeigeht. Ein Bagger trägt
+ihn ab und lädt ihn auf Lastwagen; ist der Berg weg, ist die Zeit um, und die
+Mitteilung dazu steht im Feed.
+
+**Der Bagger arbeitet immer gleich schnell.** Ein Eimer dauert 5 s, vier Eimer
+füllen einen Lastwagen, dann fährt er und der nächste kommt — unabhängig davon,
+ob der Timer auf drei Minuten oder auf zwei Stunden steht. Was sich mit der
+Dauer ändert, ist der *Berg*: er ist bei einem langen Timer größer und braucht
+deshalb mehr Eimer. Andersherum wäre es falsch — ein Bagger, der bei einer
+Stunde in Zeitlupe schwenkt, sieht nicht nach viel Arbeit aus, sondern nach
+einem hängenden Bildschirm. Der Berg wächst dabei gedämpft (`DIG.growth`), weil
+der Block nicht mitwächst: zehn Minuten liegen bei knapp der halben Höhe, eine
+halbe Stunde bei zwei Dritteln, zwei Stunden füllen ihn ganz.
+
+Jeder Eimer nimmt einen sichtbaren Bissen aus dem Berg, und zwischen zwei
+Eimern steht er still: der Berg wird kleiner, *weil* gegraben wurde, und nicht,
+weil Zeit vergeht. Damit Bissen und Schwenk zusammenfallen, bekommt die
+Bewegung einen Versatz mit (`--dig-phase`, eine negative `animation-delay`) —
+sie beginnt dort, wo sie nach der verstrichenen Zeit stehen müsste, und nicht
+dort, wo die Anzeige gerade das Bild aufgebaut hat.
+
+**Bewegt wird im Stylesheet, gerechnet wird im Modul.** Der Takt ist fest, und
+ein fester Takt ist genau das, was CSS-Keyframes gut können: sie laufen im
+Compositor und kosten kein JavaScript. Das Modul rechnet nur aus, wie groß der
+Berg noch ist. Beide Seiten teilen sich dieselben Zahlen (`DIG` in `design.ts`,
+`--dig-bucket` im Stylesheet), und ein Test hält sie gegeneinander.
+
+Dass sich der Oberwagen im Seitenriss *spiegelt*, statt zu drehen, ist kein
+Trick, sondern die richtige Ansicht: ein Bagger lädt, indem sich Kabine,
+Ausleger und Kontergewicht zusammen um die Hochachse drehen, und von der Seite
+gesehen wird er dabei erst schmal und steht dann andersherum. Die Raupe bleibt
+stehen — daran erkennt man, dass sich der Oberwagen dreht und nicht die
+Maschine kippt.
+
+Was dabei zusammenpassen muss, prüfen Tests ohne Browser (`src/scene.ts`): dass
+der Zahn der Schaufel den Fuß des Berges überstreicht (dort schrumpft der Berg
+hin, also trifft der Bagger ihn bis zum letzten Eimer), dass die Ladung nach der
+Drehung über der Mulde und nicht daneben landet, und dass kein Gelenk aus dem
+Feld stößt. Dieselbe Trennung wie bei den Wettersymbolen: die Rechnung braucht
+keinen Browser, das Zeichnen schon.
+
+**Gesetzt wird der Timer in der Handy-App** — Dauer und ein Schalter, mehr
+nicht. Ein Modul hat dort keine eigene Oberfläche, und jede
+Konfigurationsänderung startet die Instanz neu: dieser Neustart *ist* der
+Startknopf. Daraus folgt eine Eigenschaft, die man kennen muss: startet der
+Spiegel neu, während der Schalter noch an steht, beginnt der Timer von vorn. Der
+Core merkt sich den Zustand eines Moduls nicht über einen Neustart hinweg, und
+in die Konfiguration darf ein Modul nicht schreiben — sie gehört dem Nutzer.
+
+Läuft kein Timer, bleibt der Block leer. Kein „kein Timer": eine leere Fläche
+auf einem Spiegel ist ein Spiegel.
 
 ### Nachts eine Stufe dunkler
 

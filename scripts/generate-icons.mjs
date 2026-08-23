@@ -31,8 +31,8 @@ const WANTED = [
   'train-front', 'train-front-tunnel', 'tram-front', 'bus-front', 'ship',
   'cable-car', 'signpost',
   // Allgemein
-  'clock', 'calendar-days', 'bell', 'triangle-alert', 'wifi-off', 'refresh-cw',
-  'octagon-x',
+  'clock', 'timer', 'calendar-days', 'bell', 'triangle-alert', 'wifi-off',
+  'refresh-cw', 'octagon-x',
 ];
 
 /** Zerlegt die Kindelemente eines Lucide-SVG in { tag, attrs }. */
