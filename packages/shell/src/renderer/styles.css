@@ -58,6 +58,17 @@
   --mirror-box-warm-line: rgba(212, 180, 131, 0.32);
   --mirror-box-danger: rgba(196, 87, 74, 0.08);
   --mirror-box-danger-line: rgba(196, 87, 74, 0.35);
+  /*
+   * Eine Flaeche ohne Ton — fuer Koerper, die keine Farbe tragen sollen und
+   * trotzdem Koerper sind. Die schwaechste Flaeche des Systems.
+   *
+   * Deckend und nicht durchscheinend, obwohl sie auf Schwarz genauso aussieht
+   * wie 8 % Weiss: durch einen Koerper sieht man nicht hindurch. Eine
+   * durchscheinende Flaeche zeigt, was hinter ihr liegt — bei einem Haufen Kies
+   * ist das der Boden, den er verdeckt, und bei einer Ladung die Bordwand,
+   * hinter der sie liegt.
+   */
+  --mirror-box-soft: #15171a;
 
   /* --------------------------------- Typo ---------------------------------- */
 
@@ -164,6 +175,20 @@
   --board-gap: 16px;
   --board-text: 40px;
 
+  /* ---------------------------------- Aushub -------------------------------- */
+
+  /*
+   * Der Takt des Baggers. Dieselben Zahlen stehen als DIG im Design-System:
+   * das Modul rechnet mit ihnen aus, aus wievielen Eimern ein Berg besteht,
+   * und hier bewegen sie den Arm. Der Takt ist fest — ein laengerer Timer
+   * macht den Berg groesser und nicht den Bagger langsamer.
+   */
+  --dig-bucket: 5000ms;
+  /* Vier Eimer, dann faehrt der Wagen. */
+  --dig-load: 20000ms;
+  /* Wird von der Anzeige am Block gesetzt: wo im Takt die Bewegung einsteigt. */
+  --dig-phase: 0ms;
+
   /* ------------------------------ Schriftgroesse --------------------------- */
 
   /*
@@ -205,6 +230,7 @@
   --mirror-box-accent-line: rgba(255, 255, 255, 0.07);
   --mirror-box-warm: transparent;
   --mirror-box-warm-line: rgba(255, 255, 255, 0.07);
+  --mirror-box-soft: #000000;
 }
 
 * {
@@ -1182,7 +1208,8 @@ body {
 .clock,
 .weather,
 .spotify,
-.feed {
+.feed,
+.timer {
   width: 100%;
   height: 100%;
   min-width: 0;
@@ -1220,14 +1247,16 @@ body {
 /* 3 – der Wert, fuer den der Block da ist */
 .clock__time,
 .weather__temp,
-.spotify__title {
+.spotify__title,
+.timer__value {
   font-weight: var(--mirror-weight-value);
   line-height: 1.06;
   letter-spacing: var(--mirror-track-value);
 }
 
 .clock__time,
-.weather__temp {
+.weather__temp,
+.timer__value {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -1996,14 +2025,20 @@ body {
  * Im dunklen Zimmer zieht jede Animation den Blick auf sich; wer um drei Uhr
  * aufsteht, will eine Uhrzeit lesen und nicht von einer tropfenden Wolke
  * geweckt werden.
+ *
+ * Die beiden Regeln nennen `.is-alive` mit, obwohl sie ohne die Klasse
+ * kuerzer waeren — und die zweite dazu den Block, in dem das Symbol haengt.
+ * Ohne das waeren sie leichter als die Regeln darueber, die die Bewegung
+ * setzen, und blieben wirkungslos: die Wolke zoege nachts weiter, und gemerkt
+ * haette man es um drei Uhr morgens.
  */
-[data-night='1'] .weather__glyph *,
+[data-night='1'] .weather__glyph.is-alive *,
 .weather__glyph:not(.is-alive) * {
   animation: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .weather__glyph * {
+  .module .weather__glyph.is-alive * {
     animation: none;
   }
 }
@@ -2845,6 +2880,590 @@ body {
 
 [data-night='1'] .feed__item--lead .feed__desc {
   color: var(--mirror-fg-dim);
+}
+
+/* ---------------------------------- Timer --------------------------------- */
+
+/*
+ * Ein Timer, den man im Vorbeigehen liest.
+ *
+ * Der Block zeigt die Restzeit zweimal: als Ziffern fuer den, der hinsieht,
+ * und als Berg fuer den, der nur vorbeigeht. Aus drei Metern sieht man, ob
+ * noch ein halber Berg steht, lange bevor man "07:12" gelesen hat — und genau
+ * das ist die Frage, die man im Vorbeigehen stellt.
+ *
+ * Der Bagger schwenkt in einem festen Takt: `--dig-bucket` fuer einen Eimer,
+ * vier davon fuer eine Ladung. Der Takt haengt *nicht* an der eingestellten
+ * Dauer — laenger heisst mehr Berg, nicht langsamer graben. Das Modul rechnet
+ * mit denselben Zahlen aus, aus wievielen Eimern der Berg besteht, und ein
+ * Test haelt beide Seiten gegeneinander.
+ *
+ * `--dig-phase` setzt die Anzeige am Block: eine negative `animation-delay`,
+ * die die Bewegung dort einsteigen laesst, wo sie nach der verstrichenen Zeit
+ * stehen muesste. Ohne sie finge ein Spiegel, der um 18:03 neu startet, mitten
+ * in der Ladung einen frischen Schwenk an — und der Bissen aus dem Berg faende
+ * neben dem Schwenk statt.
+ *
+ * Nachts und bei `prefers-reduced-motion` steht alles still, wie bei den
+ * Wettersymbolen: eine Baustelle, die im dunklen Zimmer im Augenwinkel laeuft,
+ * weckt zuverlaessig auf. Der Berg bleibt trotzdem richtig gross — er ist
+ * Inhalt und keine Bewegung.
+ */
+
+.timer {
+  display: flex;
+  font-size: min(9cqh, 4.4cqw);
+  gap: 3cqh;
+}
+
+/* Der quadratische Block: Zeit oben, Baustelle in voller Breite darunter. */
+.timer--l {
+  flex-direction: column;
+}
+
+
+
+.timer__head {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  flex: none;
+}
+
+/*
+ * Die Restzeit fuellt den Platz, den sie hat — und wie breit sie wird, haengt
+ * daran, was in ihr steht: "07:12" sind fuenf Zeichen, "1:07:12" sieben und
+ * "Fertig" sechs. Die Zeichenzahl kommt als `--timer-chars` aus dem Modul, wie
+ * bei der Uhr, statt dass eine feste Groesse immer den laengsten Fall annehmen
+ * muesste.
+ */
+.timer__value {
+  font-size: min(30cqh, calc(115cqw / var(--timer-chars, 5)));
+}
+
+/*
+ * In den flachen Bloecken steht die Zeit im Himmel ueber dem Wagen.
+ *
+ * Dort ist der einzige Platz, den die Szene nicht braucht — und er ist knapp:
+ * knapp ein Drittel der Hoehe. Deshalb sind die Ziffern hier kleiner als im
+ * quadratischen Block, obwohl er groesser ist. Das ist die richtige Reihenfolge:
+ * in einem breiten Band ist die Baustelle der Inhalt und die Zahl die Auskunft
+ * dazu. Lesbar bleibt sie in beiden Faellen — unter der Grenze fuer 3 m Abstand
+ * liegt sie nie.
+ */
+.timer--m .timer__value,
+.timer--xl .timer__value {
+  font-size: min(25cqh, calc(52cqw / var(--timer-chars, 5)));
+}
+
+/*
+ * Ist die Zeit um, traegt die Zahl den warmen Akzent.
+ *
+ * Sand ist im Design-System der Ton fuer Spitzen und fuer alles, was
+ * Aufmerksamkeit verlangt — und ein abgelaufener Timer ist genau das. Es ist
+ * der einzige Ton im ganzen Block: solange er laeuft, steht dort Weiss auf
+ * Schwarz, und genau deshalb faellt "Fertig" auf.
+ */
+.timer--done .timer__value {
+  color: var(--mirror-accent-warm);
+}
+
+/* ------------------------------- Die Baustelle ----------------------------- */
+
+/*
+ * Gezeichnet wird in Koerpern und nicht in Strichen.
+ *
+ * Ein Ausleger ist ein Kastentraeger und keine Linie, eine Mulde ein Kasten mit
+ * Stirnwand und ein Rad hat eine Nabe. Aus drei Metern sieht man von alldem nur
+ * die Silhouette — und genau deshalb muss sie stimmen: eine Reihe gleich dicker
+ * Striche liest sich als Diagramm, ein Umriss als Maschine.
+ *
+ * Drei Staerken, drei Rollen: der Umriss traegt die Form, das Beiwerk
+ * (Zylinder, Rollen, Rippen, Zaehne) macht sie erkennbar, Scheiben und Naben
+ * stehen ganz zurueck. Ohne diese Ordnung waere jede Linie gleich wichtig, und
+ * das ist der Grund, warum eine Strichzeichnung flach aussieht.
+ */
+.dig {
+  color: var(--mirror-fg-dim);
+}
+
+/*
+ * In den flachen Bloecken liegt die Zeit *auf* der Baustelle und nicht daneben.
+ *
+ * Der Grund ist der abfahrende Wagen: stuende die Zeit in einer eigenen Spalte,
+ * endete die Zeichenflaeche an deren Kante, und der Wagen verschwaende mitten
+ * im Block wie vor einer unsichtbaren Wand. Ueber die volle Breite faehrt er
+ * bis zur Blockkante hinaus — und die Ziffern stehen davor, im leeren Himmel
+ * ueber dem Wagen, wo die Szene ohnehin nichts zeigt.
+ *
+ * Beide Kinder liegen im selben Rasterfeld; das eine oben, das andere unten.
+ */
+.timer--m,
+.timer--xl {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+  gap: 0;
+}
+
+.timer--m > *,
+.timer--xl > * {
+  grid-area: 1 / 1;
+}
+
+.timer--m .timer__head,
+.timer--xl .timer__head {
+  align-self: start;
+  /* Die Ziffern liegen vor der Szene: der Wagen faehrt hinter ihnen hindurch. */
+  position: relative;
+  z-index: 1;
+}
+
+/* Der Boden ist eine Kante und kein Bauteil: er steht so weit zurueck wie eine
+   Achse in einem Diagramm. */
+.dig__ground {
+  stroke: var(--mirror-fg-mute);
+  stroke-width: 1;
+}
+
+/*
+ * Der Berg ist der Wert, fuer den der Block da ist — und deshalb das hellste
+ * Teil der Szene: weisser Umriss auf einer sehr schwachen weissen Flaeche.
+ *
+ * Kein Akzent. Farbe braucht eine Quelle, und ein Haufen Kies hat keine: er
+ * waere salbeifarben, weil Salbei gerade die Normalfarbe ist, und das ist genau
+ * der Fall, vor dem das Design-System warnt. Den Akzent traegt die Zeile
+ * darueber, die sagt, wofuer der Timer laeuft. Nachts wird die Flaeche
+ * durchsichtig, ohne dass hier etwas dafuer stehen muesste — dasselbe Token wie
+ * in jeder Box.
+ */
+.dig__mountain {
+  stroke: var(--mirror-fg);
+  stroke-width: 2;
+  fill: var(--mirror-box-soft);
+}
+
+/*
+ * Die Ladung sitzt auf der Bordwand, nicht in der Mulde: von der Seite schaut
+ * niemand in einen Kipper hinein. Sichtbar wird sie erst, wenn sie oben ueber
+ * steht — und dann sieht sie aus wie der Berg, denn sie *ist* der Berg.
+ */
+.dig__cargo {
+  stroke: var(--mirror-fg);
+  stroke-width: 1.6;
+  fill: var(--mirror-box-soft);
+  opacity: 0;
+}
+
+/*
+ * Was beim Kippen faellt und was an der Wand nachrieselt. Beides ist derselbe
+ * Stoff wie der Berg und hat deshalb dieselbe Farbe.
+ *
+ * Die Deckkraft steht ausschliesslich in den Animationsbildern: steht die
+ * Baustelle still, haengt nichts in der Luft und rieselt nichts.
+ */
+.dig__spill,
+.dig__slide {
+  stroke: var(--mirror-fg);
+  stroke-width: 1.4;
+  opacity: 0;
+}
+
+/*
+ * Der Umriss: Aufbauten, Kette, Ausleger, Stiel, Schaufel, Raeder.
+ *
+ * Und zwar gefuellt. Ein Bagger ist kein Drahtgitter: steht er vor dem Berg,
+ * muss der Berg *hinter* ihm sein, und durch eine Schaufel sieht man nicht
+ * hindurch. Die Fuellung ist die Boxfarbe des Design-Systems — praktisch
+ * schwarz, also keine leuchtende Flaeche, aber deckend. Genau das ist der
+ * Unterschied zwischen einer Zeichnung und einem Bild.
+ *
+ * Die Reihenfolge im SVG uebernimmt damit die Arbeit der Tiefe: Kette, dann
+ * Oberwagen, dann Arm — was spaeter kommt, liegt vorn.
+ */
+.dig__body,
+.dig__wheel {
+  stroke: var(--mirror-fg-dim);
+  stroke-width: 1.8;
+  fill: var(--mirror-box);
+}
+
+/*
+ * Die Schaufel steht eine Stufe heller — und ebenfalls deckend.
+ *
+ * Sie ist das Werkzeug: das eine Teil, dem man mit dem Blick folgt. Deckend
+ * muss sie sein, weil sie die meiste Zeit vor dem Berg steht: durch eine
+ * Schaufel sieht man keinen Sand. Eine durchscheinende Fuellung waere genau
+ * dort durchsichtig, wo es auffaellt.
+ */
+.dig__bucket .dig__body {
+  fill: #1e2124;
+}
+
+/* Beiwerk: Laufrollen, Rippen, Zaehne, Bordwandprofil. Es macht die Form
+   erkennbar und soll sie nicht mittragen. */
+.dig__trim {
+  stroke: var(--mirror-fg-mute);
+  stroke-width: 1.1;
+}
+
+/*
+ * Zylinder und Kolbenstangen.
+ *
+ * Als dicker und duenner Strich und nicht als Umriss: ein Hydraulikzylinder
+ * *ist* ein Rohr mit einer Stange darin, und zwei Staerken sagen das in zwei
+ * Linien. Ein gezeichneter Umriss haette an dieser Groesse mehr Ecken als
+ * Aussage.
+ */
+.dig__ram {
+  stroke: var(--mirror-fg-mute);
+  stroke-width: 3;
+}
+
+.dig__rod {
+  stroke: var(--mirror-fg-mute);
+  stroke-width: 1.2;
+}
+
+/* Der Rahmen, auf dem die Mulde sitzt. */
+.dig__frame {
+  stroke: var(--mirror-fg-dim);
+  stroke-width: 1.2;
+}
+
+/* Scheiben und Naben stehen ganz zurueck — sie sind Loecher in der Form. */
+.dig__pane,
+.dig__hub {
+  stroke: var(--mirror-fg-mute);
+  stroke-width: 1;
+}
+
+/*
+ * Im flachen Block bleibt die Silhouette.
+ *
+ * Was nicht hineinpasst, faellt weg — es staucht sich nicht. Ein M-Block ist
+ * halb so hoch wie ein L, und darin werden Scheiben, Naben, Zylinder und
+ * Bordwandprofile zu einem Grieseln, das die Form eher verdeckt als erklaert.
+ * Uebrig bleibt, was die Maschine ausmacht: ihr Umriss.
+ */
+.timer--m .dig__trim,
+.timer--m .dig__hub,
+.timer--m .dig__pane,
+.timer--m .dig__ram,
+.timer--m .dig__rod {
+  display: none;
+}
+
+/*
+ * Der Vorschub.
+ *
+ * Die Abbaukante wandert nach rechts, also faehrt der Bagger ihr nach — und
+ * der Wagen steht dort, wo geladen wird, also faehrt er mit. Verschoben wird
+ * die ganze Baustelle und nicht jedes Teil einzeln: sie ist *ein* Ort.
+ *
+ * Der Wert kommt aus dem Modul und springt einmal je Ladung; der Uebergang
+ * macht daraus eine kurze Fahrt. Ohne ihn stuende die Maschine ploetzlich
+ * einen Schritt weiter rechts, und niemand haette sie fahren sehen.
+ */
+.dig__site {
+  transition: transform 900ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* --------------------------------- Bewegung -------------------------------- */
+
+/*
+ * Ein Eimer, in Prozent seiner Dauer:
+ *
+ *   0 – 7    ausheben: der Zahn faehrt in die Wand und zieht nach unten durch
+ *   7 – 15   zuziehen: die Schaufel rollt ein und ist voll
+ *  15 – 26   heben
+ *  26 – 40   schwenken: der Oberwagen dreht sich zur Mulde
+ *  40 – 56   kippen; ab 56 ist die Schaufel leer
+ *  56 – 66   ausschwingen
+ *  66 – 82   zurueckschwenken und senken
+ *  82 – 100  stehen, bevor es von vorn losgeht
+ *
+ * Die Winkel stehen als POSE in modules/timer/src/scene.ts, das Ende des
+ * Kippens als DIG.dump im Design-System — daran haengt, wann der Wagen fahren
+ * darf. Doppelt gefuehrt, weil hier keine Rechnung moeglich ist und dort kein
+ * Browser; ein Test rechnet die Reihenfolge nach.
+ */
+.dig.is-digging .dig__house {
+  animation: dig-slew var(--dig-bucket) ease-in-out var(--dig-phase) infinite;
+}
+
+.dig.is-digging .dig__boom {
+  animation: dig-boom var(--dig-bucket) ease-in-out var(--dig-phase) infinite;
+}
+
+.dig.is-digging .dig__stick {
+  animation: dig-stick var(--dig-bucket) ease-in-out var(--dig-phase) infinite;
+}
+
+.dig.is-digging .dig__bucket {
+  animation: dig-bucket var(--dig-bucket) ease-in-out var(--dig-phase) infinite;
+}
+
+.dig.is-digging .dig__spill {
+  animation: dig-spill var(--dig-bucket) linear var(--dig-phase) infinite;
+}
+
+/*
+ * Der Berg reagiert auf den Zahn.
+ *
+ * Kies steht nicht wie Beton: wo die Schaufel hineinfaehrt, sackt der Haufen
+ * ein wenig nach und darueber rieselt etwas ab. Beides zusammen ist der
+ * Unterschied zwischen einem Berg und einem Bild von einem Berg — und beides
+ * faellt genau in die Zeit, in der gegraben wird (0 bis 15 %).
+ *
+ * Das Nachsacken ist bewusst winzig: anderthalb Prozent der Hoehe, gerechnet
+ * vom Boden aus. Man sieht es nicht als Bewegung, man sieht nur, dass der Berg
+ * lebt.
+ */
+.dig.is-digging .dig__mountain {
+  animation: dig-settle var(--dig-bucket) ease-out var(--dig-phase) infinite;
+}
+
+.dig.is-digging .dig__slide {
+  animation: dig-slide var(--dig-bucket) linear var(--dig-phase) infinite;
+}
+
+/*
+ * Der Wagen und seine Ladung laufen im Takt der *Ladung* und nicht des Eimers:
+ * vier Eimer, dann ist er voll und faehrt. Beide Takte haben denselben
+ * Versatz — die Ladung ist ein ganzes Vielfaches des Eimers, also stimmt ein
+ * Versatz, der fuer sie stimmt, fuer den Eimer mit.
+ */
+.dig.is-digging .dig__truck {
+  animation: dig-haul-away var(--dig-load) linear var(--dig-phase) infinite;
+}
+
+.dig.is-digging .dig__cargo {
+  animation: dig-fill var(--dig-load) linear var(--dig-phase) infinite;
+}
+
+@keyframes dig-boom {
+  0% {
+    transform: rotate(0deg);
+  }
+  7% {
+    transform: rotate(13deg);
+  }
+  15% {
+    transform: rotate(7deg);
+  }
+  26%,
+  66% {
+    transform: rotate(-80deg);
+  }
+  82%,
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes dig-stick {
+  0% {
+    transform: rotate(0deg);
+  }
+  7% {
+    transform: rotate(-8deg);
+  }
+  15%,
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes dig-bucket {
+  0% {
+    transform: rotate(0deg);
+  }
+  7% {
+    transform: rotate(12deg);
+  }
+  15%,
+  40% {
+    transform: rotate(34deg);
+  }
+  52%,
+  66% {
+    transform: rotate(-25deg);
+  }
+  82%,
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+/*
+ * Die Drehung des Oberwagens.
+ *
+ * Im Seitenriss ist eine halbe Umdrehung eine Spiegelung, und dazwischen steht
+ * der Oberwagen quer zum Blick und wird schmal — deshalb geht die Skalierung
+ * durch die Null. Das ist kein Trick, sondern die richtige Ansicht: genau so
+ * sieht eine Drehung von der Seite aus.
+ */
+@keyframes dig-slew {
+  0%,
+  26% {
+    transform: scaleX(1);
+  }
+  40%,
+  52% {
+    transform: scaleX(-1);
+  }
+  66%,
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes dig-settle {
+  0%,
+  4% {
+    transform: scaleY(1);
+  }
+  9% {
+    transform: scaleY(0.985);
+  }
+  15% {
+    transform: scaleY(0.997);
+  }
+  22%,
+  100% {
+    transform: scaleY(1);
+  }
+}
+
+/* Das Rieseln laeuft die Boeschung hinab: nach links unten, mit dem Gefaelle. */
+@keyframes dig-slide {
+  0%,
+  5% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  9% {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+  17% {
+    opacity: 0.7;
+    transform: translate(-1.4px, 2.2px);
+  }
+  24%,
+  100% {
+    opacity: 0;
+    transform: translate(-2px, 3.2px);
+  }
+}
+
+/* Der Stoff faellt nur waehrend des Kippens — und er faellt, er schwebt nicht. */
+@keyframes dig-spill {
+  0%,
+  40% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  43% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  54% {
+    opacity: 1;
+    transform: translateY(9px);
+  }
+  56%,
+  100% {
+    opacity: 0;
+    transform: translateY(11px);
+  }
+}
+
+/*
+ * Die Ladung waechst in Stufen — aber erst, wenn man sie sehen kann.
+ *
+ * Die ersten beiden Eimer verschwinden in der Mulde: von der Seite schaut
+ * niemand hinein. Der dritte steht knapp ueber der Bordwand, der vierte haeuft
+ * sich. Jede Stufe springt, statt zu wachsen: was steigt, ohne dass jemand
+ * etwas hineinschuettet, kommt aus dem Nichts.
+ *
+ * Die Marken sitzen jeweils am *Ende* eines Kippens (14, 39, 64, 89 %) und
+ * nicht an seinem Anfang: vorher ist der Stoff noch in der Luft.
+ *
+ * Weggeraeumt wird die Ladung erst bei 100 % — also genau dann, wenn der Wagen
+ * ganz aus dem Bild ist. Verschwaende sie frueher, faehre ein voller Wagen
+ * ploetzlich leer davon, und man saehe es genau an der Kante, an der man
+ * hinsieht. Der naechste kommt dann von 0 % an leer herein.
+ */
+@keyframes dig-fill {
+  0%,
+  64% {
+    opacity: 0;
+    transform: scale(0.6, 0.15);
+  }
+  64.01%,
+  89% {
+    opacity: 1;
+    transform: scale(0.6, 0.45);
+  }
+  89.01%,
+  100% {
+    opacity: 1;
+    transform: scale(1, 1);
+  }
+}
+
+@keyframes dig-haul-away {
+  0% {
+    transform: translateX(-170px);
+    animation-timing-function: cubic-bezier(0.16, 0.7, 0.2, 1);
+  }
+  8%,
+  92% {
+    transform: translateX(0);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.85, 0.4);
+  }
+  100% {
+    transform: translateX(-170px);
+  }
+}
+
+/*
+ * Nachts steht die Baustelle still, und `prefers-reduced-motion` haelt sie
+ * ebenso an — nicht mit `animation: none`, sondern indem der Takt auf null
+ * geht.
+ *
+ * Das ist die verlaesslichere Fassung. Eine Regel, die die Bewegung abschaltet,
+ * muesste jede einzelne der Regeln oben ueberstimmen und dafuer mindestens
+ * ebenso schwer wiegen — beim ersten neuen bewegten Teil waere sie vergessen,
+ * und gemerkt haette man es um drei Uhr morgens. Der Takt dagegen ist die eine
+ * Stelle, an der alle haengen.
+ *
+ * Bei einer Dauer von null steht jedes Teil auf seinem Ausgangswert: der Arm
+ * in der Grabstellung, die Mulde leer, der Wagen an seinem Platz. Der Berg
+ * bleibt dabei richtig gross und der Vorschub an der richtigen Stelle — beides
+ * ist Inhalt und keine Bewegung.
+ */
+[data-night='1'] {
+  --dig-bucket: 0s;
+  --dig-load: 0s;
+}
+
+[data-night='1'] .dig__site {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dig-bucket: 0s;
+    --dig-load: 0s;
+  }
+
+  .dig__site {
+    transition: none;
+  }
 }
 
 /* ------------------------------ Der Wechsel ------------------------------- */

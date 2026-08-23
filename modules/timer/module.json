@@ -1,0 +1,43 @@
+{
+  "id": "timer",
+  "name": "Timer",
+  "version": "0.1.0",
+  "description": "Ein Timer, den man im Vorbeigehen liest: ein Bagger traegt einen Berg ab und verlaedt ihn auf Lastwagen. Ist der Berg weg, ist die Zeit um. Der Bagger arbeitet immer gleich schnell — laenger heisst nicht langsamer, sondern mehr Berg.",
+  "author": "smartmirror",
+  "permissions": [
+    "notify"
+  ],
+  "sizes": [
+    "m",
+    "l",
+    "xl"
+  ],
+  "preferredSize": "l",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "label": {
+        "type": "string",
+        "title": "Wofuer",
+        "description": "Steht in der Mitteilung, wenn die Zeit um ist. Im Block selbst steht nur die Restzeit — was der Timer bedeutet, weiss der, der ihn gestellt hat.",
+        "default": "Timer",
+        "maxLength": 24
+      },
+      "minutes": {
+        "type": "integer",
+        "title": "Dauer (Minuten)",
+        "description": "Der Bagger arbeitet immer gleich schnell. Eine laengere Dauer macht den Berg groesser, nicht die Bewegung langsamer.",
+        "minimum": 1,
+        "maximum": 120,
+        "step": 1,
+        "default": 10
+      },
+      "running": {
+        "type": "boolean",
+        "title": "Timer laeuft",
+        "description": "Einschalten startet ihn von vorn, mit der Dauer darueber. Ausschalten nimmt ihn zurueck und raeumt den Block.",
+        "default": false
+      }
+    }
+  }
+}

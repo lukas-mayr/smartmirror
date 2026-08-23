@@ -1,0 +1,14 @@
+{
+  "name": "@mirror/module-timer",
+  "version": "0.20.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node ../../scripts/build-module.mjs",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@mirror/sdk": "0.20.0",
+    "lit": "^3.2.1"
+  }
+}

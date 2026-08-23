@@ -49,6 +49,7 @@ modules/
   calendar/      ICS-Kalender (iCloud, Gemeinde, Schule), Zeitraum einstellbar
   sbb/           Abfahrten einer Haltestelle, von der Fahrplanauskunft search.ch
   notifications/ Die Fläche für Mitteilungen; den Inhalt melden die Module
+  timer/         Ein Bagger trägt einen Berg ab; ist er weg, ist die Zeit um
 deploy/      systemd-Units, Compositor-Start, Installer, Drehung, Neustart,
              Plymouth-Thema fuer den Start
 scripts/     Build-, Bundle- und Generator-Skripte
@@ -539,6 +540,185 @@ blendet über (`--motion-swap`, 500 ms), Fortschritt wächst als Breite
 gleichzeitig zwei Elemente, nie Position und Größe zusammen. Im dunklen Raum
 zieht jede Animation den Blick auf sich, und ein Spiegel, der den Blick zieht,
 ist kaputt. `prefers-reduced-motion` schaltet alles ab.
+
+Zwei Blöcke weichen bewusst ab, und beide aus demselben Grund: bei ihnen *ist*
+die Bewegung die Auskunft. Die Wettersymbole ziehen, tropfen und blitzen, weil
+eine stehende Wolke nur eine Form ist und eine ziehende ein Wetter. Der Timer
+gräbt, weil ein Bagger, der stillsteht, keine Zeit vergehen lässt. Beide halten
+sich dafür an die andere Hälfte der Regel: nachts steht alles still, und wer
+Bewegung abbestellt hat, bekommt keine — beim Timer, indem sein Takt auf null
+geht (`--dig-bucket`), also an der einen Stelle, an der alle Teile hängen.
+
+### Ein Timer als Baustelle
+
+Ein Timer auf einem Spiegel hat ein Problem, das eine Sanduhr nicht hat: man
+geht an ihm vorbei. Eine Zahl, die herunterzählt, beantwortet „wie viel noch?"
+erst, wenn man sie liest — ein Berg, der kleiner geworden ist, beantwortet es im
+Vorbeigehen. Deshalb steht die Restzeit im Timer-Block zweimal: als Ziffern für
+den, der hinsieht, und als Berg für den, der nur vorbeigeht. Ein Bagger trägt
+ihn ab und lädt ihn auf Lastwagen; ist der Berg weg, ist die Zeit um, und die
+Mitteilung dazu steht im Feed.
+
+**Der Bagger arbeitet immer gleich schnell.** Ein Eimer dauert 5 s, vier Eimer
+füllen einen Lastwagen, dann fährt er und der nächste kommt — unabhängig davon,
+ob der Timer auf drei Minuten oder auf zwei Stunden steht. Was sich mit der
+Dauer ändert, ist der *Berg*: er ist bei einem langen Timer größer und braucht
+deshalb mehr Eimer. Andersherum wäre es falsch — ein Bagger, der bei einer
+Stunde in Zeitlupe schwenkt, sieht nicht nach viel Arbeit aus, sondern nach
+einem hängenden Bildschirm.
+
+**Jeder Berg überragt die Maschine**, auch der von drei Minuten: ein Haufen, der
+niedriger ist als der Bagger davor, sieht nach Aufräumen aus und nicht nach
+Arbeit, und aus drei Metern beantwortet er die Frage „wie viel noch?" gar nicht.
+Das Maß dafür ist das Kabinendach, und ein Test hält den kleinsten Berg dagegen.
+Nach oben ist bei einer halben Stunde Schluss (`DIG.fullLoads`): der Unterschied
+zwischen kurz und lang fällt damit genau in den Bereich, in dem ein Timer
+meistens steht, und ob eine Stunde oder zwei — „ein voller Berg" ist die
+ehrlichere Auskunft als zwei Berge, die sich um eine Handbreit unterscheiden.
+
+**Abgebaut wird von der Seite, nicht kleiner gezoomt.** Der Berg bekommt eine
+Abbaukante — eine gerade Böschung, die sich in den Haufen frisst — und darüber
+eine Sohle, die tiefer wird. Was übrig bleibt, ist das Kleinste dreier Geraden:
+das ursprüngliche Profil, die Sohle und die Böschung. Genau daraus entsteht die
+Form, die eine angegrabene Halde hat, und genau so verschwindet sie: erst eine
+Wand, dann eine Bank, dann nichts.
+
+Jeder Eimer nimmt dabei gleich viel **Fläche** weg — nicht gleich viel Höhe und
+nicht gleich viel Breite. Wie viel davon Kante und wie viel Sohle ist, fällt aus
+der Rechnung (`tauForShare`) und nicht aus einer Schätzung. Daraus folgt auch,
+dass die Kante am Ende schneller wandert als am Anfang: aus einer hohen Wand
+holt ein Eimer viel Menge auf kurzem Weg, aus einer flachen Lage dieselbe Menge
+erst auf langer Strecke. Wer schon einmal eine Grube hat fertig machen sehen,
+kennt genau dieses Tempo.
+
+**Deshalb fährt der Bagger.** Die Wand wandert nach rechts, also folgt er ihr —
+einmal je Lastwagen, mit einem kurzen Ruck, und der Wagen fährt mit, weil er
+dort steht, wo geladen wird. Über einen langen Timer arbeitet sich die Maschine
+so sichtbar in den Berg hinein. Die Schaufel greift dabei immer zwei Einheiten
+hinter der Zehe der Kante; dass das in jeder Größe und bei jedem Stand stimmt,
+prüft ein Test.
+
+Zwischen zwei Eimern steht der Berg still: er wird kleiner, *weil* gegraben
+wurde, und nicht, weil Zeit vergeht. Damit Bissen und Schwenk zusammenfallen,
+bekommt die Bewegung einen Versatz mit (`--dig-phase`, eine negative
+`animation-delay`) — sie beginnt dort, wo sie nach der verstrichenen Zeit stehen
+müsste, und nicht dort, wo die Anzeige gerade das Bild aufgebaut hat.
+
+**Der Wagen fährt erst, wenn die Schaufel leer ist.** Das letzte Kippen einer
+Ladung endet bei 89 % ihrer Dauer, er zieht bei 92 % an, und der nächste steht
+bei 8 % — lange vor dem ersten Kippen bei 10 %. Andersherum fällt eine Ladung
+neben die Mulde, und das sieht man sofort. Die vier Zahlen stehen als
+`DIG.dump` und `DIG.swap` im Design-System, und ein Test rechnet ihre
+Reihenfolge nach.
+
+**Man sieht nicht in eine Mulde hinein.** Von der Seite ist eine Ladung erst
+sichtbar, wenn sie über die Bordwand steht: die ersten beiden Eimer
+verschwinden im Wagen, der dritte lugt hervor, der vierte häuft sich. Und der
+Haufen liegt **hinten**, nicht in der Mitte — geschüttet wird am Heck, weil dort
+der Bagger steht, und Kies bleibt liegen, wo er hinfällt. Aus demselben Grund
+ist in der Schaufel nichts zu sehen: sie ist von der Seite zu, und was man
+sieht, ist der Stoff, der beim Kippen fällt.
+
+Weggeräumt wird die Ladung erst am Ende der Runde — genau dann, wenn der Wagen
+ganz aus dem Bild ist. Verschwände sie früher, führe ein voller Wagen plötzlich
+leer davon, und die Fuhre wäre nirgends hingekommen.
+
+Und der Wagen ist bewusst klein: niedriger als das Haus des Baggers und kurz
+genug, dass er nicht die halbe Baustelle einnimmt. Zwei gleich große Maschinen
+nebeneinander haben keine Hauptrolle mehr — gegraben wird hier, abgeholt wird
+nur.
+
+**Kies steht nicht wie Beton.** Wo der Zahn eindringt, sackt der Haufen ein
+wenig nach (anderthalb Prozent seiner Höhe, vom Boden aus gerechnet) und über
+der Zehe rieselt etwas die Böschung hinab. Man sieht es nicht als Bewegung, man
+sieht nur, dass der Berg lebt — und beides fällt genau in die Zeit, in der
+gegraben wird.
+
+Was beim Kippen fällt, fällt **hinter** die nahe Bordwand: in der
+Zeichenreihenfolge steht es vor dem Wagen, im Bild also dahinter, und
+verschwindet auf halbem Weg in der Mulde. Andersherum rieselt der Sand sichtbar
+vor dem Wagen zu Boden — und landet damit neben ihm.
+
+**Der Berg ist weiß, nicht farbig.** Farbe braucht eine Quelle, und ein Haufen
+Kies hat keine: er wäre salbeifarben, weil Salbei gerade die Normalfarbe ist,
+und genau davor warnt das Design-System. Er ist der Wert, für den der Block da
+ist, und damit das hellste Teil der Szene — weißer Umriss auf der schwächsten
+Fläche des Systems (`--mirror-box-soft`).
+
+**Im Block steht nur die Zeit.** Keine Beschriftung darüber: wofür der Timer
+läuft, weiß der, der ihn gestellt hat, und wenn nicht, sagt es die Mitteilung,
+sobald er abgelaufen ist. Die Zeile kostete Höhe, die den Ziffern fehlt, und
+beantwortete eine Frage, die vor dem Spiegel niemand stellt. Damit trägt der
+ganze Block keinen Akzent mehr — Weiß auf Schwarz, solange er läuft. Genau
+deshalb fällt „Fertig" in Sand auf: es ist der einzige Ton, der überhaupt
+vorkommt.
+
+**Bewegt wird im Stylesheet, gerechnet wird im Modul.** Der Takt ist fest, und
+ein fester Takt ist genau das, was CSS-Keyframes gut können: sie laufen im
+Compositor und kosten kein JavaScript. Das Modul rechnet nur aus, wie groß der
+Berg noch ist. Beide Seiten teilen sich dieselben Zahlen (`DIG` in `design.ts`,
+`--dig-bucket` im Stylesheet), und ein Test hält sie gegeneinander.
+
+Dass sich der Oberwagen im Seitenriss *spiegelt*, statt zu drehen, ist kein
+Trick, sondern die richtige Ansicht: ein Bagger lädt, indem sich Kabine,
+Ausleger und Kontergewicht zusammen um die Hochachse drehen, und von der Seite
+gesehen wird er dabei erst schmal und steht dann andersherum. Die Raupe bleibt
+stehen — daran erkennt man, dass sich der Oberwagen dreht und nicht die
+Maschine kippt.
+
+**Gezeichnet wird in Körpern und nicht in Strichen.** Ein Ausleger ist ein
+Kastenträger: am Fuß dick, am Knick schlank, mit einem Bauch im Rücken. Ein
+Zylinder ist ein dicker Strich mit einer dünnen Stange darin. Ein Rad hat eine
+Nabe, eine Kette einen Gurt mit Leitrad, Turas und Laufrollen, ein Kipper eine
+Stirnwand, ein Bordwandprofil und ein Fahrerhaus, das höher steht als beide. Aus
+drei Metern sieht man von alldem nur die Silhouette — und genau deshalb muss sie
+stimmen: eine Reihe gleich dicker Striche liest sich als Diagramm, ein Umriss
+als Maschine. Im flachen M-Block fällt das Beiwerk weg und die Silhouette bleibt;
+dort würde es zu einem Grieseln, das die Form verdeckt.
+
+**Und gefüllt — deckend, nicht durchscheinend.** Ein Bagger ist kein
+Drahtgitter: steht er vor dem Berg, muss der Berg *hinter* ihm sein, und durch
+eine Schaufel sieht man keinen Sand. Dasselbe gilt für den Berg selbst und für
+die Ladung: eine durchscheinende Fläche zeigt, was hinter ihr liegt — beim Berg
+den Boden, den er verdeckt, bei der Ladung die Bordwand, hinter der sie liegt.
+Auf Schwarz sieht eine deckende Fläche aus wie 8 % Weiß; der Unterschied fällt
+erst auf, wenn etwas dahinterliegt, und dann sofort. Damit übernimmt die
+Reihenfolge im SVG die Arbeit der Tiefe: Kette, dann Oberwagen, dann Arm. Nur
+die Schaufel steht eine Stufe heller: sie ist das Werkzeug, dem der Blick folgt.
+
+Der Hubzylinder des Auslegers fehlt als einziges Teil mit Absicht: er sitzt mit
+einem Ende am Oberwagen und mit dem anderen am Ausleger und *fährt aus*, während
+gehoben wird. Mit einer Drehung allein ist das nicht nachzubauen, und ein
+Zylinder, der beim Heben mitwandert statt auszufahren, fällt mehr auf als einer,
+den es nicht gibt.
+
+Was zusammenpassen muss, prüfen Tests ohne Browser (`src/scene.ts`): dass jeder
+Eimer gleich viel Fläche wegnimmt, dass der Zahn der Schaufel bei jedem Stand
+und in jeder Berggröße in der Wand steht, dass die Ladung nach der Drehung über
+der Mulde und nicht daneben landet, dass der Wagen erst nach dem letzten Kippen
+anfährt und dass auch ganz vorgerückt nichts aus dem Feld stößt. Dieselbe
+Trennung wie bei den Wettersymbolen: die Rechnung braucht keinen Browser, das
+Zeichnen schon.
+
+**Gesetzt wird der Timer in der Handy-App** — Dauer und ein Schalter, mehr
+nicht. Ein Modul hat dort keine eigene Oberfläche, und jede
+Konfigurationsänderung startet die Instanz neu: dieser Neustart *ist* der
+Startknopf. Daraus folgt eine Eigenschaft, die man kennen muss: startet der
+Spiegel neu, während der Schalter noch an steht, beginnt der Timer von vorn. Der
+Core merkt sich den Zustand eines Moduls nicht über einen Neustart hinweg, und
+in die Konfiguration darf ein Modul nicht schreiben — sie gehört dem Nutzer.
+
+**Die Baustelle nimmt in jeder Blockgröße die volle Breite ein.** Im
+quadratischen L-Block steht die Zeit darüber, in den flachen Blöcken *darauf* —
+oben links, im leeren Himmel über dem Wagen, wo die Szene ohnehin nichts zeigt.
+Der Grund ist der abfahrende Wagen: stünde die Zeit in einer eigenen Spalte,
+endete die Zeichenfläche an deren Kante und der Wagen verschwände mitten im
+Block wie vor einer unsichtbaren Wand. Dafür sind die Ziffern dort kleiner als
+im L-Block, obwohl er kleiner ist — in einem breiten Band ist die Baustelle der
+Inhalt und die Zahl die Beschriftung dazu.
+
+Läuft kein Timer, bleibt der Block leer. Kein „kein Timer": eine leere Fläche
+auf einem Spiegel ist ein Spiegel.
 
 ### Nachts eine Stufe dunkler
 

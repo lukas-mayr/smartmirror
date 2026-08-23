@@ -205,6 +205,7 @@ test('gibt jeder Quelle ihr Symbol', () => {
   // Symbol davor.
   assert.equal(feedIcon(item('a', { source: 'calendar' })), 'calendar-days');
   assert.equal(feedIcon(item('a', { source: 'sbb' })), 'train-front');
+  assert.equal(feedIcon(item('a', { source: 'timer' })), 'timer');
   assert.equal(feedIcon(item('a', { source: 'weather' })), 'cloud');
   assert.equal(feedIcon(item('a', { source: 'spotify' })), 'music');
   assert.equal(feedIcon(item('a', { source: 'notifications' })), 'bell');

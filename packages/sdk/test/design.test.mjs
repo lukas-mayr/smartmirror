@@ -5,6 +5,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   BOARD,
+  DIG,
   FEED,
   MIRROR_COLORS,
   MIRROR_RADIUS,
@@ -79,6 +80,7 @@ test('die Farben der Anzeige stehen in beiden Quellen gleich', () => {
     '--mirror-danger': MIRROR_COLORS.danger,
     '--mirror-danger-fg': MIRROR_COLORS.dangerFg,
     '--mirror-box': MIRROR_SURFACES.box,
+    '--mirror-box-soft': MIRROR_SURFACES.boxSoft,
   };
   for (const [name, value] of Object.entries(pairs)) {
     assert.equal(mirror.get(name), value, `${name} laeuft auseinander`);
@@ -134,6 +136,17 @@ test('die Masse der Abfahrtstafel stehen in beiden Quellen gleich', () => {
   assert.equal(mirror.get('--board-row-h'), `${BOARD.rowHeight}px`);
   assert.equal(mirror.get('--board-gap'), `${BOARD.gap}px`);
   assert.equal(mirror.get('--board-text'), `${BOARD.textSize}px`);
+});
+
+test('der Takt des Baggers steht in beiden Quellen gleich', () => {
+  /*
+   * Hier haengt mehr daran als an einer Schriftgroesse: das Timer-Modul rechnet
+   * mit dieser Zahl aus, aus wievielen Eimern ein Berg besteht, und das
+   * Stylesheet bewegt mit ihr den Arm. Laufen die beiden auseinander, gruebe
+   * der Bagger sichtbar neben dem Bissen, den er aus dem Berg nimmt.
+   */
+  assert.equal(mirror.get('--dig-bucket'), `${DIG.bucket}ms`);
+  assert.equal(mirror.get('--dig-load'), `${DIG.bucket * DIG.perLoad}ms`);
 });
 
 test('der Faktor der Schriftgroesse steht auf 1, bevor jemand daran dreht', () => {

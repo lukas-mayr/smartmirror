@@ -68,6 +68,20 @@ export const MIRROR_SURFACES = {
   boxWarmLine: 'rgba(212, 180, 131, 0.32)',
   boxDanger: 'rgba(196, 87, 74, 0.08)',
   boxDangerLine: 'rgba(196, 87, 74, 0.35)',
+  /**
+   * Eine Flaeche ohne Ton.
+   *
+   * Fuer Koerper, die keine Farbe tragen sollen und trotzdem Koerper sind —
+   * ein Berg zum Beispiel. Auf Schwarz sieht sie aus wie 8 % Weiss: hell genug,
+   * dass eine Form nicht mehr nur Umriss ist, und weit unter der Grenze, ab der
+   * eine Flaeche durch die Folie zu leuchten beginnt.
+   *
+   * Deckend und nicht durchscheinend, obwohl beides auf Schwarz gleich
+   * aussieht: durch einen Koerper sieht man nicht hindurch. Eine durchscheinende
+   * Flaeche zeigt, was hinter ihr liegt — bei einem Haufen Kies ist das der
+   * Boden, den er verdeckt.
+   */
+  boxSoft: '#15171a',
 } as const;
 
 /** Hoechste erlaubte Deckkraft einer getoenten Flaeche, in Prozent. */
@@ -411,6 +425,86 @@ export const BOARD = {
    * ersten Faktor auseinander.
    */
   textSize: 40,
+} as const;
+
+/* --------------------------------- Aushub ---------------------------------- */
+
+/**
+ * Der Timer als Baustelle: ein Bagger traegt einen Berg ab.
+ *
+ * Ein Timer auf einem Spiegel hat ein Problem, das eine Sanduhr nicht hat: man
+ * geht daran vorbei. Eine Zahl, die herunterzaehlt, beantwortet "wieviel noch"
+ * erst, wenn man sie liest — ein Berg, der kleiner geworden ist, beantwortet es
+ * im Vorbeigehen. Deshalb zeigt dieses Modul die Restzeit zweimal: als Ziffern
+ * fuer den, der hinsieht, und als Berg fuer den, der nur vorbeigeht.
+ *
+ * Die Zahlen hier tragen die eine Regel, an der die ganze Darstellung haengt:
+ * **der Bagger arbeitet immer gleich schnell.** Ein Eimer dauert `bucket`, egal
+ * ob der Timer auf drei Minuten oder auf zwei Stunden steht. Was sich mit der
+ * Dauer aendert, ist der Berg — er ist bei einem langen Timer groesser und
+ * braucht deshalb mehr Eimer. Andersherum waere es falsch: ein Bagger, der bei
+ * einer Stunde in Zeitlupe schwenkt, sieht nicht nach viel Arbeit aus, sondern
+ * nach einem haengenden Bildschirm.
+ *
+ * Die Taktung steht doppelt: hier als Zahl und im Stylesheet als Dauer der
+ * Keyframes. Das Modul braucht sie, um auszurechnen, aus wievielen Eimern ein
+ * Berg besteht; das Stylesheet braucht sie, um den Arm zu bewegen. Ein Test
+ * haelt beide Seiten gegeneinander.
+ */
+export const DIG = {
+  /** Ein Eimer: ausheben, heben, schwenken, kippen, zurueck. In ms. */
+  bucket: 5000,
+  /** Eimer, die auf einen Lastwagen gehen. Danach faehrt er, und der naechste kommt. */
+  perLoad: 4,
+  /**
+   * Zahl der Ladungen, ab der der Berg den Block ganz ausfuellt.
+   *
+   * 90 Ladungen sind eine halbe Stunde. Laenger heisst nicht mehr groesser,
+   * und das ist Absicht: der Bereich, in dem ein Timer meistens steht, sind
+   * die ersten dreissig Minuten, und dort soll man den Unterschied sehen. Ob
+   * eine Stunde oder zwei — "ein voller Berg" ist die ehrlichere Auskunft als
+   * zwei Berge, die sich um eine Handbreit unterscheiden.
+   */
+  fullLoads: 90,
+  /**
+   * Kleinster Berg, als Anteil der vollen Groesse.
+   *
+   * Hoch angesetzt, und das mit Absicht: auch drei Minuten brauchen einen Berg,
+   * der den Bagger ueberragt. Ein Haufen, der kleiner ist als die Maschine
+   * davor, sieht nach Aufraeumen aus und nicht nach Arbeit — und die Frage
+   * "wieviel noch" beantwortet er aus drei Metern gar nicht.
+   */
+  minSize: 0.66,
+  /**
+   * Wie stark die Zahl der Ladungen auf die Groesse durchschlaegt.
+   *
+   * Kleiner als 1, weil der Block nicht mitwaechst: bei linearem Zusammenhang
+   * waere ein Zehn-Minuten-Berg ein Kruemel neben dem Zwei-Stunden-Berg. Mit
+   * Mit 0,25 liegen fuenf Minuten an der Untergrenze, zehn bei drei Vierteln,
+   * zwanzig bei neun Zehnteln und ab einer halben Stunde ist der Berg voll.
+   * Zusammen mit der hohen Untergrenze heisst das: jeder Berg ist ein Berg,
+   * und der Unterschied zwischen kurz und lang faellt genau in den Bereich,
+   * in dem ein Timer meistens steht.
+   */
+  growth: 0.25,
+  /**
+   * Wann im Eimer gekippt wird, als Anteil seiner Dauer.
+   *
+   * `from` ist der Moment, in dem die Schaufel aufgeht, `to` der, in dem der
+   * letzte Stoff unten angekommen ist. Danach ist die Schaufel leer — und erst
+   * danach darf der Wagen anfahren.
+   */
+  dump: { from: 0.4, to: 0.56 },
+  /**
+   * Wann der Wagen wechselt, als Anteil einer Ladung.
+   *
+   * `leave` ist die Abfahrt des vollen, `ready` der Moment, in dem der naechste
+   * steht. Beide Zahlen haben genau eine Aufgabe: der volle Wagen faehrt erst
+   * los, wenn der letzte Eimer ausgeschuettet ist, und der neue steht, bevor
+   * der naechste kippt. Sonst faellt eine Ladung neben die Mulde — und das
+   * sieht man sofort.
+   */
+  swap: { leave: 0.92, ready: 0.08 },
 } as const;
 
 /* ------------------------------ Schriftgroesse ----------------------------- */
