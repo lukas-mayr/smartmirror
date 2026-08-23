@@ -1,6 +1,6 @@
 {
   "name": "@mirror/module-notifications",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,8 +8,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@mirror/sdk": "0.13.0",
+    "@mirror/sdk": "0.14.0",
     "lit": "^3.2.1",
-    "@mirror/icons": "0.13.0"
+    "@mirror/icons": "0.14.0"
   }
 }
