@@ -1958,6 +1958,7 @@ export class MirrorRemote extends LitElement {
     const offline = this.snapshot.status !== 'ready';
     return html`
       <section class="panel">
+        ${this.#renderBootLookHint()}
         ${this.#renderRestartAction(
           'services',
           'Anzeige neu starten',
@@ -1971,6 +1972,27 @@ export class MirrorRemote extends LitElement {
           offline,
         )}
       </section>
+    `;
+  }
+
+  /**
+   * Der einzige Ort, an dem ein ausstehender Neustart sichtbar wird.
+   *
+   * Wie der Spiegel beim Booten aussieht, steht in /boot und in den Units –
+   * ausserhalb des Releases, und wirksam erst beim naechsten Start. Wer nicht
+   * ans Terminal kann, saehe sonst nirgends, dass sich etwas geaendert hat und
+   * nur noch der Neustart fehlt. Deshalb steht der Hinweis hier: direkt ueber
+   * dem Knopf, der ihn erledigt.
+   */
+  #renderBootLookHint(): TemplateResult | typeof nothing {
+    const bootLook = this.snapshot.bootLook;
+    if (!bootLook?.pendingReboot) return nothing;
+    return html`
+      <p class="banner banner--hint">
+        Der Startbildschirm wurde eingerichtet${bootLook.plymouth === 'missing'
+          ? ' (ohne Wortzeichen – Plymouth fehlt auf diesem Geraet)'
+          : nothing}. Sichtbar wird das beim naechsten Neustart des Spiegels.
+      </p>
     `;
   }
 

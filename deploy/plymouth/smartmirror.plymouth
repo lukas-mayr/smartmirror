@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Smartmirror
+Description=Wortzeichen des Spiegels auf Schwarz
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/smartmirror
+ScriptFile=/usr/share/plymouth/themes/smartmirror/smartmirror.script

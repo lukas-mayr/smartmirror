@@ -36,6 +36,7 @@ import type { ModuleHost } from './module-host.js';
 import type { PowerController } from './power.js';
 import type { SecretStore } from './secrets.js';
 import type { UpdateBridge } from './update-bridge.js';
+import type { BootLookBridge } from './boot-look.js';
 import { createLogger } from './logger.js';
 import { appVersion, remoteDistDir } from './paths.js';
 import { requestRestart } from './system-bridge.js';
@@ -69,6 +70,7 @@ export interface ServerDeps {
   auth: AuthStore;
   power: PowerController;
   updates: UpdateBridge;
+  bootLook: BootLookBridge;
 }
 
 export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
@@ -137,6 +139,7 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
     state: deps.modules.snapshot(),
     power: { on: deps.power.isOn },
     update: deps.updates.status,
+    bootLook: deps.bootLook.status,
     viewport,
     previewScreenId: preview?.screenId ?? null,
   });
@@ -252,6 +255,11 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
   deps.modules.on('modules', () => broadcast({ t: 'modules:update', modules: deps.modules.descriptors() }));
   deps.power.on('change', (on: boolean) => broadcast({ t: 'display:power', on }));
   deps.updates.on('status', (status) => broadcast({ t: 'update:status', status }));
+  // Nur an die Fernbedienung: die Anzeige hat mit ihrem eigenen Startbildschirm
+  // nichts zu entscheiden, und ein Hinweis darauf gehoert nicht an die Wand.
+  deps.bootLook.on('status', (status) =>
+    broadcast({ t: 'bootlook:status', status }, (client) => client.type === 'remote'),
+  );
 
   deps.power.on('override', (override: { active: boolean; on: boolean } | null) => {
     void deps.config.update((draft) => {

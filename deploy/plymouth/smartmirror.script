@@ -1,0 +1,42 @@
+# Startbildschirm des Spiegels, solange Plymouth laeuft.
+#
+# Er zeigt dasselbe Bild, das die Anzeige gleich darauf selbst zeichnet:
+# Wortzeichen und drei Punkte auf Schwarz. Der Uebergang soll nicht als Wechsel
+# auffallen, sondern nur daran, dass die Punkte zu atmen anfangen.
+#
+# Das Bild kommt fertig gedreht aus deploy/plymouth/splash-<grad>.png; welche
+# Fassung hier liegt, entscheidet mirror-bootlook.sh anhand der Konfiguration
+# des Spiegels. Plymouth selbst kann sie nicht lesen.
+
+Window.SetBackgroundTopColor(0, 0, 0);
+Window.SetBackgroundBottomColor(0, 0, 0);
+
+splash.image = Image("splash.png");
+splash.sprite = Sprite(splash.image);
+splash.sprite.SetX((Window.GetWidth() - splash.image.GetWidth()) / 2);
+splash.sprite.SetY((Window.GetHeight() - splash.image.GetHeight()) / 2);
+splash.sprite.SetZ(1);
+
+# Plymouth ruft diese Funktionen auf, wenn es etwas mitzuteilen haette:
+# Fortschritt, Meldungen, eine Passwortabfrage fuer eine verschluesselte
+# Platte. Auf einem Spiegel hinter Glas soll nichts davon erscheinen - es gibt
+# dort weder jemanden, der es liest, noch eine Tastatur, um zu antworten.
+# Leere Funktionen sind die Art, das zu sagen; ohne sie zeichnet Plymouth
+# seine Voreinstellung.
+fun refresh_callback() { }
+Plymouth.SetRefreshFunction(refresh_callback);
+
+fun message_callback(text) { }
+Plymouth.SetMessageFunction(message_callback);
+
+fun display_normal_callback() { }
+Plymouth.SetDisplayNormalFunction(display_normal_callback);
+
+fun display_password_callback(prompt, bullets) { }
+Plymouth.SetDisplayPasswordFunction(display_password_callback);
+
+fun display_question_callback(prompt, entry) { }
+Plymouth.SetDisplayQuestionFunction(display_question_callback);
+
+fun quit_callback() { }
+Plymouth.SetQuitFunction(quit_callback);

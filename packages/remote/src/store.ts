@@ -6,6 +6,7 @@ import type {
   PairedDevice,
   PairingState,
   ServerMessage,
+  BootLookStatus,
   UpdateStatus,
   Viewport,
 } from '@mirror/sdk';
@@ -69,6 +70,11 @@ export interface StoreSnapshot {
   powerOn: boolean;
   update: UpdateStatus | null;
   /**
+   * Wie der Spiegel beim Booten aussieht – und ob dafuer noch ein Neustart
+   * aussteht. `null`, solange der Spiegel nichts dazu gemeldet hat.
+   */
+  bootLook: BootLookStatus | null;
+  /**
    * Kantenlaengen der Anzeige in Pixeln, sofern sie gerade haengt. Nur zur
    * Erlaeuterung beim Ausrichten: neben "2,5 %" steht dann auch "27 px".
    */
@@ -112,6 +118,7 @@ export class Store extends EventTarget {
     state: {},
     powerOn: true,
     update: null,
+    bootLook: null,
     viewport: null,
     previewScreenId: null,
     mirrorPaired: false,
@@ -309,6 +316,7 @@ export class Store extends EventTarget {
           state: message.state,
           powerOn: message.power.on,
           update: message.update,
+          bootLook: message.bootLook,
           viewport: message.viewport,
           previewScreenId: message.previewScreenId,
         });
@@ -343,6 +351,9 @@ export class Store extends EventTarget {
         return;
       case 'update:status':
         this.#patch({ update: message.status });
+        return;
+      case 'bootlook:status':
+        this.#patch({ bootLook: message.status });
         return;
       case 'error':
         // Ein abgelaufenes Token muss zur Kopplung fuehren, nicht zu einer

@@ -71,6 +71,11 @@ export const updateRequestFile = join(dataDir, 'update-request.json');
  * deploy/mirror-system.sh.
  */
 export const systemRequestFile = join(dataDir, 'system-request.json');
+/**
+ * Bericht von deploy/mirror-bootlook.sh: wie der Spiegel beim Booten aussieht
+ * und ob dafuer noch ein Neustart aussteht. Der Core liest nur.
+ */
+export const bootLookStatusFile = join(dataDir, 'bootlook-status.json');
 
 export function appVersion(): string {
   for (const file of [join(appRoot, 'VERSION'), join(appRoot, 'package.json')]) {
