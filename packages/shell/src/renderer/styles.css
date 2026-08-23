@@ -58,9 +58,17 @@
   --mirror-box-warm-line: rgba(212, 180, 131, 0.32);
   --mirror-box-danger: rgba(196, 87, 74, 0.08);
   --mirror-box-danger-line: rgba(196, 87, 74, 0.35);
-  /* Eine Flaeche ohne Ton — fuer Koerper, die keine Farbe tragen sollen und
-     trotzdem Koerper sind. Die schwaechste Flaeche des Systems. */
-  --mirror-box-soft: rgba(255, 255, 255, 0.08);
+  /*
+   * Eine Flaeche ohne Ton — fuer Koerper, die keine Farbe tragen sollen und
+   * trotzdem Koerper sind. Die schwaechste Flaeche des Systems.
+   *
+   * Deckend und nicht durchscheinend, obwohl sie auf Schwarz genauso aussieht
+   * wie 8 % Weiss: durch einen Koerper sieht man nicht hindurch. Eine
+   * durchscheinende Flaeche zeigt, was hinter ihr liegt — bei einem Haufen Kies
+   * ist das der Boden, den er verdeckt, und bei einer Ladung die Bordwand,
+   * hinter der sie liegt.
+   */
+  --mirror-box-soft: #15171a;
 
   /* --------------------------------- Typo ---------------------------------- */
 
@@ -222,7 +230,7 @@
   --mirror-box-accent-line: rgba(255, 255, 255, 0.07);
   --mirror-box-warm: transparent;
   --mirror-box-warm-line: rgba(255, 255, 255, 0.07);
-  --mirror-box-soft: transparent;
+  --mirror-box-soft: #000000;
 }
 
 * {
@@ -2914,18 +2922,7 @@ body {
   flex-direction: column;
 }
 
-/*
- * Die flachen Bloecke: Zeit links, Baustelle daneben.
- *
- * Uebereinander bliebe fuer den Berg eine Zeile von wenigen Pixeln — und ein
- * Berg, den man nicht mehr schrumpfen sieht, ist nur noch Zierde an einer Zahl.
- */
-.timer--m,
-.timer--xl {
-  flex-direction: row;
-  align-items: stretch;
-  gap: 2cqw;
-}
+
 
 .timer__head {
   display: flex;
@@ -2933,11 +2930,6 @@ body {
   justify-content: center;
   min-width: 0;
   flex: none;
-}
-
-.timer--m .timer__head,
-.timer--xl .timer__head {
-  width: 40%;
 }
 
 /*
@@ -2952,7 +2944,7 @@ body {
 
 .timer--m .timer__eyebrow,
 .timer--xl .timer__eyebrow {
-  font-size: min(8cqh, 4cqw);
+  font-size: min(5.5cqh, 3.4cqw);
 }
 
 /*
@@ -2966,9 +2958,19 @@ body {
   font-size: min(30cqh, calc(115cqw / var(--timer-chars, 5)));
 }
 
+/*
+ * In den flachen Bloecken steht die Zeit im Himmel ueber dem Wagen.
+ *
+ * Dort ist der einzige Platz, den die Szene nicht braucht — und er ist knapp:
+ * knapp ein Drittel der Hoehe. Deshalb sind die Ziffern hier kleiner als im
+ * quadratischen Block, obwohl er groesser ist. Das ist die richtige Reihenfolge:
+ * in einem breiten Band ist die Baustelle der Inhalt und die Zahl die
+ * Beschriftung dazu. Lesbar bleibt sie in beiden Faellen — unter der Grenze
+ * fuer 3 m Abstand liegt sie nie.
+ */
 .timer--m .timer__value,
 .timer--xl .timer__value {
-  font-size: min(46cqh, calc(56cqw / var(--timer-chars, 5)));
+  font-size: min(20cqh, calc(46cqw / var(--timer-chars, 5)));
 }
 
 /*
@@ -3000,6 +3002,38 @@ body {
  */
 .dig {
   color: var(--mirror-fg-dim);
+}
+
+/*
+ * In den flachen Bloecken liegt die Zeit *auf* der Baustelle und nicht daneben.
+ *
+ * Der Grund ist der abfahrende Wagen: stuende die Zeit in einer eigenen Spalte,
+ * endete die Zeichenflaeche an deren Kante, und der Wagen verschwaende mitten
+ * im Block wie vor einer unsichtbaren Wand. Ueber die volle Breite faehrt er
+ * bis zur Blockkante hinaus — und die Ziffern stehen davor, im leeren Himmel
+ * ueber dem Wagen, wo die Szene ohnehin nichts zeigt.
+ *
+ * Beide Kinder liegen im selben Rasterfeld; das eine oben, das andere unten.
+ */
+.timer--m,
+.timer--xl {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+  gap: 0;
+}
+
+.timer--m > *,
+.timer--xl > * {
+  grid-area: 1 / 1;
+}
+
+.timer--m .timer__head,
+.timer--xl .timer__head {
+  align-self: start;
+  /* Die Ziffern liegen vor der Szene: der Wagen faehrt hinter ihnen hindurch. */
+  position: relative;
+  z-index: 1;
 }
 
 /* Der Boden ist eine Kante und kein Bauteil: er steht so weit zurueck wie eine
@@ -3072,15 +3106,15 @@ body {
 }
 
 /*
- * Die Schaufel steht eine Stufe heller.
+ * Die Schaufel steht eine Stufe heller — und ebenfalls deckend.
  *
- * Sie ist das Werkzeug: das eine Teil, dem man mit dem Blick folgt, wenn man
- * hinsieht. Eine Fuellung von 10 % Weiss ueber Schwarz bleibt eine dunkle
- * Flaeche — sie leuchtet nicht, hebt die Schaufel aber vom Arm ab, an dem sie
- * haengt.
+ * Sie ist das Werkzeug: das eine Teil, dem man mit dem Blick folgt. Deckend
+ * muss sie sein, weil sie die meiste Zeit vor dem Berg steht: durch eine
+ * Schaufel sieht man keinen Sand. Eine durchscheinende Fuellung waere genau
+ * dort durchsichtig, wo es auffaellt.
  */
 .dig__bucket .dig__body {
-  fill: rgba(255, 255, 255, 0.1);
+  fill: #1e2124;
 }
 
 /* Beiwerk: Laufrollen, Rippen, Zaehne, Bordwandprofil. Es macht die Form
@@ -3237,7 +3271,7 @@ body {
   }
   26%,
   66% {
-    transform: rotate(-74deg);
+    transform: rotate(-80deg);
   }
   82%,
   100% {
@@ -3378,12 +3412,12 @@ body {
   0%,
   64% {
     opacity: 0;
-    transform: scale(0.82, 0.15);
+    transform: scale(0.6, 0.15);
   }
   64.01%,
   89% {
     opacity: 1;
-    transform: scale(0.82, 0.38);
+    transform: scale(0.6, 0.45);
   }
   89.01%,
   96% {
@@ -3393,7 +3427,7 @@ body {
   96.01%,
   100% {
     opacity: 0;
-    transform: scale(0.82, 0.15);
+    transform: scale(0.6, 0.15);
   }
 }
 
@@ -3405,24 +3439,29 @@ body {
  * und das sieht man sofort. Der naechste steht bei 8 %, also lange vor dem
  * ersten Kippen bei 10 %.
  *
- * Dass es derselbe Wagen ist, sieht niemand: der Sprung von "draussen links"
- * zurueck liegt ausserhalb des Feldes. Er faehrt nach links, weil das
+ * Er faehrt weiter, als das Feld breit ist: in den flachen Bloecken steht die
+ * Zeit links neben der Baustelle, und ein Wagen, der in der Blockmitte
+ * verschwindet, faehrt gegen eine unsichtbare Wand. Dafuer darf die Zeichnung
+ * ueber ihr Feld hinausragen (`overflow: visible`); abgeschnitten wird erst an
+ * der Blockkante, und die Ziffern liegen davor.
+ *
+ * Dass es derselbe Wagen ist, sieht niemand: er ist waehrend des Wechsels weit
+ * genug draussen. Er faehrt nach links, weil das
  * Fahrerhaus nach links zeigt — ein Lastwagen, der rueckwaerts aus dem Bild
  * rollt, sieht nicht nach Abtransport aus.
  */
 @keyframes dig-haul-away {
   0% {
-    transform: translateX(-180px);
-    animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+    transform: translateX(-170px);
+    animation-timing-function: cubic-bezier(0.16, 0.7, 0.2, 1);
   }
   8%,
   92% {
     transform: translateX(0);
-    animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.45);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.85, 0.4);
   }
-  97%,
   100% {
-    transform: translateX(-180px);
+    transform: translateX(-170px);
   }
 }
 

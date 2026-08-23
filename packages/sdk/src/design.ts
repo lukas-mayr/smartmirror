@@ -72,11 +72,16 @@ export const MIRROR_SURFACES = {
    * Eine Flaeche ohne Ton.
    *
    * Fuer Koerper, die keine Farbe tragen sollen und trotzdem Koerper sind —
-   * ein Berg zum Beispiel. 8 % Weiss ist die schwaechste Flaeche des Systems:
-   * hell genug, dass eine Form nicht mehr nur Umriss ist, und weit unter der
-   * Grenze, ab der eine Flaeche durch die Folie zu leuchten beginnt.
+   * ein Berg zum Beispiel. Auf Schwarz sieht sie aus wie 8 % Weiss: hell genug,
+   * dass eine Form nicht mehr nur Umriss ist, und weit unter der Grenze, ab der
+   * eine Flaeche durch die Folie zu leuchten beginnt.
+   *
+   * Deckend und nicht durchscheinend, obwohl beides auf Schwarz gleich
+   * aussieht: durch einen Koerper sieht man nicht hindurch. Eine durchscheinende
+   * Flaeche zeigt, was hinter ihr liegt — bei einem Haufen Kies ist das der
+   * Boden, den er verdeckt.
    */
-  boxSoft: 'rgba(255, 255, 255, 0.08)',
+  boxSoft: '#15171a',
 } as const;
 
 /** Hoechste erlaubte Deckkraft einer getoenten Flaeche, in Prozent. */

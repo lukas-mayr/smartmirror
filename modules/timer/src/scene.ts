@@ -380,9 +380,9 @@ export const POSE: Readonly<Record<'reach' | 'cut' | 'full' | 'raised' | 'tipped
   /** Zugezogen und voll — die Schaufel steht neben der Raupe, nicht darauf. */
   full: { boom: 7, stick: 0, bucket: 34 },
   /** Gehoben. In dieser Stellung dreht der Oberwagen. */
-  raised: { boom: -74, stick: 0, bucket: 34 },
+  raised: { boom: -80, stick: 0, bucket: 34 },
   /** Gekippt, ueber der Mulde. */
-  tipped: { boom: -74, stick: 0, bucket: -25 },
+  tipped: { boom: -80, stick: 0, bucket: -25 },
 };
 
 /**
@@ -479,10 +479,10 @@ export function knuckleAt(pose: Pose, slewed = false): Point {
  */
 export const TRUCK = {
   /** Linke und rechte Kante der Mulde. */
-  bed: { left: 36, right: 88 },
+  bed: { left: 36, right: 93 },
   /** Oberkante der Bordwand und Boden der Mulde. */
-  rim: 48,
-  floor: 62,
+  rim: 42,
+  floor: 60,
   /**
    * Oberkante der Stirnwand.
    *
@@ -490,11 +490,21 @@ export const TRUCK = {
    * Fahrerhauses — in dieser Reihenfolge, sonst sieht der Wagen aus, als
    * schoebe er eine Kiste vor sich her.
    */
-  headboard: 44,
+  headboard: 37,
   /** Oberkante des Rahmens, auf dem die Mulde sitzt. */
-  frame: 64,
-  /** Wie weit der volle Wagen aus dem Bild faehrt. */
-  exit: -180,
+  frame: 61,
+  /** Dach des Fahrerhauses. Das hoechste am Wagen. */
+  cabRoof: 33,
+  /**
+   * Wie weit der volle Wagen aus dem Bild faehrt.
+   *
+   * Weit genug, dass auch der vorgerueckte Wagen ganz aus dem Feld ist — und
+   * damit aus dem Block, denn die Baustelle nimmt in jeder Blockgroesse die
+   * volle Breite ein. In den flachen Bloecken liegt die Zeit deshalb *auf* der
+   * Szene: stuende sie daneben, verschwaende der Wagen mitten im Block wie vor
+   * einer unsichtbaren Wand.
+   */
+  exit: -170,
 } as const;
 
 /**
@@ -502,22 +512,24 @@ export const TRUCK = {
  *
  * Von der Seite schaut niemand in eine Mulde hinein. Sichtbar wird eine Ladung
  * erst, wenn sie ueber die Bordwand steht, und genau dort setzt dieser Haufen
- * an: seine Grundlinie *ist* die Bordwand. Was darunter liegt, ist im Wagen und
- * geht die Zeichnung nichts an.
+ * an: seine Grundlinie *ist* die Bordwand.
  *
- * Deshalb steht hier auch keine Fuellmenge: das Stylesheet laesst den Haufen
- * erst bei den letzten beiden Eimern aufsteigen — vorher ist die Mulde tief
- * genug, dass man nichts sieht.
+ * Er liegt hinten, nicht in der Mitte: geschuettet wird am Heck, weil dort der
+ * Bagger steht, und Kies bleibt liegen, wo er hinfaellt. Ein Haufen, der
+ * gleichmaessig ueber die ganze Mulde steht, waere von jemandem verteilt
+ * worden — und das macht hier niemand.
+ *
+ * Eine Fuellmenge steht hier nicht: das Stylesheet laesst den Haufen erst bei
+ * den letzten beiden Eimern aufsteigen, und zwar von hinten her.
  */
 export function cargoPath(): string {
-  const left = TRUCK.bed.left + 3;
-  const right = TRUCK.bed.right - 3;
-  const width = right - left;
-  const top = TRUCK.rim - 8;
+  const right = TRUCK.bed.right - 2;
+  const left = TRUCK.bed.left + (TRUCK.bed.right - TRUCK.bed.left) * 0.34;
+  const peak = TRUCK.rim - 8;
   return (
-    `M${left} ${TRUCK.rim}` +
-    `Q${round(left + width * 0.22)} ${round(top + 2)} ${round(left + width * 0.44)} ${top}` +
-    `Q${round(left + width * 0.7)} ${round(top + 3)} ${right} ${TRUCK.rim}` +
+    `M${round(left)} ${TRUCK.rim}` +
+    `Q${round(left + 9)} ${round(peak + 3)} ${round(left + 18)} ${round(peak)}` +
+    `Q${round(right - 9)} ${round(peak - 1)} ${round(right)} ${TRUCK.rim}` +
     `Z`
   );
 }

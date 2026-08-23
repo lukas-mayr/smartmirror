@@ -613,9 +613,11 @@ Reihenfolge nach.
 
 **Man sieht nicht in eine Mulde hinein.** Von der Seite ist eine Ladung erst
 sichtbar, wenn sie über die Bordwand steht: die ersten beiden Eimer
-verschwinden im Wagen, der dritte lugt hervor, der vierte häuft sich. Aus
-demselben Grund ist in der Schaufel nichts zu sehen — sie ist von der Seite
-zu, und was man sieht, ist der Stoff, der beim Kippen fällt.
+verschwinden im Wagen, der dritte lugt hervor, der vierte häuft sich. Und der
+Haufen liegt **hinten**, nicht in der Mitte — geschüttet wird am Heck, weil dort
+der Bagger steht, und Kies bleibt liegen, wo er hinfällt. Aus demselben Grund
+ist in der Schaufel nichts zu sehen: sie ist von der Seite zu, und was man
+sieht, ist der Stoff, der beim Kippen fällt.
 
 **Kies steht nicht wie Beton.** Wo der Zahn eindringt, sackt der Haufen ein
 wenig nach (anderthalb Prozent seiner Höhe, vom Boden aus gerechnet) und über
@@ -653,12 +655,15 @@ stimmen: eine Reihe gleich dicker Striche liest sich als Diagramm, ein Umriss
 als Maschine. Im flachen M-Block fällt das Beiwerk weg und die Silhouette bleibt;
 dort würde es zu einem Grieseln, das die Form verdeckt.
 
-**Und gefüllt.** Ein Bagger ist kein Drahtgitter: steht er vor dem Berg, muss
-der Berg *hinter* ihm sein, und durch eine Schaufel sieht man nicht hindurch.
-Die Füllung ist die Boxfarbe des Design-Systems — praktisch schwarz, also keine
-leuchtende Fläche, aber deckend. Damit übernimmt die Reihenfolge im SVG die
-Arbeit der Tiefe: Kette, dann Oberwagen, dann Arm. Nur die Schaufel steht eine
-Stufe heller: sie ist das Werkzeug, dem der Blick folgt.
+**Und gefüllt — deckend, nicht durchscheinend.** Ein Bagger ist kein
+Drahtgitter: steht er vor dem Berg, muss der Berg *hinter* ihm sein, und durch
+eine Schaufel sieht man keinen Sand. Dasselbe gilt für den Berg selbst und für
+die Ladung: eine durchscheinende Fläche zeigt, was hinter ihr liegt — beim Berg
+den Boden, den er verdeckt, bei der Ladung die Bordwand, hinter der sie liegt.
+Auf Schwarz sieht eine deckende Fläche aus wie 8 % Weiß; der Unterschied fällt
+erst auf, wenn etwas dahinterliegt, und dann sofort. Damit übernimmt die
+Reihenfolge im SVG die Arbeit der Tiefe: Kette, dann Oberwagen, dann Arm. Nur
+die Schaufel steht eine Stufe heller: sie ist das Werkzeug, dem der Blick folgt.
 
 Der Hubzylinder des Auslegers fehlt als einziges Teil mit Absicht: er sitzt mit
 einem Ende am Oberwagen und mit dem anderen am Ausleger und *fährt aus*, während
@@ -681,6 +686,15 @@ Startknopf. Daraus folgt eine Eigenschaft, die man kennen muss: startet der
 Spiegel neu, während der Schalter noch an steht, beginnt der Timer von vorn. Der
 Core merkt sich den Zustand eines Moduls nicht über einen Neustart hinweg, und
 in die Konfiguration darf ein Modul nicht schreiben — sie gehört dem Nutzer.
+
+**Die Baustelle nimmt in jeder Blockgröße die volle Breite ein.** Im
+quadratischen L-Block steht die Zeit darüber, in den flachen Blöcken *darauf* —
+oben links, im leeren Himmel über dem Wagen, wo die Szene ohnehin nichts zeigt.
+Der Grund ist der abfahrende Wagen: stünde die Zeit in einer eigenen Spalte,
+endete die Zeichenfläche an deren Kante und der Wagen verschwände mitten im
+Block wie vor einer unsichtbaren Wand. Dafür sind die Ziffern dort kleiner als
+im L-Block, obwohl er kleiner ist — in einem breiten Band ist die Baustelle der
+Inhalt und die Zahl die Beschriftung dazu.
 
 Läuft kein Timer, bleibt der Block leer. Kein „kein Timer": eine leere Fläche
 auf einem Spiegel ist ein Spiegel.

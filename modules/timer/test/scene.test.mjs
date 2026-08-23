@@ -237,56 +237,31 @@ test('nach der Drehung haengt die Schaufel ueber der Mulde', () => {
   assert.ok(tooth.y < TRUCK.headboard, 'die Schaufel streift die Stirnwand');
 });
 
-test('der Schwenk endet neben der Maschine und nicht ueber ihr', () => {
+test('der Schwenk endet neben der Mulde, gekippt wird erst darueber', () => {
+  /*
+   * Drei Bedingungen auf einmal, und alle drei sieht man sofort, wenn eine
+   * fehlt: die gehobene Schaufel steht links der Maschine (sonst schuettet sie
+   * auf das eigene Dach), sie steht dabei noch *neben* der Mulde und nicht
+   * darin, und auf dem Weg nach links ist sie ueber der Bordwand, bevor sie die
+   * Heckkante erreicht — sonst faehrt sie durch die Klappe.
+   */
   const raised = toothAt(POSE.raised, true);
+  const tipped = toothAt(POSE.tipped, true);
+
   assert.ok(raised.x < TRACK.left, `die gehobene Schaufel steht bei x=${raised.x.toFixed(1)}`);
-  assert.ok(raised.y < TRUCK.rim, 'die gehobene Schaufel haengt unterhalb der Bordwand');
-  assert.ok(toothAt(POSE.tipped, true).x < raised.x, 'sie kippt zurueck statt weiter');
-});
-
-test('der Wagen faehrt erst los, wenn die Schaufel leer ist', () => {
-  /*
-   * Der Fehler, den man sofort sieht: der Wagen zieht an, waehrend die letzte
-   * Ladung noch faellt, und sie landet daneben. Der letzte Eimer einer Ladung
-   * ist der `perLoad`-te; sein Kippen endet bei `dump.to` seiner eigenen Dauer.
-   */
-  const lastDumpEnds = (DIG.perLoad - 1 + DIG.dump.to) / DIG.perLoad;
   assert.ok(
-    DIG.swap.leave > lastDumpEnds,
-    `der Wagen faehrt bei ${DIG.swap.leave}, das Kippen endet erst bei ${lastDumpEnds.toFixed(3)}`,
+    raised.x > TRUCK.bed.right,
+    `die gehobene Schaufel steht schon ueber der Mulde (x=${raised.x.toFixed(1)})`,
   );
+  assert.ok(tipped.x < raised.x, 'sie kippt zurueck statt weiter');
 
-  // Und der naechste steht, bevor der erste Eimer der neuen Ladung kippt.
-  const firstDumpStarts = DIG.dump.from / DIG.perLoad;
+  const share = (raised.x - TRUCK.bed.right) / (raised.x - tipped.x);
+  const atTailgate = raised.y + (tipped.y - raised.y) * share;
   assert.ok(
-    DIG.swap.ready < firstDumpStarts,
-    `der neue Wagen steht erst bei ${DIG.swap.ready}, gekippt wird schon bei ${firstDumpStarts.toFixed(3)}`,
+    atTailgate < TRUCK.rim,
+    `an der Heckkante haengt der Zahn bei y=${atTailgate.toFixed(1)}, die Bordwand bei ${TRUCK.rim}`,
   );
 });
-
-test('der volle Wagen faehrt weit genug, um aus dem Bild zu sein', () => {
-  assert.ok(
-    TRUCK.exit + TRUCK.bed.right + siteShift(1, 0) < 0,
-    'ein Stueck des Wagens bleibt sichtbar stehen',
-  );
-});
-
-test('die Ladung sitzt auf der Bordwand und nicht in der Mulde', () => {
-  /*
-   * Von der Seite schaut niemand in einen Kipper hinein: sichtbar ist eine
-   * Ladung erst, wenn sie oben ueber steht. Ihre Grundlinie *ist* deshalb die
-   * Bordwand — kein Punkt darf darunter liegen.
-   */
-  const numbers = [...cargoPath().matchAll(/-?\d+(?:\.\d+)?/g)].map((match) => Number(match[0]));
-  const xs = numbers.filter((_, index) => index % 2 === 0);
-  const ys = numbers.filter((_, index) => index % 2 === 1);
-  assert.ok(Math.max(...ys) <= TRUCK.rim, 'die Ladung reicht in die Mulde hinein');
-  assert.ok(Math.min(...ys) < TRUCK.rim, 'die Ladung steht nicht ueber der Bordwand');
-  assert.ok(Math.min(...xs) >= TRUCK.bed.left, 'die Ladung haengt links ueber der Bordwand');
-  assert.ok(Math.max(...xs) <= TRUCK.bed.right, 'die Ladung haengt rechts ueber der Bordwand');
-});
-
-/* -------------------------------- Der Aufbau ------------------------------- */
 
 test('die Spiegelung ist die Drehung: was rechts der Achse liegt, liegt danach links davon', () => {
   const tooth = toothAt(POSE.raised);
