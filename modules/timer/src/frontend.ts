@@ -117,38 +117,38 @@ export default defineFrontend<TimerState, TimerConfig>({
      */
     const truck = (): TemplateResult => svg`
       <g class="dig__truck">
-        <path class="dig__frame" d=${`M6 ${TRUCK.frame}H93V${TRUCK.frame + 2.5}H6Z`} />
+        <path class="dig__frame" d=${`M16 ${TRUCK.frame}H93V${TRUCK.frame + 2}H16Z`} />
 
         <path
           class="dig__body"
-          d=${`M6 ${TRUCK.frame}V${TRUCK.cabRoof + 3}Q6 ${TRUCK.cabRoof} 10 ${TRUCK.cabRoof}H30Q34 ${TRUCK.cabRoof} 34 ${TRUCK.cabRoof + 4}V${TRUCK.frame}Z`}
+          d=${`M16 ${TRUCK.frame}V${TRUCK.cabRoof + 2.5}Q16 ${TRUCK.cabRoof} 19.5 ${TRUCK.cabRoof}H38.5Q42 ${TRUCK.cabRoof} 42 ${TRUCK.cabRoof + 3.5}V${TRUCK.frame}Z`}
         />
-        <path class="dig__pane" d=${`M9.5 ${TRUCK.cabRoof + 4}H21.5V${TRUCK.cabRoof + 13}H9.5Z`} />
-        <path class="dig__trim" d=${`M26 ${TRUCK.cabRoof + 4}V${TRUCK.frame}`} />
-        <path class="dig__ram" d=${`M6.2 ${TRUCK.cabRoof + 5}L4.4 ${TRUCK.cabRoof + 2}`} />
-        <path class="dig__trim" d=${`M6 ${TRUCK.frame - 4}H4`} />
+        <path class="dig__pane" d=${`M19 ${TRUCK.cabRoof + 3}H29.5V${TRUCK.cabRoof + 11}H19Z`} />
+        <path class="dig__trim" d=${`M34.5 ${TRUCK.cabRoof + 3}V${TRUCK.frame}`} />
+        <path class="dig__ram" d=${`M16.2 ${TRUCK.cabRoof + 4}L14.6 ${TRUCK.cabRoof + 1.5}`} />
+        <path class="dig__trim" d=${`M16 ${TRUCK.frame - 3.5}H14.2`} />
 
         <path
           class="dig__body"
-          d=${`M${TRUCK.bed.left} ${TRUCK.floor}V${TRUCK.headboard}H${TRUCK.bed.left + 3.5}V${TRUCK.rim}H${TRUCK.bed.right}V${TRUCK.floor}Z`}
+          d=${`M${TRUCK.bed.left} ${TRUCK.floor}V${TRUCK.headboard}H${TRUCK.bed.left + 3}V${TRUCK.rim}H${TRUCK.bed.right}V${TRUCK.floor}Z`}
         />
         <path
           class="dig__cargo"
           d=${cargoPath()}
           style=${`transform-origin:${TRUCK.bed.right - 4}px ${TRUCK.rim}px`}
         />
-        <path class="dig__trim" d=${`M${TRUCK.bed.left + 3.5} ${TRUCK.rim + 2.5}H${TRUCK.bed.right}`} />
-        <path class="dig__trim" d=${`M${TRUCK.bed.right - 4} ${TRUCK.rim}V${TRUCK.floor}`} />
-        <path class="dig__trim" d=${`M54 ${TRUCK.rim + 4}V${TRUCK.floor - 2}`} />
-        <path class="dig__trim" d=${`M68 ${TRUCK.rim + 4}V${TRUCK.floor - 2}`} />
-        <path class="dig__trim" d=${`M82 ${TRUCK.rim + 4}V${TRUCK.floor - 2}`} />
+        <path class="dig__trim" d=${`M${TRUCK.bed.left + 3} ${TRUCK.rim + 2}H${TRUCK.bed.right}`} />
+        <path class="dig__trim" d=${`M${TRUCK.bed.right - 3.5} ${TRUCK.rim}V${TRUCK.floor}`} />
+        <path class="dig__trim" d=${`M60 ${TRUCK.rim + 3.5}V${TRUCK.floor - 2}`} />
+        <path class="dig__trim" d=${`M72 ${TRUCK.rim + 3.5}V${TRUCK.floor - 2}`} />
+        <path class="dig__trim" d=${`M84 ${TRUCK.rim + 3.5}V${TRUCK.floor - 2}`} />
 
-        <circle class="dig__wheel" cx="16" cy="72.5" r="7.5" />
-        <circle class="dig__hub" cx="16" cy="72.5" r="2.6" />
-        <circle class="dig__wheel" cx="60" cy="72.5" r="7.5" />
-        <circle class="dig__hub" cx="60" cy="72.5" r="2.6" />
-        <circle class="dig__wheel" cx="78" cy="72.5" r="7.5" />
-        <circle class="dig__hub" cx="78" cy="72.5" r="2.6" />
+        <circle class="dig__wheel" cx="26" cy="73.6" r="6.4" />
+        <circle class="dig__hub" cx="26" cy="73.6" r="2.2" />
+        <circle class="dig__wheel" cx="66" cy="73.6" r="6.4" />
+        <circle class="dig__hub" cx="66" cy="73.6" r="2.2" />
+        <circle class="dig__wheel" cx="82" cy="73.6" r="6.4" />
+        <circle class="dig__hub" cx="82" cy="73.6" r="2.2" />
       </g>
     `;
 
@@ -268,9 +268,9 @@ export default defineFrontend<TimerState, TimerConfig>({
      */
     const spill = (): TemplateResult => svg`
       <g class="dig__spill">
-        <path d="M83 34V38" />
-        <path d="M87 36V39" />
-        <path d="M79.5 37V40" />
+        <path d="M85 33V37" />
+        <path d="M89 35V38" />
+        <path d="M81.5 36V39" />
       </g>
     `;
 

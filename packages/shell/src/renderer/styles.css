@@ -3391,6 +3391,11 @@ body {
  *
  * Die Marken sitzen jeweils am *Ende* eines Kippens (14, 39, 64, 89 %) und
  * nicht an seinem Anfang: vorher ist der Stoff noch in der Luft.
+ *
+ * Weggeraeumt wird die Ladung erst bei 100 % — also genau dann, wenn der Wagen
+ * ganz aus dem Bild ist. Verschwaende sie frueher, faehre ein voller Wagen
+ * ploetzlich leer davon, und man saehe es genau an der Kante, an der man
+ * hinsieht. Der naechste kommt dann von 0 % an leer herein.
  */
 @keyframes dig-fill {
   0%,
@@ -3404,36 +3409,12 @@ body {
     transform: scale(0.6, 0.45);
   }
   89.01%,
-  96% {
+  100% {
     opacity: 1;
     transform: scale(1, 1);
   }
-  96.01%,
-  100% {
-    opacity: 0;
-    transform: scale(0.6, 0.15);
-  }
 }
 
-/*
- * Der volle Wagen faehrt ab, ein leerer kommt.
- *
- * Er faehrt erst los, wenn die Schaufel leer ist — das letzte Kippen endet bei
- * 89 %, er zieht bei 92 % an. Andersherum faellt eine Ladung neben die Mulde,
- * und das sieht man sofort. Der naechste steht bei 8 %, also lange vor dem
- * ersten Kippen bei 10 %.
- *
- * Er faehrt weiter, als das Feld breit ist: in den flachen Bloecken steht die
- * Zeit links neben der Baustelle, und ein Wagen, der in der Blockmitte
- * verschwindet, faehrt gegen eine unsichtbare Wand. Dafuer darf die Zeichnung
- * ueber ihr Feld hinausragen (`overflow: visible`); abgeschnitten wird erst an
- * der Blockkante, und die Ziffern liegen davor.
- *
- * Dass es derselbe Wagen ist, sieht niemand: er ist waehrend des Wechsels weit
- * genug draussen. Er faehrt nach links, weil das
- * Fahrerhaus nach links zeigt — ein Lastwagen, der rueckwaerts aus dem Bild
- * rollt, sieht nicht nach Abtransport aus.
- */
 @keyframes dig-haul-away {
   0% {
     transform: translateX(-170px);

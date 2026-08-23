@@ -619,6 +619,15 @@ der Bagger steht, und Kies bleibt liegen, wo er hinfällt. Aus demselben Grund
 ist in der Schaufel nichts zu sehen: sie ist von der Seite zu, und was man
 sieht, ist der Stoff, der beim Kippen fällt.
 
+Weggeräumt wird die Ladung erst am Ende der Runde — genau dann, wenn der Wagen
+ganz aus dem Bild ist. Verschwände sie früher, führe ein voller Wagen plötzlich
+leer davon, und die Fuhre wäre nirgends hingekommen.
+
+Und der Wagen ist bewusst klein: niedriger als das Haus des Baggers und kurz
+genug, dass er nicht die halbe Baustelle einnimmt. Zwei gleich große Maschinen
+nebeneinander haben keine Hauptrolle mehr — gegraben wird hier, abgeholt wird
+nur.
+
 **Kies steht nicht wie Beton.** Wo der Zahn eindringt, sackt der Haufen ein
 wenig nach (anderthalb Prozent seiner Höhe, vom Boden aus gerechnet) und über
 der Zehe rieselt etwas die Böschung hinab. Man sieht es nicht als Bewegung, man

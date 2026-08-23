@@ -473,16 +473,21 @@ export function knuckleAt(pose: Pose, slewed = false): Point {
  * aus. Die Mulde liegt damit auf der Baggerseite, und der Weg der Schaufel
  * wird kurz.
  *
+ * Er ist knapp niedriger als der Bagger und deutlich kuerzer als frueher —
+ * nicht, weil ein Lastwagen so aussieht, sondern weil zwei gleich grosse
+ * Maschinen nebeneinander keine Hauptrolle mehr haben. Die Baustelle gehoert
+ * dem Bagger; der Wagen holt ab.
+ *
  * Die Bordwand steht deutlich niedriger als das Dach des Fahrerhauses. Auf
  * gleicher Hoehe wurde aus beiden ein einziger langer Kasten, und der sah nach
  * Anhaenger aus statt nach Kipper.
  */
 export const TRUCK = {
   /** Linke und rechte Kante der Mulde. */
-  bed: { left: 36, right: 93 },
+  bed: { left: 44, right: 93 },
   /** Oberkante der Bordwand und Boden der Mulde. */
-  rim: 42,
-  floor: 60,
+  rim: 47,
+  floor: 63,
   /**
    * Oberkante der Stirnwand.
    *
@@ -490,11 +495,11 @@ export const TRUCK = {
    * Fahrerhauses — in dieser Reihenfolge, sonst sieht der Wagen aus, als
    * schoebe er eine Kiste vor sich her.
    */
-  headboard: 37,
+  headboard: 43,
   /** Oberkante des Rahmens, auf dem die Mulde sitzt. */
-  frame: 61,
+  frame: 63.5,
   /** Dach des Fahrerhauses. Das hoechste am Wagen. */
-  cabRoof: 33,
+  cabRoof: 41,
   /**
    * Wie weit der volle Wagen aus dem Bild faehrt.
    *
@@ -525,7 +530,7 @@ export const TRUCK = {
 export function cargoPath(): string {
   const right = TRUCK.bed.right - 2;
   const left = TRUCK.bed.left + (TRUCK.bed.right - TRUCK.bed.left) * 0.34;
-  const peak = TRUCK.rim - 8;
+  const peak = TRUCK.rim - 7;
   return (
     `M${round(left)} ${TRUCK.rim}` +
     `Q${round(left + 9)} ${round(peak + 3)} ${round(left + 18)} ${round(peak)}` +
