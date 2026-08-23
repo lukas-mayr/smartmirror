@@ -25,7 +25,10 @@ MAX_AGE_SECONDS=120
 
 log() { printf 'mirror-system: %s\n' "$*"; }
 
-[[ -f "$REQUEST" ]] || { log "Kein Auftrag vorhanden."; exit 0; }
+# Der haeufigste Fall, seit der Timer alle zehn Sekunden nachsieht. Still
+# bleiben: eine Zeile pro Lauf waere ein volles Journal ohne jeden Erkenntnis-
+# gewinn.
+[[ -f "$REQUEST" ]] || exit 0
 
 # Erst lesen, dann sofort loeschen – vor dem Ausfuehren.
 #
@@ -95,6 +98,13 @@ case "$ACTION" in
     # der noch herunterfaehrt.
     systemctl restart mirror-core.service mirror-shell.service
     log "Dienste laufen wieder."
+    ;;
+  run-updater)
+    # Der Core hat seinen Auftrag schon in update-request.json gelegt; hier
+    # fehlt nur noch der Startschuss. Frueher gab ihn mirror-updater.path -
+    # und genau der blieb auf einem Geraet im Feld aus.
+    log "Updater wird gestartet."
+    systemctl start --no-block mirror-updater.service
     ;;
   reboot)
     log "Geraet wird neu gestartet."

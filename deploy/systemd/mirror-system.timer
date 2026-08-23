@@ -1,0 +1,24 @@
+[Unit]
+Description=Sieht regelmaessig nach, ob die Handy-App etwas angefordert hat
+
+[Timer]
+# Rueckfallebene fuer mirror-system.path.
+#
+# Eigentlich soll die Path-Unit den Auftrag sofort bemerken. Auf einem Geraet
+# im Feld tat sie das nicht - weder der Knopf "Jetzt pruefen" noch "Neustart"
+# bewirkten etwas, waehrend der 15-Minuten-Timer des Updaters weiterlief und
+# Updates brachte. Woran es lag, liess sich aus der Ferne nicht klaeren; dass
+# Timer auf demselben Geraet zuverlaessig feuern, dagegen schon.
+#
+# Also beides: die Path-Unit bleibt der schnelle Weg, dieser Timer der, auf den
+# Verlass ist. Ein Knopfdruck wirkt damit spaetestens nach zehn Sekunden.
+OnBootSec=20s
+OnUnitActiveSec=10s
+# Ohne diese Zeile fasst systemd Weckzeiten zu Minutenbloecken zusammen, um
+# Strom zu sparen - aus zehn Sekunden wuerde bis zu eine Minute. Auf einem
+# Geraet am Netzteil ist die Ersparnis keine, das Warten am Knopf schon.
+AccuracySec=1s
+Unit=mirror-system.service
+
+[Install]
+WantedBy=timers.target
