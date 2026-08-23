@@ -6,6 +6,7 @@ import {
   ADVANCE_SECONDS,
   feedDescription,
   feedIcon,
+  feedScale,
   fitCount,
   restOpacity,
   slotCount,
@@ -61,7 +62,7 @@ export default defineFrontend<NotificationsState, NotificationsConfig>({
       const block = host.querySelector<HTMLElement>('.feed');
       const list = host.querySelector<HTMLElement>('.feed__list');
       if (!block || !list) return slots;
-      return fitCount(list.clientHeight, block.clientHeight);
+      return fitCount(list.clientHeight, block.clientHeight, feedScale(config));
     };
 
     const paint = (): void => {
@@ -166,6 +167,10 @@ export default defineFrontend<NotificationsState, NotificationsConfig>({
      * dehnen.
      */
     const draw = (): void => {
+      // Der Faktor steht am Block und nicht im Stylesheet: dort kennt niemand
+      // die Einstellung, und eine Deklaration auf `.feed` gewaenne gegen den
+      // geerbten Wert.
+      host.style.setProperty('--feed-scale', String(feedScale(config)));
       paint();
       const fits = slotCount(config.visibleCount, measure());
       if (fits === slots) return;
@@ -195,6 +200,7 @@ export default defineFrontend<NotificationsState, NotificationsConfig>({
       destroy() {
         stopCycle();
         observer.disconnect();
+        host.style.removeProperty('--feed-scale');
         render(html``, host);
       },
     };

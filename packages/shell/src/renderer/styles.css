@@ -148,15 +148,34 @@
 
   /* ---------------------------------- Feed --------------------------------- */
 
-  --feed-item-h: 84px;
-  --feed-item-h-rest: 64px;
+  --feed-item-h: 108px;
+  --feed-item-h-rest: 80px;
   /* Die Haelfte des Blockabstands – und derselbe Wert wie FEED.gap im
      Design-System: die Anzeige rechnet mit ihm aus, wieviele Zeilen passen. */
   --feed-gap: 1rem;
-  --feed-title: 30px;
-  --feed-title-rest: 26px;
+  --feed-title: 40px;
+  --feed-title-rest: 32px;
   --feed-dim-1: 0.8;
   --feed-dim-2: 0.45;
+
+  /* ----------------------------- Abfahrtstafel ----------------------------- */
+
+  --board-row-h: 112px;
+  --board-gap: 16px;
+  --board-text: 40px;
+
+  /* ------------------------------ Schriftgroesse --------------------------- */
+
+  /*
+   * Der Faktor, mit dem ein Block seine Schrift vergroessert.
+   *
+   * Er steht hier auf 1 und wird von der Anzeige am Block selbst gesetzt, wenn
+   * jemand ihn in der Handy-App verstellt hat. Deshalb steht er bewusst *nicht*
+   * auf `.feed` oder `.board`: eine eigene Deklaration dort gewaenne gegen den
+   * geerbten Wert, und der Regler bliebe wirkungslos.
+   */
+  --feed-scale: 1;
+  --board-scale: 1;
 
   /* Wird aus der Konfiguration gesetzt; der Wert hier ist nur der Ausgangspunkt. */
   --mirror-font: 'Nunito', 'Helvetica Neue', Arial, system-ui, sans-serif;
@@ -2109,12 +2128,22 @@ body {
 /* -------------------------------- Abfahrten -------------------------------- */
 
 /*
- * Drei Spalten: Linie, Ziel, wann.
+ * Eine Zeile: Fahrzeug, Linie, Ziel, Gleis, Restzeit.
+ *
+ * Was frueher als Wort dastand, steht jetzt als Symbol. "Bus" ist ein Bus,
+ * "Gleis 5" ist ein Wegweiser mit einer 5, "faellt aus" ist ein Kreuz — das
+ * erkennt man, bevor man zu lesen anfaengt, und es kostet einen Bruchteil der
+ * Breite. Die gewonnene Breite geht in die Ziffern: bis 0.15 stand die
+ * Restzeit in derselben Groesse wie alles andere, und genau sie ist der Grund
+ * hinzusehen.
  *
  * Die Linie steht links und in fester Breite, damit die Ziele an einer Kante
- * beginnen; die Minutenzahl steht rechts und ist das, weswegen man hinsieht.
- * Sie traegt deshalb den Akzent und die Ziffernbreite der Tabelle — beim
- * Herunterzaehlen soll nichts zappeln.
+ * beginnen; die Restzeit steht rechts, traegt den Akzent und die
+ * Ziffernbreite der Tabelle — beim Herunterzaehlen soll nichts zappeln.
+ *
+ * Alle Groessen sind Vielfache eines Masses, wie im Feed. Ein Faktor aus der
+ * Handy-App (`--board-scale`) vergroessert die ganze Zeile; was dann nicht mehr
+ * hineinpasst, wird nicht gezeigt.
  */
 .board {
   display: flex;
@@ -2124,29 +2153,61 @@ body {
   min-width: 0;
   text-align: left;
   container-type: size;
+  /*
+   * Der Pixelwert deckelt, Hoehe und Breite des Blocks entscheiden darunter —
+   * in einem schmalen Block gewinnt die Breite, sonst waere das Ziel
+   * abgeschnitten statt kleiner.
+   */
+  --board-size: calc(var(--board-scale) * min(var(--board-text), 6.5cqh, 4.4cqw));
+  font-size: var(--board-size);
 }
 
 .board__list {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--board-gap);
   flex: 1 1 auto;
   min-height: 0;
+  /* Sicherheitsnetz: die Anzeige besetzt nur so viele Zeilen, wie ganz
+     hineinpassen — bliebe trotzdem eine uebrig, faellt sie aus dem Bild, statt
+     den Block aufzuziehen. */
   overflow: hidden;
 }
 
+/*
+ * Mittig ausgerichtet und nicht auf der Grundlinie: in der Zeile stehen jetzt
+ * Symbole neben Text, und ein Symbol hat keine Grundlinie. Auf `baseline`
+ * haengen Bus und Kreuz eine halbe Zeile zu tief.
+ */
 .board__row {
   display: flex;
-  align-items: baseline;
-  gap: 0.8em;
+  align-items: center;
+  gap: 0.5em;
   flex: none;
   min-width: 0;
+  min-height: calc(var(--board-scale) * min(var(--board-row-h), 26cqh));
+}
+
+/*
+ * Das Fahrzeug.
+ *
+ * Feste Spaltenbreite, damit die Liniennummern an einer Kante beginnen. Die
+ * Breite haengt am Mass des Blocks und nicht an der eigenen Schriftgroesse:
+ * sonst schoebe ein groesseres Symbol die ganze Zeile nach rechts.
+ */
+.board__mode {
+  flex: none;
+  display: inline-flex;
+  justify-content: center;
+  width: calc(1.5 * var(--board-size));
+  font-size: calc(1.2 * var(--board-size));
+  line-height: 0;
+  color: var(--mirror-accent);
 }
 
 .board__line {
   flex: none;
-  min-width: 3.2em;
-  font-size: min(4.4cqh, 3cqw);
+  min-width: 2.8em;
   font-weight: var(--mirror-weight-value);
   color: var(--mirror-fg);
   white-space: nowrap;
@@ -2156,51 +2217,83 @@ body {
 
 .board__body {
   display: flex;
-  flex-direction: column;
   flex: 1 1 auto;
   min-width: 0;
-  gap: 0.1em;
 }
 
 .board__destination {
-  font-size: min(4.8cqh, 3.2cqw);
+  font-size: calc(1.05 * var(--board-size));
   line-height: 1.1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+/*
+ * Das Gleis: ein Wegweiser und eine Zahl, kein Wort.
+ *
+ * "Gleis" sagt niemandem etwas, was der Wegweiser nicht auch sagt, und es
+ * stand bis 0.15 in Versalien quer durch die halbe Zeile. Fehlt das Gleis —
+ * beim Bus ist das die Regel —, faellt die Spalte ganz weg.
+ */
 .board__track {
-  font-size: min(2.8cqh, 2cqw);
-  letter-spacing: var(--mirror-track-label-wide);
-  text-transform: uppercase;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2em;
+  font-size: calc(0.68 * var(--board-size));
+  font-variant-numeric: tabular-nums;
   color: var(--mirror-fg-mute);
   white-space: nowrap;
 }
 
+/*
+ * Die Restzeit. Sie ist der Grund, weswegen man hinsieht, und deshalb das
+ * Groesste in der Zeile. Feste Mindestbreite, damit die Ziffern der Zeilen
+ * untereinander stehen und nicht je nach Laenge wandern.
+ */
 .board__when {
   flex: none;
   display: flex;
   align-items: baseline;
-  gap: 0.3em;
-  font-size: min(4.4cqh, 3cqw);
-  font-variant-numeric: tabular-nums;
+  justify-content: flex-end;
+  gap: 0.25em;
+  min-width: 3.6em;
   color: var(--mirror-accent);
   white-space: nowrap;
+}
+
+.board__value {
+  font-size: calc(1.35 * var(--board-size));
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/*
+ * Die Einheit klein und in Grau: "min" ist keine Auskunft, sondern die
+ * Lesehilfe fuer die Zahl davor. Weglassen kann man sie trotzdem nicht —
+ * jenseits einer Stunde steht dort eine Uhrzeit, und "14:32" gegen "7" muss
+ * man auseinanderhalten koennen.
+ */
+.board__unit {
+  font-size: calc(0.5 * var(--board-size));
+  letter-spacing: var(--mirror-track-label);
+  text-transform: uppercase;
+  color: var(--mirror-fg-mute);
 }
 
 /* Die Verspaetung steht hinter der Zahl und in Sand: sie aendert die
    Auskunft, sie ersetzt sie nicht. */
 .board__delay {
-  font-size: 0.7em;
+  font-size: calc(0.62 * var(--board-size));
   color: var(--mirror-accent-warm);
 }
 
 /*
  * Ein Ausfall wird durchgestrichen und gedimmt, nicht rot: Rot ist im
  * Design-System fuer Zerstoerendes reserviert, und ein Zug, der nicht faehrt,
- * zerstoert nichts. Die durchgestrichene Zeile sagt es ohnehin deutlicher als
- * jede Farbe.
+ * zerstoert nichts. Statt der Minutenzahl steht ein Kreuz — die durchgestrichene
+ * Zeile daneben sagt ohnehin deutlicher, was los ist, als das Wort es koennte.
  */
 .board__row--cancelled .board__destination,
 .board__row--cancelled .board__line {
@@ -2208,9 +2301,15 @@ body {
   opacity: 0.6;
 }
 
-.board__row--cancelled .board__when {
+.board__row--cancelled .board__mode,
+.board__cancelled {
   color: var(--mirror-fg-mute);
-  font-size: min(3.2cqh, 2.2cqw);
+}
+
+.board__cancelled {
+  display: inline-flex;
+  font-size: calc(1.1 * var(--board-size));
+  line-height: 0;
 }
 
 /* --------------------------------- Kalender -------------------------------- */
@@ -2393,13 +2492,21 @@ body {
  * dass mehr wartet — der Rest ist kein Text, den man lesen soll, sondern die
  * Auskunft "da kommt noch was".
  *
- * Klein gesetzt, und zwar mit Absicht. Bis 0.13 stand die oberste Mitteilung
- * in 72 px auf 232 px Hoehe; das ist die Groesse einer Temperatur oder einer
- * Uhrzeit — eines Wertes also, fuer den man hinsieht. Eine Mitteilung ist
- * keiner: man ueberfliegt sie im Vorbeigehen. Sie steht deshalb jetzt in den
- * kleinen Stufen des Design-Systems, naeher an den Wochentagen der Vorschau
- * im Wetterblock als an der Temperatur darueber — und in dieselbe Hauptzone
- * passen statt drei Meldungen acht.
+ * Zurueckhaltend gesetzt, und zwar mit Absicht. Bis 0.13 stand die oberste
+ * Mitteilung in 72 px auf 232 px Hoehe; das ist die Groesse einer Temperatur
+ * oder einer Uhrzeit — eines Wertes also, fuer den man hinsieht. Eine
+ * Mitteilung ist keiner: man ueberfliegt sie im Vorbeigehen.
+ *
+ * Ab 0.14 stand sie dafuer in 30 px, und das war eine Stufe zu weit: was man
+ * ueberfliegen soll, muss man aus 3 m auch lesen koennen, sonst tritt man
+ * naeher — und dann haette die Zeile gleich gross sein koennen. Seit 0.16
+ * traegt die oberste Zeile die Stufe M (40 px) und der Ausblick die
+ * Untergrenze fuer 3 m (32 px). In dieselbe Hauptzone passen damit statt acht
+ * Meldungen sechs, und das ist der bessere Handel.
+ *
+ * Wem auch das nicht reicht, dreht in der Handy-App am Faktor: er steht als
+ * `--feed-scale` vor jeder Groesse dieser Liste und macht sie kuerzer, indem
+ * er sie groesser macht.
  *
  * Wieviele Positionen es sind, rechnet die Anzeige aus der Blockhoehe aus. Das
  * Stylesheet kennt deshalb nur zwei Rollen — die oberste und der Rest — und
@@ -2433,8 +2540,13 @@ body {
    * eine Stufe kleiner, und waeren Innenabstand und Symbolspalte in `em`
    * gerechnet, ruecken sie mit — die Titel begaennen dann auf jeder Position
    * an einer anderen Kante.
+   *
+   * Der Faktor steht aussen und nicht in der Klammer: er soll auch dann noch
+   * wirken, wenn im flachen Block laengst die Blockhoehe entscheidet. Was
+   * dadurch nicht mehr hineinpasst, wird nicht gezeigt — die Anzeige rechnet
+   * mit derselben Formel und besetzt eine Position weniger.
    */
-  --feed-size: min(var(--feed-title), 8cqh, 6cqw);
+  --feed-size: calc(var(--feed-scale) * min(var(--feed-title), 10cqh, 8cqw));
   font-size: var(--feed-size);
 }
 
@@ -2502,7 +2614,7 @@ body {
 }
 
 .feed__item--lead {
-  min-height: min(var(--feed-item-h), 12cqh);
+  min-height: calc(var(--feed-scale) * min(var(--feed-item-h), 15cqh));
   background: var(--mirror-accent);
   color: var(--mirror-on-accent);
   animation: mirror-swap var(--motion-swap) both;
@@ -2524,8 +2636,8 @@ body {
  * Verlauf heraus wie frueher, bei sechs verteilt er sich eben auf sechs.
  */
 .feed__item--rest {
-  min-height: min(var(--feed-item-h-rest), 9cqh);
-  font-size: min(var(--feed-title-rest), 7cqh, 5.2cqw);
+  min-height: calc(var(--feed-scale) * min(var(--feed-item-h-rest), 11cqh));
+  font-size: calc(var(--feed-scale) * min(var(--feed-title-rest), 8.5cqh, 6.4cqw));
   color: var(--mirror-fg);
   opacity: var(--feed-dim-1);
 }
@@ -2589,7 +2701,7 @@ body {
  * keine halbe Zeile.
  */
 .feed__desc {
-  font-size: 0.72em;
+  font-size: 0.78em;
   line-height: 1.2;
   color: var(--mirror-fg-dim);
   white-space: nowrap;
