@@ -1233,8 +1233,7 @@ body {
  */
 .clock__label,
 .weather__place,
-.spotify__eyebrow,
-.timer__eyebrow {
+.spotify__eyebrow {
   font-size: 0.62em;
   font-weight: var(--mirror-weight-label);
   letter-spacing: var(--mirror-track-label-wide);
@@ -2933,21 +2932,6 @@ body {
 }
 
 /*
- * Die Beschriftung rechnet gegen die Blockhoehe — dieselbe Ueberlegung wie bei
- * der Uhr: ein Bruchteil einer Groesse, die an der Breite haengt, landet in
- * einem flachen Block unter der Grenze, ab der aus 3 m ueberhaupt noch etwas
- * lesbar ist.
- */
-.timer__eyebrow {
-  font-size: min(8cqh, 10cqw);
-}
-
-.timer--m .timer__eyebrow,
-.timer--xl .timer__eyebrow {
-  font-size: min(5.5cqh, 3.4cqw);
-}
-
-/*
  * Die Restzeit fuellt den Platz, den sie hat — und wie breit sie wird, haengt
  * daran, was in ihr steht: "07:12" sind fuenf Zeichen, "1:07:12" sieben und
  * "Fertig" sechs. Die Zeichenzahl kommt als `--timer-chars` aus dem Modul, wie
@@ -2964,23 +2948,23 @@ body {
  * Dort ist der einzige Platz, den die Szene nicht braucht — und er ist knapp:
  * knapp ein Drittel der Hoehe. Deshalb sind die Ziffern hier kleiner als im
  * quadratischen Block, obwohl er groesser ist. Das ist die richtige Reihenfolge:
- * in einem breiten Band ist die Baustelle der Inhalt und die Zahl die
- * Beschriftung dazu. Lesbar bleibt sie in beiden Faellen — unter der Grenze
- * fuer 3 m Abstand liegt sie nie.
+ * in einem breiten Band ist die Baustelle der Inhalt und die Zahl die Auskunft
+ * dazu. Lesbar bleibt sie in beiden Faellen — unter der Grenze fuer 3 m Abstand
+ * liegt sie nie.
  */
 .timer--m .timer__value,
 .timer--xl .timer__value {
-  font-size: min(20cqh, calc(46cqw / var(--timer-chars, 5)));
+  font-size: min(25cqh, calc(52cqw / var(--timer-chars, 5)));
 }
 
 /*
- * Ist die Zeit um, traegt die Zeile den warmen Akzent.
+ * Ist die Zeit um, traegt die Zahl den warmen Akzent.
  *
  * Sand ist im Design-System der Ton fuer Spitzen und fuer alles, was
- * Aufmerksamkeit verlangt — und ein abgelaufener Timer ist genau das. Der Berg
- * ist dann ohnehin weg, also gibt es keine zweite farbige Flaeche daneben.
+ * Aufmerksamkeit verlangt — und ein abgelaufener Timer ist genau das. Es ist
+ * der einzige Ton im ganzen Block: solange er laeuft, steht dort Weiss auf
+ * Schwarz, und genau deshalb faellt "Fertig" auf.
  */
-.timer--done .timer__eyebrow,
 .timer--done .timer__value {
   color: var(--mirror-accent-warm);
 }

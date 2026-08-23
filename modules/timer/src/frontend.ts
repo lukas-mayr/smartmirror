@@ -18,7 +18,6 @@ import {
   formatRemaining,
   mountainSize,
   remainingShare,
-  timerLabel,
   timerWindow,
   type TimerConfig,
   type TimerState,
@@ -50,6 +49,12 @@ import {
  * Rahmen, Mulde, Stirnwand, Raeder mit Nabe. Aus drei Metern sieht man von
  * alldem nur die Silhouette, und genau deshalb muss sie stimmen: eine Reihe
  * gleich dicker Striche liest sich als Diagramm, ein Umriss als Maschine.
+ *
+ * **Im Block steht nur die Zeit.** Wofuer der Timer laeuft, weiss der, der ihn
+ * gestellt hat — und wenn nicht, sagt es die Mitteilung, sobald er abgelaufen
+ * ist. Eine Zeile darueber kostet Hoehe, die den Ziffern fehlt, und beantwortet
+ * eine Frage, die vor dem Spiegel niemand stellt. Damit traegt der Block auch
+ * keinen Akzent mehr: Farbe braucht eine Quelle, und ein Bagger hat keine.
  *
  * Laeuft kein Timer, bleibt der Block leer. Kein "kein Timer": eine leere
  * Flaeche auf einem Spiegel ist ein Spiegel, ein Satz darueber ist eine
@@ -255,6 +260,11 @@ export default defineFrontend<TimerState, TimerConfig>({
      * Fall eine Bewegung und keine Form. Sie liegen ausserhalb des Oberwagens,
      * weil sie nicht mitdrehen — sie fallen senkrecht, egal wie die Maschine
      * gerade steht.
+     *
+     * Und sie liegen *vor* dem Wagen in der Zeichenreihenfolge, also hinter ihm
+     * im Bild: geschuettet wird in die Mulde, und zwischen dem fallenden Stoff
+     * und dem Betrachter steht die nahe Bordwand. Andersherum faellt der Sand
+     * sichtbar vor dem Wagen zu Boden und damit daneben.
      */
     const spill = (): TemplateResult => svg`
       <g class="dig__spill">
@@ -301,7 +311,7 @@ export default defineFrontend<TimerState, TimerConfig>({
               />`
             : nothing}
           <g class="dig__site" style=${`transform:translateX(${shift.toFixed(1)}px)`}>
-            ${slide()} ${truck()} ${spill()} ${excavator()}
+            ${slide()} ${spill()} ${truck()} ${excavator()}
           </g>
         </svg>
       `;
@@ -330,7 +340,6 @@ export default defineFrontend<TimerState, TimerConfig>({
         phaseStyle = `--dig-phase:-${(digPhaseMs(elapsed) / 1000).toFixed(2)}s`;
       }
 
-      const label = timerLabel(config.label);
       const size = host.dataset.size ?? 'l';
       const share = done ? 0 : remainingShare(elapsed, total);
       const scale = mountainSize(total);
@@ -359,7 +368,6 @@ export default defineFrontend<TimerState, TimerConfig>({
         html`
           <div class=${`timer timer--${size}${done ? ' timer--done' : ''}`}>
             <div class="timer__head">
-              <div class="timer__eyebrow">${label}</div>
               <div class="timer__value" style=${`--timer-chars:${value.length}`}>${value}</div>
             </div>
             ${scene(scale, share, shift, !done)}

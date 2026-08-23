@@ -625,12 +625,24 @@ der Zehe rieselt etwas die Böschung hinab. Man sieht es nicht als Bewegung, man
 sieht nur, dass der Berg lebt — und beides fällt genau in die Zeit, in der
 gegraben wird.
 
+Was beim Kippen fällt, fällt **hinter** die nahe Bordwand: in der
+Zeichenreihenfolge steht es vor dem Wagen, im Bild also dahinter, und
+verschwindet auf halbem Weg in der Mulde. Andersherum rieselt der Sand sichtbar
+vor dem Wagen zu Boden — und landet damit neben ihm.
+
 **Der Berg ist weiß, nicht farbig.** Farbe braucht eine Quelle, und ein Haufen
 Kies hat keine: er wäre salbeifarben, weil Salbei gerade die Normalfarbe ist,
 und genau davor warnt das Design-System. Er ist der Wert, für den der Block da
 ist, und damit das hellste Teil der Szene — weißer Umriss auf der schwächsten
-Fläche des Systems (`--mirror-box-soft`, 8 % Weiß). Den Akzent trägt die Zeile
-darüber, die sagt, wofür der Timer läuft.
+Fläche des Systems (`--mirror-box-soft`).
+
+**Im Block steht nur die Zeit.** Keine Beschriftung darüber: wofür der Timer
+läuft, weiß der, der ihn gestellt hat, und wenn nicht, sagt es die Mitteilung,
+sobald er abgelaufen ist. Die Zeile kostete Höhe, die den Ziffern fehlt, und
+beantwortete eine Frage, die vor dem Spiegel niemand stellt. Damit trägt der
+ganze Block keinen Akzent mehr — Weiß auf Schwarz, solange er läuft. Genau
+deshalb fällt „Fertig" in Sand auf: es ist der einzige Ton, der überhaupt
+vorkommt.
 
 **Bewegt wird im Stylesheet, gerechnet wird im Modul.** Der Takt ist fest, und
 ein fester Takt ist genau das, was CSS-Keyframes gut können: sie laufen im

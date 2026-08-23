@@ -19,7 +19,7 @@
       "label": {
         "type": "string",
         "title": "Wofuer",
-        "description": "Steht ueber der Restzeit und in der Mitteilung, wenn die Zeit um ist.",
+        "description": "Steht in der Mitteilung, wenn die Zeit um ist. Im Block selbst steht nur die Restzeit — was der Timer bedeutet, weiss der, der ihn gestellt hat.",
         "default": "Timer",
         "maxLength": 24
       },
