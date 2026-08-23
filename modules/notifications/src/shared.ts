@@ -1,4 +1,4 @@
-import { FEED, type FeedNotification } from '@mirror/sdk';
+import { clampTextScale, FEED, type FeedNotification } from '@mirror/sdk';
 import type { IconName } from '@mirror/icons';
 
 /**
@@ -64,6 +64,15 @@ export interface NotificationsConfig {
    * naechste Sache, sonst nichts" ein legitimer Wunsch ist und kein Platzmangel.
    */
   visibleCount: number;
+  /**
+   * Schriftgroesse der Liste als Faktor.
+   *
+   * Nicht die Zahl der Positionen: die ergibt sich daraus. Wer groesser stellt,
+   * sieht weniger Mitteilungen gleichzeitig — und das ist die richtige
+   * Reihenfolge, denn eine Mitteilung, die man aus dem Flur lesen kann, ist
+   * mehr wert als drei, vor die man treten muss.
+   */
+  scale: number;
 }
 
 export interface NotificationsState {
@@ -82,6 +91,11 @@ export const VISIBLE_MAX: number = FEED.visibleMax;
 
 /** Voreingestellte Taktung in Sekunden, aus dem Design-System. */
 export const ADVANCE_SECONDS = FEED.advance / 1000;
+
+/** Die eingestellte Schriftgroesse, auf die erlaubten Grenzen gebracht. */
+export function feedScale(config: Partial<Pick<NotificationsConfig, 'scale'>>): number {
+  return clampTextScale(config.scale);
+}
 
 /**
  * Eine Mitteilung aus einer Konfigurationszeile.
@@ -171,17 +185,22 @@ export function feedDescription(item: Pick<FeedNotification, 'label' | 'meta'>):
  * `listHeight` ist der Platz, der der Liste tatsaechlich bleibt (also ohne
  * Ueberschrift), `blockHeight` die Hoehe des ganzen Blocks — an der haengen
  * die `cqh`-Deckel der Positionen im Stylesheet, und deshalb muessen beide
- * Masse herein. Gerechnet wird mit denselben Formeln wie dort: passte hier
+ * Masse herein. `scale` ist die eingestellte Schriftgroesse: sie vergroessert
+ * die Zeilen und macht die Liste damit kuerzer. Gerechnet wird mit denselben Formeln wie dort: passte hier
  * eine Position mehr als dort, waere die unterste angeschnitten.
  *
  * Angeschnitten wird nichts: was nicht ganz hineinpasst, wird nicht gezeigt.
  * Eine halbe Zeile am unteren Rand liest sich als Fehler, nicht als Ausblick.
  */
-export function fitCount(listHeight: number, blockHeight: number): number {
+export function fitCount(listHeight: number, blockHeight: number, scale = 1): number {
   if (!Number.isFinite(listHeight) || !Number.isFinite(blockHeight)) return VISIBLE_MIN;
 
-  const lead = Math.min(FEED.itemHeight, blockHeight * FEED.itemShare);
-  const rest = Math.min(FEED.itemHeightRest, blockHeight * FEED.itemShareRest);
+  // Der Faktor steht aussen und nicht in der Klammer — genau wie im
+  // Stylesheet: er soll auch dann noch wirken, wenn laengst die Blockhoehe
+  // entscheidet, und dann passt eben eine Position weniger hinein.
+  const factor = clampTextScale(scale);
+  const lead = factor * Math.min(FEED.itemHeight, blockHeight * FEED.itemShare);
+  const rest = factor * Math.min(FEED.itemHeightRest, blockHeight * FEED.itemShareRest);
   if (rest <= 0) return VISIBLE_MIN;
 
   // Jede weitere Position kostet ihre Hoehe plus den Abstand davor.

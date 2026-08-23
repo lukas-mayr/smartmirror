@@ -25,10 +25,14 @@ const WANTED = [
   'wind', 'snowflake', 'droplets', 'thermometer', 'sunrise', 'sunset',
   // Musik
   'music', 'pause',
-  // Verkehr
-  'train-front',
+  // Verkehr. Die Abfahrtstafel zeigt das Fahrzeug als Symbol statt als Wort –
+  // ob eine "10" ein Bus oder ein Tram ist, weiss sonst nur, wer die Stadt
+  // kennt.
+  'train-front', 'train-front-tunnel', 'tram-front', 'bus-front', 'ship',
+  'cable-car', 'signpost',
   // Allgemein
   'clock', 'calendar-days', 'bell', 'triangle-alert', 'wifi-off', 'refresh-cw',
+  'octagon-x',
 ];
 
 /** Zerlegt die Kindelemente eines Lucide-SVG in { tag, attrs }. */

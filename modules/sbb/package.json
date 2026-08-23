@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@mirror/sdk": "0.15.1",
+    "@mirror/icons": "0.15.1",
     "lit": "^3.2.1"
   }
 }

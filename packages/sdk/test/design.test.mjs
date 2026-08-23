@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  BOARD,
   FEED,
   MIRROR_COLORS,
   MIRROR_RADIUS,
@@ -17,7 +18,9 @@ import {
   PWA_METRICS,
   PWA_RADIUS,
   PWA_TYPE,
+  TEXT_SCALE,
   ZONE_SPECS,
+  clampTextScale,
   defaultGridForRotation,
   DEFAULT_GRID,
   isDefaultGrid,
@@ -125,6 +128,30 @@ test('die Masse des Feeds stehen in beiden Quellen gleich', () => {
   assert.equal(mirror.get('--feed-title-rest'), `${FEED.titleSizeRest}px`);
   assert.equal(mirror.get('--feed-dim-1'), String(FEED.dim1));
   assert.equal(mirror.get('--feed-dim-2'), String(FEED.dim2));
+});
+
+test('die Masse der Abfahrtstafel stehen in beiden Quellen gleich', () => {
+  assert.equal(mirror.get('--board-row-h'), `${BOARD.rowHeight}px`);
+  assert.equal(mirror.get('--board-gap'), `${BOARD.gap}px`);
+  assert.equal(mirror.get('--board-text'), `${BOARD.textSize}px`);
+});
+
+test('der Faktor der Schriftgroesse steht auf 1, bevor jemand daran dreht', () => {
+  // Er steht in `:root` und nicht auf `.feed` oder `.board`: eine Deklaration
+  // dort gewaenne gegen den Wert, den die Anzeige am Block setzt.
+  assert.equal(mirror.get('--feed-scale'), String(TEXT_SCALE.default));
+  assert.equal(mirror.get('--board-scale'), String(TEXT_SCALE.default));
+});
+
+test('klemmt die Schriftgroesse auf das, was ein Block vertraegt', () => {
+  assert.equal(clampTextScale(1.25), 1.25);
+  assert.equal(clampTextScale(9), TEXT_SCALE.max);
+  assert.equal(clampTextScale(0), TEXT_SCALE.min);
+  // Aus der Konfiguration kann alles kommen – ein Block, der daran zerbricht,
+  // zeigt gar nichts mehr.
+  assert.equal(clampTextScale(undefined), TEXT_SCALE.default);
+  assert.equal(clampTextScale('Unsinn'), TEXT_SCALE.default);
+  assert.equal(clampTextScale('1.2'), 1.2);
 });
 
 test('die Baender teilen die Hoehe so auf wie das Design-System', () => {

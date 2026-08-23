@@ -298,12 +298,19 @@ export const MOTION = {
  * dass mehr wartet. Ein leerer Feed heisst leere Hauptzone – kein "Keine
  * Mitteilungen".
  *
- * Die Masse sind bewusst klein. Bis 0.13 stand die oberste Mitteilung in 72 px
- * auf 232 px Hoehe – das ist die Groesse eines Wertes, und eine Mitteilung ist
- * keiner: man sieht nicht hin, um sie abzulesen, man ueberfliegt sie. Der
- * Titel liegt jetzt bei den kleinen Stufen, naeher an den Wochentagen der
- * Wettervorschau als an der Temperatur darueber – und in dieselbe Hauptzone
- * passt statt dreien eine ganze Liste.
+ * Die Masse sind bewusst zurueckhaltend. Bis 0.13 stand die oberste Mitteilung
+ * in 72 px auf 232 px Hoehe – das ist die Groesse eines Wertes, und eine
+ * Mitteilung ist keiner: man sieht nicht hin, um sie abzulesen, man
+ * ueberfliegt sie. Seit 0.14 lag der Titel dafuer bei 30 px, und das war eine
+ * Stufe zu weit: aus 3 m ueberfliegt man 30 px nicht mehr, man tritt naeher.
+ * Seit 0.16 traegt die oberste Zeile die Stufe M (40 px) und der Ausblick die
+ * Untergrenze fuer 3 m Leseabstand (32 px) – gross genug zum Ueberfliegen,
+ * klein genug, dass in dieselbe Hauptzone weiterhin eine Liste passt und keine
+ * drei Meldungen.
+ *
+ * Wem das nicht reicht, dreht am Faktor: `TEXT_SCALE` multipliziert die ganze
+ * Zeile, und die Liste wird dann eben kuerzer. Das ist die richtige Reihenfolge
+ * – lieber drei lesbare Mitteilungen als sechs, die niemand liest.
  *
  * Wieviele Positionen es sind, steht bewusst nicht hier: das entscheidet die
  * Blockhoehe. Eine feste Zahl waere in einem hohen Block eine halbleere Liste
@@ -324,9 +331,9 @@ export const FEED = {
   /** Wie lange, bis die Liste eine Position nachrueckt. */
   advance: 3400,
   /** Hoehe der obersten Position in Pixeln. */
-  itemHeight: 84,
+  itemHeight: 108,
   /** Hoehe jeder weiteren. */
-  itemHeightRest: 64,
+  itemHeightRest: 80,
   /**
    * Anteil der Blockhoehe, den eine Position hoechstens einnimmt.
    *
@@ -336,8 +343,8 @@ export const FEED = {
    * besetzen darf – rechnete sie anders als das Stylesheet legt, waere die
    * unterste Zeile mal angeschnitten und mal fehlte eine.
    */
-  itemShare: 0.12,
-  itemShareRest: 0.09,
+  itemShare: 0.15,
+  itemShareRest: 0.11,
   /**
    * Abstand zwischen zwei Zeilen.
    *
@@ -347,9 +354,15 @@ export const FEED = {
    * auseinander.
    */
   gap: 16,
-  /** Schriftgroesse des Titels oben bzw. auf den Ausblick-Positionen. */
-  titleSize: 30,
-  titleSizeRest: 26,
+  /**
+   * Schriftgroesse des Titels oben bzw. auf den Ausblick-Positionen.
+   *
+   * Die Stufe M des Design-Systems und darunter die Untergrenze fuer 2 bis 3 m
+   * Leseabstand: die oberste Zeile liest man aus dem Flur, die darunter, wenn
+   * man hinsieht.
+   */
+  titleSize: 40,
+  titleSizeRest: 32,
   /**
    * Deckkraft der Ausblick-Positionen: die erste darunter, die unterste.
    *
@@ -360,6 +373,70 @@ export const FEED = {
   dim1: 0.8,
   dim2: 0.45,
 } as const;
+
+/* ------------------------------ Abfahrtstafel ------------------------------ */
+
+/**
+ * Die Zeile einer Abfahrtstafel.
+ *
+ * Sie steht hier aus demselben Grund wie der Feed: das Stylesheet setzt die
+ * Zeile, die Anzeige rechnet aus, wieviele davon in den Block passen – und
+ * beide muessen mit denselben Zahlen rechnen, sonst ist die unterste Zeile mal
+ * angeschnitten und mal fehlt eine.
+ *
+ * Eine Zeile ist breit und flach: Fahrzeugsymbol, Linie, Ziel, Gleis, Restzeit.
+ * Was frueher als Wort dastand, steht jetzt als Symbol – das Fahrzeug statt
+ * "Bus", ein Kreuz statt "faellt aus", ein Wegweiser statt "Gleis". Damit
+ * bleibt in derselben Zeile Platz fuer groessere Ziffern, und genau die sind
+ * der Grund hinzusehen.
+ */
+export const BOARD = {
+  /** Hoehe einer Zeile in Pixeln auf 1080 x 1920. */
+  rowHeight: 112,
+  /**
+   * Anteil der Blockhoehe, den eine Zeile hoechstens einnimmt.
+   *
+   * Derselbe Deckel wie im Stylesheet: in einem flachen Block gewinnt der
+   * Anteil, in einem hohen die Pixelhoehe.
+   */
+  rowShare: 0.26,
+  /** Abstand zwischen zwei Zeilen – wie im Feed die Haelfte des Blockabstands. */
+  gap: 16,
+  /**
+   * Das Mass, an dem alles in der Zeile haengt.
+   *
+   * Die Linie steht in dieser Groesse, das Ziel etwas darueber, die Restzeit
+   * deutlich darueber und Gleis und Einheit darunter. Ein Mass statt fuenf:
+   * eine Zeile, die aus fuenf unabhaengigen Groessen besteht, faellt beim
+   * ersten Faktor auseinander.
+   */
+  textSize: 40,
+} as const;
+
+/* ------------------------------ Schriftgroesse ----------------------------- */
+
+/**
+ * Der Faktor, mit dem ein Block seine Schrift vergroessert.
+ *
+ * Die Masse des Design-Systems gelten fuer einen Spiegel im Flur bei 2 bis 3 m
+ * Abstand. Ein Spiegel im Bad haengt naeher, einer am Ende des Korridors
+ * weiter weg, und wer ohne Brille davorsteht, liest anders als der Rest der
+ * Familie. Genau dafuer ist der Faktor da – und nicht dafuer, einen Block zum
+ * Plakat zu machen: bei 1,6 ist Schluss.
+ *
+ * Er vergroessert die ganze Zeile, nicht nur die Schrift. Die Liste wird
+ * dadurch kuerzer, weil weniger Zeilen in denselben Block passen. Das ist die
+ * richtige Reihenfolge: lieber drei lesbare Zeilen als sechs, die niemand
+ * liest.
+ */
+export const TEXT_SCALE = { min: 0.8, max: 1.6, step: 0.05, default: 1 } as const;
+
+/** Der Faktor, auf die erlaubten Grenzen gebracht. Unsinn wird zu 1. */
+export function clampTextScale(value: unknown): number {
+  const num = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(num)) return TEXT_SCALE.default;
+  return Math.min(TEXT_SCALE.max, Math.max(TEXT_SCALE.min, num));
+}
 
 /* ---------------------------------- PWA ----------------------------------- */
 

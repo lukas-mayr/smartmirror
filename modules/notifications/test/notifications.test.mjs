@@ -118,10 +118,10 @@ test('gibt fuer eine leere Liste nichts zurueck', () => {
 /* --------------------------------- Plaetze -------------------------------- */
 
 test('fuellt einen hohen Block mit mehr Positionen als einen flachen', () => {
-  // Dieselbe Rechnung wie im Stylesheet: oben 84 px, darunter je 64 px plus
+  // Dieselbe Rechnung wie im Stylesheet: oben 108 px, darunter je 80 px plus
   // 16 px Abstand.
-  assert.equal(fitCount(244, 800), 3);
-  assert.equal(fitCount(500, 800), 6);
+  assert.equal(fitCount(244, 800), 2);
+  assert.equal(fitCount(500, 800), 5);
   assert.ok(fitCount(200, 400) < fitCount(900, 900));
 });
 
@@ -137,10 +137,28 @@ test('schneidet keine Position an', () => {
   // Eine halbe Zeile am unteren Rand liest sich als Fehler und nicht als
   // Ausblick: was nicht ganz hineinpasst, wird nicht gezeigt.
   const block = 1000;
-  const lead = Math.min(84, block * 0.12);
-  const row = Math.min(64, block * 0.09);
+  const lead = Math.min(108, block * 0.15);
+  const row = Math.min(80, block * 0.11);
   const list = lead + 2 * (row + 16) + row / 2;
   assert.equal(fitCount(list, block), 3);
+});
+
+test('macht die Liste kuerzer, wenn die Schrift groesser wird', () => {
+  // Die richtige Reihenfolge: eine Mitteilung, die man aus dem Flur lesen
+  // kann, ist mehr wert als drei, vor die man treten muss.
+  assert.ok(fitCount(500, 500, 1.5) < fitCount(500, 500, 1));
+  assert.ok(fitCount(500, 500, 0.8) > fitCount(500, 500, 1));
+});
+
+test('nimmt einen unsinnigen Faktor nicht ernst', () => {
+  // Aus der Konfiguration kann alles kommen; eine Liste, die daran zerbricht,
+  // waere ein Block, der nichts mehr zeigt.
+  const normal = fitCount(500, 500, 1);
+  assert.equal(fitCount(500, 500, Number.NaN), normal);
+  assert.equal(fitCount(500, 500, undefined), normal);
+  // Geklemmt statt uebernommen: bei 1,6 ist Schluss.
+  assert.equal(fitCount(500, 500, 99), fitCount(500, 500, 1.6));
+  assert.ok(fitCount(500, 500, 1.6) < normal);
 });
 
 test('zeigt in derselben Hauptzone mehr Zeilen als die klobige Fassung', () => {

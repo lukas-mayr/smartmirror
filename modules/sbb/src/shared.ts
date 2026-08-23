@@ -1,4 +1,5 @@
-import { parseLocalStamp, type NotificationInput } from '@mirror/sdk';
+import { BOARD, clampTextScale, parseLocalStamp, type NotificationInput } from '@mirror/sdk';
+import type { IconName } from '@mirror/icons';
 
 /**
  * Abfahrten im oeffentlichen Verkehr der Schweiz.
@@ -34,12 +35,22 @@ export interface SbbConfig {
   notify: boolean;
   notifyCount: number;
   refreshSeconds: number;
+  /**
+   * Schriftgroesse der Tafel als Faktor.
+   *
+   * Nicht die Zahl der Zeilen: die ergibt sich daraus. Wer groesser stellt,
+   * bekommt weniger Abfahrten zu sehen, und das ist die richtige Reihenfolge —
+   * eine Abfahrt, die man lesen kann, ist mehr wert als drei, die man ahnt.
+   */
+  scale: number;
 }
 
 export interface Departure {
   id: string;
   /** Linienbezeichnung: "S3", "10", "IC 8". */
   line: string;
+  /** Womit es faehrt – die Tafel zeigt es als Symbol statt als Wort. */
+  kind: VehicleKind;
   /** Wohin: "Biel/Bienne". */
   destination: string;
   /** Planmaessige Abfahrt als Zeitpunkt. */
@@ -72,6 +83,62 @@ interface RawConnection {
 interface RawBoard {
   stop?: { name?: unknown } | null;
   connections?: unknown;
+}
+
+/**
+ * Das Fahrzeug hinter einer Verbindung.
+ *
+ * Die Auskunft schickt es als Wort mit: "strain", "bus", "post", "tram",
+ * "ship", "cablecar" und einiges mehr, je nach Betrieb auch in Varianten, die
+ * nirgends dokumentiert sind. Deshalb wird nicht auf Gleichheit geprueft,
+ * sondern gesucht: "night_bus" ist ein Bus, "express_train" ein Zug.
+ *
+ * Wer hier nicht zuzuordnen ist, faehrt auf Schienen. Das ist keine
+ * Verlegenheit, sondern die haeufigste richtige Antwort — die Auskunft ist ein
+ * Bahnfahrplan, und ein unbekannter Eintrag ist eher ein seltener Zugtyp als
+ * ein Schiff.
+ */
+export type VehicleKind = 'train' | 'metro' | 'tram' | 'bus' | 'ship' | 'cable';
+
+const KIND_PATTERNS: readonly (readonly [RegExp, VehicleKind])[] = [
+  [/tram/i, 'tram'],
+  [/metro|subway|underground/i, 'metro'],
+  [/bus|post/i, 'bus'],
+  [/ship|boat|schiff/i, 'ship'],
+  [/cable|gondola|funicular|lift|seil/i, 'cable'],
+];
+
+export function vehicleKind(type: unknown): VehicleKind {
+  const raw = typeof type === 'string' ? type : '';
+  for (const [pattern, kind] of KIND_PATTERNS) {
+    if (pattern.test(raw)) return kind;
+  }
+  return 'train';
+}
+
+/**
+ * Das Symbol zum Fahrzeug.
+ *
+ * Es ersetzt kein Wort, das dagestanden haette — bis 0.15 stand dort gar
+ * nichts, und ob eine "10" ein Bus oder ein Tram ist, wusste nur, wer die
+ * Stadt kennt. Ein Symbol beantwortet das in der Breite, die ohnehin frei war.
+ */
+const VEHICLE_ICONS: Readonly<Record<VehicleKind, IconName>> = {
+  train: 'train-front',
+  metro: 'train-front-tunnel',
+  tram: 'tram-front',
+  bus: 'bus-front',
+  ship: 'ship',
+  cable: 'cable-car',
+};
+
+export function vehicleIcon(departure: Pick<Departure, 'kind'>): IconName {
+  return VEHICLE_ICONS[departure.kind] ?? 'train-front';
+}
+
+/** Die Schriftgroesse der Tafel als Faktor, auf die erlaubten Grenzen gebracht. */
+export function boardScale(config: Partial<Pick<SbbConfig, 'scale'>>): number {
+  return clampTextScale(config.scale);
 }
 
 function text(value: unknown): string {
@@ -113,6 +180,7 @@ export function parseBoard(body: unknown, zone: string): Departure[] {
     out.push({
       id: `${line}-${scheduled}-${index}`,
       line,
+      kind: vehicleKind(entry.type),
       destination: text(entry.terminal?.name),
       scheduled,
       delay,
@@ -165,11 +233,54 @@ export function selectDepartures(
 }
 
 /**
- * Wie lange es noch dauert, als Text.
+ * Wie lange es noch dauert, in seine Teile zerlegt.
  *
- * In Minuten, solange es in Minuten zaehlbar ist, sonst als Uhrzeit: "in 7
- * min" beantwortet die Frage im Flur, "14:32" die am Vorabend. Ab einer
- * Stunde rechnet niemand mehr in Minuten.
+ * In Minuten, solange es in Minuten zaehlbar ist, sonst als Uhrzeit: "7 min"
+ * beantwortet die Frage im Flur, "14:32" die am Vorabend. Ab einer Stunde
+ * rechnet niemand mehr in Minuten.
+ *
+ * Zahl und Einheit getrennt, weil die Tafel sie verschieden gross setzt: die
+ * Zahl ist die Auskunft, "min" nur die Lesehilfe dazu. Weglassen kann man die
+ * Einheit trotzdem nicht — "7" und "14:32" muss man auseinanderhalten koennen.
+ * Bei einer Uhrzeit und bei "jetzt" bleibt sie leer, weil es dort nichts zu
+ * erklaeren gibt.
+ */
+export interface Countdown {
+  /** Die Zahl, auf die man sieht: Minuten oder Uhrzeit. */
+  value: string;
+  /** Die Lesehilfe dahinter, oder leer. */
+  unit: string;
+  /** Faellt aus – die Tafel setzt dann ein Kreuz statt der Zahl. */
+  cancelled: boolean;
+}
+
+export function countdownParts(
+  departure: Departure,
+  now: Date,
+  locale: string,
+  zone: string,
+): Countdown {
+  if (departure.cancelled) return { value: 'faellt aus', unit: '', cancelled: true };
+  const minutes = Math.round((actualDeparture(departure) - now.getTime()) / 60_000);
+  if (minutes <= 0) return { value: 'jetzt', unit: '', cancelled: false };
+  if (minutes <= 60) return { value: String(minutes), unit: 'min', cancelled: false };
+  return {
+    value: new Date(actualDeparture(departure)).toLocaleTimeString(locale, {
+      timeZone: zone,
+      hour: '2-digit',
+      minute: '2-digit',
+    }),
+    unit: '',
+    cancelled: false,
+  };
+}
+
+/**
+ * Dasselbe als eine Zeichenkette.
+ *
+ * Fuer die Mitteilung: dort ist kein Platz fuer zwei Groessen, und ein Ausfall
+ * muss ausgeschrieben werden — im Feed steht kein Kreuz daneben, das es
+ * erklaeren wuerde.
  */
 export function countdown(
   departure: Departure,
@@ -177,15 +288,24 @@ export function countdown(
   locale: string,
   zone: string,
 ): string {
-  if (departure.cancelled) return 'faellt aus';
-  const minutes = Math.round((actualDeparture(departure) - now.getTime()) / 60_000);
-  if (minutes <= 0) return 'jetzt';
-  if (minutes <= 60) return `${minutes} min`;
-  return new Date(actualDeparture(departure)).toLocaleTimeString(locale, {
-    timeZone: zone,
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const parts = countdownParts(departure, now, locale, zone);
+  return parts.unit.length > 0 ? `${parts.value} ${parts.unit}` : parts.value;
+}
+
+/**
+ * Wieviele Zeilen in einen Block dieser Hoehe passen.
+ *
+ * `listHeight` ist der Platz, der der Liste bleibt, `blockHeight` die Hoehe des
+ * ganzen Blocks — an ihr haengt der Deckel der Zeilenhoehe im Stylesheet.
+ * Gerechnet wird mit denselben Zahlen wie dort; passte hier eine Zeile mehr als
+ * dort, waere die unterste angeschnitten. Angeschnitten wird nichts: eine halbe
+ * Abfahrt am unteren Rand liest sich als Fehler.
+ */
+export function rowCount(listHeight: number, blockHeight: number, scale = 1): number {
+  if (!Number.isFinite(listHeight) || !Number.isFinite(blockHeight)) return 1;
+  const row = clampTextScale(scale) * Math.min(BOARD.rowHeight, blockHeight * BOARD.rowShare);
+  if (row <= 0 || listHeight <= 0) return 1;
+  return Math.max(1, Math.floor((listHeight + BOARD.gap) / (row + BOARD.gap)));
 }
 
 /**

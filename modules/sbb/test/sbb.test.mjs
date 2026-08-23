@@ -4,10 +4,14 @@ import {
   actualDeparture,
   boardStopName,
   countdown,
+  countdownParts,
   departureNotifications,
   parseBoard,
   parseDelay,
+  rowCount,
   selectDepartures,
+  vehicleIcon,
+  vehicleKind,
 } from '../dist/shared.js';
 
 const ZONE = 'Europe/Zurich';
@@ -144,6 +148,26 @@ test('nennt einen Ausfall beim Namen', () => {
   assert.equal(countdown(ausfall, NOW, LOCALE, ZONE), 'faellt aus');
 });
 
+test('trennt Zahl und Einheit fuer die Tafel', () => {
+  // Die Zahl ist die Auskunft, "min" nur die Lesehilfe – die Tafel setzt sie
+  // verschieden gross.
+  const [erste] = parseBoard(BOARD, ZONE);
+  assert.deepEqual(countdownParts(erste, NOW, LOCALE, ZONE), {
+    value: '10',
+    unit: 'min',
+    cancelled: false,
+  });
+
+  // Bei einer Uhrzeit bleibt die Einheit leer: "14:32 min" waere Unsinn.
+  const spaet = { ...erste, scheduled: Date.parse('2026-08-24T12:00:00Z'), delay: 0 };
+  assert.equal(countdownParts(spaet, NOW, LOCALE, ZONE).unit, '');
+
+  // Der Ausfall ist ausgezeichnet und nicht nur ein Text: die Tafel zeigt
+  // dafuer ein Kreuz, die Mitteilung das Wort.
+  const ausfall = parseBoard(BOARD, ZONE)[2];
+  assert.equal(countdownParts(ausfall, NOW, LOCALE, ZONE).cancelled, true);
+});
+
 test('wechselt jenseits einer Stunde auf die Uhrzeit', () => {
   // Ab einer Stunde rechnet niemand mehr in Minuten.
   const spaet = { ...parseBoard(BOARD, ZONE)[0], scheduled: Date.parse('2026-08-24T12:00:00Z'), delay: 0 };
@@ -166,4 +190,61 @@ test('macht einen Ausfall dringend', () => {
   const ausfall = parseBoard(BOARD, ZONE)[2];
   const [note] = departureNotifications([ausfall], NOW, LOCALE, ZONE);
   assert.equal(note.urgent, true);
+});
+
+/* -------------------------------- Fahrzeug -------------------------------- */
+
+test('erkennt das Fahrzeug hinter der Verbindung', () => {
+  // Gesucht und nicht verglichen: die Auskunft kennt Varianten, die nirgends
+  // dokumentiert sind.
+  assert.equal(vehicleKind('strain'), 'train');
+  assert.equal(vehicleKind('express_train'), 'train');
+  assert.equal(vehicleKind('night_bus'), 'bus');
+  assert.equal(vehicleKind('post'), 'bus');
+  assert.equal(vehicleKind('tram'), 'tram');
+  assert.equal(vehicleKind('metro'), 'metro');
+  assert.equal(vehicleKind('ship'), 'ship');
+  assert.equal(vehicleKind('cablecar'), 'cable');
+});
+
+test('setzt Unbekanntes auf die Schiene', () => {
+  // Keine Verlegenheit, sondern die haeufigste richtige Antwort: die Auskunft
+  // ist ein Bahnfahrplan.
+  assert.equal(vehicleKind(''), 'train');
+  assert.equal(vehicleKind(undefined), 'train');
+  assert.equal(vehicleKind('was-auch-immer'), 'train');
+});
+
+test('gibt jedem Fahrzeug sein Symbol', () => {
+  const [zug, bus] = parseBoard(BOARD, ZONE);
+  assert.equal(zug.kind, 'train');
+  assert.equal(vehicleIcon(zug), 'train-front');
+  assert.equal(bus.kind, 'bus');
+  assert.equal(vehicleIcon(bus), 'bus-front');
+  assert.equal(vehicleIcon({ kind: 'tram' }), 'tram-front');
+  assert.equal(vehicleIcon({ kind: 'ship' }), 'ship');
+});
+
+/* --------------------------------- Zeilen --------------------------------- */
+
+test('besetzt nur so viele Zeilen, wie ganz hineinpassen', () => {
+  // Dieselbe Rechnung wie im Stylesheet: je Zeile 112 px plus 16 px Abstand,
+  // in einem flachen Block hoechstens 26 % der Blockhoehe.
+  assert.equal(rowCount(400, 1000), 3);
+  assert.equal(rowCount(1000, 1000), 7);
+  // Eine halbe Zeile am unteren Rand liest sich als Fehler.
+  assert.equal(rowCount(3 * 112 + 2 * 16 + 60, 1000), 3);
+});
+
+test('zeigt weniger Abfahrten, wenn die Schrift groesser wird', () => {
+  assert.ok(rowCount(600, 1000, 1.5) < rowCount(600, 1000, 1));
+  assert.equal(rowCount(600, 1000, Number.NaN), rowCount(600, 1000, 1));
+  // Geklemmt statt uebernommen: bei 1,6 ist Schluss.
+  assert.equal(rowCount(600, 1000, 99), rowCount(600, 1000, 1.6));
+});
+
+test('gibt auch ohne brauchbares Mass noch eine Zeile her', () => {
+  // Gemessen wird vor dem ersten Zeichnen, und da steht die Liste auf null.
+  assert.equal(rowCount(0, 0), 1);
+  assert.equal(rowCount(Number.NaN, 1000), 1);
 });

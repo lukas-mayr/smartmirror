@@ -1,14 +1,19 @@
 import { html, render, nothing } from 'lit';
 import { defineFrontend, type ModuleView } from '@mirror/sdk';
-import { countdown, type SbbConfig, type SbbState } from './shared.js';
-
-/** Zeilenmass, wie im Kalender: was nicht ganz hineinpasst, wird nicht gezeigt. */
-const ROW_HEIGHT = 88;
-const ROW_GAP = 14;
+import { icon } from '@mirror/icons';
+import {
+  boardScale,
+  countdownParts,
+  rowCount,
+  vehicleIcon,
+  type SbbConfig,
+  type SbbState,
+} from './shared.js';
 
 export default defineFrontend<SbbState, SbbConfig>({
   create(host, ctx): ModuleView<SbbState, SbbConfig> {
     let state: Partial<SbbState> = {};
+    let config = ctx.config;
     let rows = 1;
 
     /*
@@ -20,12 +25,17 @@ export default defineFrontend<SbbState, SbbConfig>({
      */
     const timer = setInterval(() => draw(), 15_000);
 
+    /*
+     * Gemessen wird die Liste und der Block: die Liste, weil in sie die Zeilen
+     * passen muessen, der Block, weil an seiner Hoehe der Deckel der Zeilenhoehe
+     * im Stylesheet haengt. Wie im Mitteilungsblock — die Rechnung steht in
+     * shared.ts, damit sie sich pruefen laesst.
+     */
     const measure = (): number => {
+      const block = host.querySelector<HTMLElement>('.board');
       const list = host.querySelector<HTMLElement>('.board__list');
-      if (!list) return rows;
-      const height = list.clientHeight;
-      if (!Number.isFinite(height) || height <= 0) return rows;
-      return Math.max(1, Math.floor((height + ROW_GAP) / (ROW_HEIGHT + ROW_GAP)));
+      if (!block || !list) return rows;
+      return rowCount(list.clientHeight, block.clientHeight, boardScale(config));
     };
 
     const paint = (): void => {
@@ -43,25 +53,45 @@ export default defineFrontend<SbbState, SbbConfig>({
         html`
           <div class="board">
             <div class="board__list">
-              ${departures.map(
-                (departure) => html`
+              ${departures.map((departure) => {
+                const when = countdownParts(departure, now, ctx.locale, ctx.timezone);
+                /*
+                 * Eine Zeile: Fahrzeug, Linie, Ziel, Gleis, Restzeit.
+                 *
+                 * Symbole tragen, was frueher Woerter trugen — das Fahrzeug
+                 * statt gar nichts, der Wegweiser statt "Gleis", das Kreuz
+                 * statt "faellt aus". Was dadurch an Breite frei wird, bekommen
+                 * die Ziffern rechts: sie sind der Grund, weswegen jemand
+                 * hersieht.
+                 */
+                return html`
                   <div class="board__row ${departure.cancelled ? 'board__row--cancelled' : ''}">
+                    <span class="board__mode">${icon(vehicleIcon(departure), { size: '1em' })}</span>
                     <span class="board__line">${departure.line}</span>
                     <span class="board__body">
                       <span class="board__destination">${departure.destination}</span>
-                      ${departure.track
-                        ? html`<span class="board__track">Gleis ${departure.track}</span>`
-                        : nothing}
                     </span>
+                    ${departure.track
+                      ? html`<span class="board__track">
+                          ${icon('signpost', { size: '1.1em' })}${departure.track}
+                        </span>`
+                      : nothing}
                     <span class="board__when">
-                      ${countdown(departure, now, ctx.locale, ctx.timezone)}
-                      ${departure.delay > 0 && !departure.cancelled
-                        ? html`<span class="board__delay">+${departure.delay}</span>`
-                        : nothing}
+                      ${when.cancelled
+                        ? html`<span class="board__cancelled" title="faellt aus">
+                            ${icon('octagon-x', { size: '1em', title: 'faellt aus' })}
+                          </span>`
+                        : html`
+                            <span class="board__value">${when.value}</span>
+                            ${when.unit ? html`<span class="board__unit">${when.unit}</span>` : nothing}
+                            ${departure.delay > 0
+                              ? html`<span class="board__delay">+${departure.delay}</span>`
+                              : nothing}
+                          `}
                     </span>
                   </div>
-                `,
-              )}
+                `;
+              })}
             </div>
           </div>
         `,
@@ -69,7 +99,17 @@ export default defineFrontend<SbbState, SbbConfig>({
       );
     };
 
+    /**
+     * Zeichnen und dabei pruefen, ob die Zahl der Zeilen noch stimmt.
+     *
+     * Die zweite Runde kostet nichts Sichtbares: Lit rendert synchron, der
+     * Browser zeichnet erst danach.
+     */
     const draw = (): void => {
+      // Der Faktor steht am Block und nicht im Stylesheet: dort kennt niemand
+      // die Einstellung, und eine Deklaration auf `.board` gewaenne gegen den
+      // geerbten Wert.
+      host.style.setProperty('--board-scale', String(boardScale(config)));
       paint();
       const fits = measure();
       if (fits === rows) return;
@@ -82,13 +122,15 @@ export default defineFrontend<SbbState, SbbConfig>({
     draw();
 
     return {
-      update(nextState) {
+      update(nextState, nextConfig) {
         state = { ...state, ...nextState };
+        config = nextConfig;
         draw();
       },
       destroy() {
         clearInterval(timer);
         observer.disconnect();
+        host.style.removeProperty('--board-scale');
         render(html``, host);
       },
     };
