@@ -565,9 +565,16 @@ ob der Timer auf drei Minuten oder auf zwei Stunden steht. Was sich mit der
 Dauer ändert, ist der *Berg*: er ist bei einem langen Timer größer und braucht
 deshalb mehr Eimer. Andersherum wäre es falsch — ein Bagger, der bei einer
 Stunde in Zeitlupe schwenkt, sieht nicht nach viel Arbeit aus, sondern nach
-einem hängenden Bildschirm. Der Berg wächst dabei gedämpft (`DIG.growth`), weil
-der Block nicht mitwächst: zehn Minuten liegen bei knapp der halben Höhe, eine
-halbe Stunde bei zwei Dritteln, zwei Stunden füllen ihn ganz.
+einem hängenden Bildschirm.
+
+**Jeder Berg überragt die Maschine**, auch der von drei Minuten: ein Haufen, der
+niedriger ist als der Bagger davor, sieht nach Aufräumen aus und nicht nach
+Arbeit, und aus drei Metern beantwortet er die Frage „wie viel noch?" gar nicht.
+Das Maß dafür ist das Kabinendach, und ein Test hält den kleinsten Berg dagegen.
+Nach oben ist bei einer halben Stunde Schluss (`DIG.fullLoads`): der Unterschied
+zwischen kurz und lang fällt damit genau in den Bereich, in dem ein Timer
+meistens steht, und ob eine Stunde oder zwei — „ein voller Berg" ist die
+ehrlichere Auskunft als zwei Berge, die sich um eine Handbreit unterscheiden.
 
 **Abgebaut wird von der Seite, nicht kleiner gezoomt.** Der Berg bekommt eine
 Abbaukante — eine gerade Böschung, die sich in den Haufen frisst — und darüber
@@ -610,6 +617,19 @@ verschwinden im Wagen, der dritte lugt hervor, der vierte häuft sich. Aus
 demselben Grund ist in der Schaufel nichts zu sehen — sie ist von der Seite
 zu, und was man sieht, ist der Stoff, der beim Kippen fällt.
 
+**Kies steht nicht wie Beton.** Wo der Zahn eindringt, sackt der Haufen ein
+wenig nach (anderthalb Prozent seiner Höhe, vom Boden aus gerechnet) und über
+der Zehe rieselt etwas die Böschung hinab. Man sieht es nicht als Bewegung, man
+sieht nur, dass der Berg lebt — und beides fällt genau in die Zeit, in der
+gegraben wird.
+
+**Der Berg ist weiß, nicht farbig.** Farbe braucht eine Quelle, und ein Haufen
+Kies hat keine: er wäre salbeifarben, weil Salbei gerade die Normalfarbe ist,
+und genau davor warnt das Design-System. Er ist der Wert, für den der Block da
+ist, und damit das hellste Teil der Szene — weißer Umriss auf der schwächsten
+Fläche des Systems (`--mirror-box-soft`, 8 % Weiß). Den Akzent trägt die Zeile
+darüber, die sagt, wofür der Timer läuft.
+
 **Bewegt wird im Stylesheet, gerechnet wird im Modul.** Der Takt ist fest, und
 ein fester Takt ist genau das, was CSS-Keyframes gut können: sie laufen im
 Compositor und kosten kein JavaScript. Das Modul rechnet nur aus, wie groß der
@@ -632,6 +652,13 @@ drei Metern sieht man von alldem nur die Silhouette — und genau deshalb muss s
 stimmen: eine Reihe gleich dicker Striche liest sich als Diagramm, ein Umriss
 als Maschine. Im flachen M-Block fällt das Beiwerk weg und die Silhouette bleibt;
 dort würde es zu einem Grieseln, das die Form verdeckt.
+
+**Und gefüllt.** Ein Bagger ist kein Drahtgitter: steht er vor dem Berg, muss
+der Berg *hinter* ihm sein, und durch eine Schaufel sieht man nicht hindurch.
+Die Füllung ist die Boxfarbe des Design-Systems — praktisch schwarz, also keine
+leuchtende Fläche, aber deckend. Damit übernimmt die Reihenfolge im SVG die
+Arbeit der Tiefe: Kette, dann Oberwagen, dann Arm. Nur die Schaufel steht eine
+Stufe heller: sie ist das Werkzeug, dem der Blick folgt.
 
 Der Hubzylinder des Auslegers fehlt als einziges Teil mit Absicht: er sitzt mit
 einem Ende am Oberwagen und mit dem anderen am Ausleger und *fährt aus*, während

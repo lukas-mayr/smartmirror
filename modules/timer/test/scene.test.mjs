@@ -10,6 +10,7 @@ import {
   PROFILE,
   SLEW_X,
   TRACK,
+  HOUSE,
   TRUCK,
   benchAt,
   cargoPath,
@@ -133,6 +134,19 @@ test('der groesste Berg passt vollstaendig ins Feld', () => {
   assert.ok(box.right <= FIELD.width - 2, `der Berg reicht bis ${box.right}`);
   assert.ok(box.top >= FIELD.top + 2, `der Gipfel steht bei ${box.top}`);
   assert.equal(box.bottom, GROUND);
+});
+
+test('auch der kuerzeste Timer bekommt einen Berg, der die Maschine ueberragt', () => {
+  /*
+   * Das Mass ist die Kabine, nicht ein Gefuehl. Ein Haufen, der niedriger ist
+   * als der Bagger davor, sieht nach Aufraeumen aus und nicht nach Arbeit — und
+   * beantwortet aus drei Metern die Frage "wieviel noch" gar nicht.
+   */
+  const smallest = mountainBox(DIG.minSize, 1);
+  assert.ok(
+    smallest.top < HOUSE.roof,
+    `der kleinste Gipfel steht bei ${smallest.top.toFixed(1)}, das Kabinendach bei ${HOUSE.roof}`,
+  );
 });
 
 test('ein langer Timer beginnt mit einem hoeheren Berg als ein kurzer', () => {

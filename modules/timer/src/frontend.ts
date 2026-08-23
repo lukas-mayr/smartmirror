@@ -1,6 +1,18 @@
 import { html, render, svg, nothing, type TemplateResult } from 'lit';
 import { defineFrontend, DIG, type ModuleView } from '@mirror/sdk';
-import { ARM, FIELD, GROUND, SLEW_X, TRACK, TRUCK, cargoPath, mountainPath, siteShift } from './scene.js';
+import {
+  ARM,
+  FIELD,
+  GROUND,
+  HOUSE,
+  MOUNTAIN,
+  SLEW_X,
+  TRACK,
+  TRUCK,
+  cargoPath,
+  mountainPath,
+  siteShift,
+} from './scene.js';
 import {
   digPhaseMs,
   formatRemaining,
@@ -160,9 +172,12 @@ export default defineFrontend<TimerState, TimerConfig>({
           <!-- Kontergewicht, Kabine mit geneigter Scheibe, Motorhaube. -->
           <path
             class="dig__body"
-            d="M100 65V56Q100 51.5 104.5 51.5H110V43Q110 40 113 40H121Q123 40 124 41.6L127.5 50H133Q137 50 137 54V65Z"
+            d=${`M100 65V56Q100 51.5 104.5 51.5H110V${HOUSE.roof + 3}Q110 ${HOUSE.roof} 113 ${HOUSE.roof}H121Q123 ${HOUSE.roof} 124 ${HOUSE.roof + 1.6}L127.5 50H133Q137 50 137 54V65Z`}
           />
-          <path class="dig__pane" d="M112.5 43H121L124 49.5H112.5Z" />
+          <path
+            class="dig__pane"
+            d=${`M112.5 ${HOUSE.roof + 3}H121L124 49.5H112.5Z`}
+          />
           <path class="dig__trim" d="M131 50V46.5" />
           <circle class="dig__hub" cx=${ARM.foot.x} cy=${ARM.foot.y} r="1.8" />
 
@@ -211,6 +226,26 @@ export default defineFrontend<TimerState, TimerConfig>({
     `;
 
     /**
+     * Was an der Wand nachrieselt, wenn der Zahn eindringt.
+     *
+     * Kies steht nicht wie Beton: wo die Schaufel hineinfaehrt, rutscht darueber
+     * etwas nach. Drei kurze Striche auf der Boeschung, die im Takt des Grabens
+     * abwaerts wandern und verschwinden — mehr braucht es nicht, damit der Berg
+     * aufhoert, ein Bild zu sein.
+     *
+     * Die Gruppe sitzt an der Zehe der Kante. Sie liegt im Vorschub und muss
+     * deshalb nicht selbst wissen, wie weit abgebaut ist: die ganze Baustelle
+     * wandert ohnehin mit der Wand.
+     */
+    const slide = (): TemplateResult => svg`
+      <g class="dig__slide">
+        <path d="M151.4 78.6l0.9 1.4" />
+        <path d="M153 75.6l1 1.5" />
+        <path d="M154.8 72.4l0.9 1.5" />
+      </g>
+    `;
+
+    /**
      * Was beim Kippen faellt.
      *
      * Drei kurze Striche und kein Schuettkegel: aus drei Metern ist Material im
@@ -255,9 +290,15 @@ export default defineFrontend<TimerState, TimerConfig>({
           aria-hidden="true"
         >
           <path class="dig__ground" d=${`M0 ${GROUND}H${FIELD.width}`} />
-          ${path ? svg`<path class="dig__mountain" d=${path} />` : nothing}
+          ${path
+            ? svg`<path
+                class="dig__mountain"
+                d=${path}
+                style=${`transform-origin:${MOUNTAIN.left}px ${GROUND}px`}
+              />`
+            : nothing}
           <g class="dig__site" style=${`transform:translateX(${shift.toFixed(1)}px)`}>
-            ${truck()} ${spill()} ${excavator()}
+            ${slide()} ${truck()} ${spill()} ${excavator()}
           </g>
         </svg>
       `;

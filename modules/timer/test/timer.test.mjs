@@ -69,6 +69,17 @@ test('eine halbe Stunde ist sichtbar mehr Berg als zehn Minuten', () => {
   assert.ok(long - short > 0.15, `Unterschied nur ${(long - short).toFixed(3)}`);
 });
 
+test('ab einer halben Stunde ist der Berg voll', () => {
+  /*
+   * Laenger heisst ab hier nicht mehr groesser. Der Block waechst nicht mit,
+   * und zwei Berge, die sich um eine Handbreit unterscheiden, sagen weniger
+   * als einer, der voll ist. Der Bereich, in dem man den Unterschied sieht,
+   * liegt dort, wo ein Timer meistens steht: in der ersten halben Stunde.
+   */
+  assert.equal(mountainSize(durationMs(30)), 1);
+  assert.equal(mountainSize(durationMs(120)), 1);
+});
+
 test('jeder Eimer nimmt einen Bissen, und der letzte raeumt den Berg weg', () => {
   const total = durationMs(1);
   const buckets = bucketCount(total);

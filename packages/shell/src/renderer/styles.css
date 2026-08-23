@@ -58,6 +58,9 @@
   --mirror-box-warm-line: rgba(212, 180, 131, 0.32);
   --mirror-box-danger: rgba(196, 87, 74, 0.08);
   --mirror-box-danger-line: rgba(196, 87, 74, 0.35);
+  /* Eine Flaeche ohne Ton — fuer Koerper, die keine Farbe tragen sollen und
+     trotzdem Koerper sind. Die schwaechste Flaeche des Systems. */
+  --mirror-box-soft: rgba(255, 255, 255, 0.08);
 
   /* --------------------------------- Typo ---------------------------------- */
 
@@ -219,6 +222,7 @@
   --mirror-box-accent-line: rgba(255, 255, 255, 0.07);
   --mirror-box-warm: transparent;
   --mirror-box-warm-line: rgba(255, 255, 255, 0.07);
+  --mirror-box-soft: transparent;
 }
 
 * {
@@ -3006,43 +3010,77 @@ body {
 }
 
 /*
- * Der Berg ist der Wert, fuer den der Block da ist, und traegt deshalb als
- * einziges Teil den Akzent — mit der schwach getoenten Flaeche des
- * Design-Systems (9 %) darunter, damit er als Koerper und nicht als Umriss
- * liest. Nachts wird die Flaeche durchsichtig, ohne dass hier etwas dafuer
- * stehen muesste: sie ist dasselbe Token wie in jeder Box.
+ * Der Berg ist der Wert, fuer den der Block da ist — und deshalb das hellste
+ * Teil der Szene: weisser Umriss auf einer sehr schwachen weissen Flaeche.
+ *
+ * Kein Akzent. Farbe braucht eine Quelle, und ein Haufen Kies hat keine: er
+ * waere salbeifarben, weil Salbei gerade die Normalfarbe ist, und das ist genau
+ * der Fall, vor dem das Design-System warnt. Den Akzent traegt die Zeile
+ * darueber, die sagt, wofuer der Timer laeuft. Nachts wird die Flaeche
+ * durchsichtig, ohne dass hier etwas dafuer stehen muesste — dasselbe Token wie
+ * in jeder Box.
  */
 .dig__mountain {
-  stroke: var(--mirror-accent);
+  stroke: var(--mirror-fg);
   stroke-width: 2;
-  fill: var(--mirror-box-accent);
+  fill: var(--mirror-box-soft);
 }
 
 /*
  * Die Ladung sitzt auf der Bordwand, nicht in der Mulde: von der Seite schaut
  * niemand in einen Kipper hinein. Sichtbar wird sie erst, wenn sie oben ueber
- * steht — und dann traegt sie den Ton des Berges, denn sie ist der Berg.
+ * steht — und dann sieht sie aus wie der Berg, denn sie *ist* der Berg.
  */
 .dig__cargo {
-  stroke: var(--mirror-accent);
+  stroke: var(--mirror-fg);
   stroke-width: 1.6;
-  fill: var(--mirror-box-accent);
+  fill: var(--mirror-box-soft);
   opacity: 0;
 }
 
-/* Was beim Kippen faellt. Die Deckkraft steht ausschliesslich in den
-   Animationsbildern: steht die Baustelle still, haengt nichts in der Luft. */
-.dig__spill {
-  stroke: var(--mirror-accent);
+/*
+ * Was beim Kippen faellt und was an der Wand nachrieselt. Beides ist derselbe
+ * Stoff wie der Berg und hat deshalb dieselbe Farbe.
+ *
+ * Die Deckkraft steht ausschliesslich in den Animationsbildern: steht die
+ * Baustelle still, haengt nichts in der Luft und rieselt nichts.
+ */
+.dig__spill,
+.dig__slide {
+  stroke: var(--mirror-fg);
   stroke-width: 1.4;
   opacity: 0;
 }
 
-/* Der Umriss: Aufbauten, Kette, Ausleger, Stiel, Schaufel, Raeder. */
+/*
+ * Der Umriss: Aufbauten, Kette, Ausleger, Stiel, Schaufel, Raeder.
+ *
+ * Und zwar gefuellt. Ein Bagger ist kein Drahtgitter: steht er vor dem Berg,
+ * muss der Berg *hinter* ihm sein, und durch eine Schaufel sieht man nicht
+ * hindurch. Die Fuellung ist die Boxfarbe des Design-Systems — praktisch
+ * schwarz, also keine leuchtende Flaeche, aber deckend. Genau das ist der
+ * Unterschied zwischen einer Zeichnung und einem Bild.
+ *
+ * Die Reihenfolge im SVG uebernimmt damit die Arbeit der Tiefe: Kette, dann
+ * Oberwagen, dann Arm — was spaeter kommt, liegt vorn.
+ */
 .dig__body,
 .dig__wheel {
   stroke: var(--mirror-fg-dim);
   stroke-width: 1.8;
+  fill: var(--mirror-box);
+}
+
+/*
+ * Die Schaufel steht eine Stufe heller.
+ *
+ * Sie ist das Werkzeug: das eine Teil, dem man mit dem Blick folgt, wenn man
+ * hinsieht. Eine Fuellung von 10 % Weiss ueber Schwarz bleibt eine dunkle
+ * Flaeche — sie leuchtet nicht, hebt die Schaufel aber vom Arm ab, an dem sie
+ * haengt.
+ */
+.dig__bucket .dig__body {
+  fill: rgba(255, 255, 255, 0.1);
 }
 
 /* Beiwerk: Laufrollen, Rippen, Zaehne, Bordwandprofil. Es macht die Form
@@ -3154,6 +3192,26 @@ body {
 }
 
 /*
+ * Der Berg reagiert auf den Zahn.
+ *
+ * Kies steht nicht wie Beton: wo die Schaufel hineinfaehrt, sackt der Haufen
+ * ein wenig nach und darueber rieselt etwas ab. Beides zusammen ist der
+ * Unterschied zwischen einem Berg und einem Bild von einem Berg — und beides
+ * faellt genau in die Zeit, in der gegraben wird (0 bis 15 %).
+ *
+ * Das Nachsacken ist bewusst winzig: anderthalb Prozent der Hoehe, gerechnet
+ * vom Boden aus. Man sieht es nicht als Bewegung, man sieht nur, dass der Berg
+ * lebt.
+ */
+.dig.is-digging .dig__mountain {
+  animation: dig-settle var(--dig-bucket) ease-out var(--dig-phase) infinite;
+}
+
+.dig.is-digging .dig__slide {
+  animation: dig-slide var(--dig-bucket) linear var(--dig-phase) infinite;
+}
+
+/*
  * Der Wagen und seine Ladung laufen im Takt der *Ladung* und nicht des Eimers:
  * vier Eimer, dann ist er voll und faehrt. Beide Takte haben denselben
  * Versatz — die Ladung ist ein ganzes Vielfaches des Eimers, also stimmt ein
@@ -3241,6 +3299,45 @@ body {
   66%,
   100% {
     transform: scaleX(1);
+  }
+}
+
+@keyframes dig-settle {
+  0%,
+  4% {
+    transform: scaleY(1);
+  }
+  9% {
+    transform: scaleY(0.985);
+  }
+  15% {
+    transform: scaleY(0.997);
+  }
+  22%,
+  100% {
+    transform: scaleY(1);
+  }
+}
+
+/* Das Rieseln laeuft die Boeschung hinab: nach links unten, mit dem Gefaelle. */
+@keyframes dig-slide {
+  0%,
+  5% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  9% {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+  17% {
+    opacity: 0.7;
+    transform: translate(-1.4px, 2.2px);
+  }
+  24%,
+  100% {
+    opacity: 0;
+    transform: translate(-2px, 3.2px);
   }
 }
 

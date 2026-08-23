@@ -80,6 +80,7 @@ test('die Farben der Anzeige stehen in beiden Quellen gleich', () => {
     '--mirror-danger': MIRROR_COLORS.danger,
     '--mirror-danger-fg': MIRROR_COLORS.dangerFg,
     '--mirror-box': MIRROR_SURFACES.box,
+    '--mirror-box-soft': MIRROR_SURFACES.boxSoft,
   };
   for (const [name, value] of Object.entries(pairs)) {
     assert.equal(mirror.get(name), value, `${name} laeuft auseinander`);

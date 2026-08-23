@@ -68,6 +68,15 @@ export const MIRROR_SURFACES = {
   boxWarmLine: 'rgba(212, 180, 131, 0.32)',
   boxDanger: 'rgba(196, 87, 74, 0.08)',
   boxDangerLine: 'rgba(196, 87, 74, 0.35)',
+  /**
+   * Eine Flaeche ohne Ton.
+   *
+   * Fuer Koerper, die keine Farbe tragen sollen und trotzdem Koerper sind —
+   * ein Berg zum Beispiel. 8 % Weiss ist die schwaechste Flaeche des Systems:
+   * hell genug, dass eine Form nicht mehr nur Umriss ist, und weit unter der
+   * Grenze, ab der eine Flaeche durch die Folie zu leuchten beginnt.
+   */
+  boxSoft: 'rgba(255, 255, 255, 0.08)',
 } as const;
 
 /** Hoechste erlaubte Deckkraft einer getoenten Flaeche, in Prozent. */
@@ -445,30 +454,34 @@ export const DIG = {
   /**
    * Zahl der Ladungen, ab der der Berg den Block ganz ausfuellt.
    *
-   * 360 Ladungen sind zwei Stunden — die laengste Dauer, die sich einstellen
-   * laesst. Der Berg waechst also ueber den ganzen Bereich und stoesst erst
-   * ganz oben an: waere die Grenze frueher erreicht, saehen eine halbe und
-   * eine ganze Stunde gleich aus.
+   * 90 Ladungen sind eine halbe Stunde. Laenger heisst nicht mehr groesser,
+   * und das ist Absicht: der Bereich, in dem ein Timer meistens steht, sind
+   * die ersten dreissig Minuten, und dort soll man den Unterschied sehen. Ob
+   * eine Stunde oder zwei — "ein voller Berg" ist die ehrlichere Auskunft als
+   * zwei Berge, die sich um eine Handbreit unterscheiden.
    */
-  fullLoads: 360,
+  fullLoads: 90,
   /**
    * Kleinster Berg, als Anteil der vollen Groesse.
    *
-   * Auch drei Minuten brauchen einen Berg, den man als Berg erkennt. Ohne
-   * diese Untergrenze waere er ein Strich auf dem Boden, und der Bagger
-   * schaufelte sichtbar an nichts.
+   * Hoch angesetzt, und das mit Absicht: auch drei Minuten brauchen einen Berg,
+   * der den Bagger ueberragt. Ein Haufen, der kleiner ist als die Maschine
+   * davor, sieht nach Aufraeumen aus und nicht nach Arbeit — und die Frage
+   * "wieviel noch" beantwortet er aus drei Metern gar nicht.
    */
-  minSize: 0.25,
+  minSize: 0.66,
   /**
    * Wie stark die Zahl der Ladungen auf die Groesse durchschlaegt.
    *
    * Kleiner als 1, weil der Block nicht mitwaechst: bei linearem Zusammenhang
    * waere ein Zehn-Minuten-Berg ein Kruemel neben dem Zwei-Stunden-Berg. Mit
-   * 0,3 liegen zehn Minuten bei knapp der Haelfte, eine halbe Stunde bei zwei
-   * Dritteln und eine ganze bei gut vier Fuenfteln — Unterschiede, die man
-   * sieht, ohne dass die kurzen Timer zu einem Kruemel werden.
+   * Mit 0,25 liegen fuenf Minuten an der Untergrenze, zehn bei drei Vierteln,
+   * zwanzig bei neun Zehnteln und ab einer halben Stunde ist der Berg voll.
+   * Zusammen mit der hohen Untergrenze heisst das: jeder Berg ist ein Berg,
+   * und der Unterschied zwischen kurz und lang faellt genau in den Bereich,
+   * in dem ein Timer meistens steht.
    */
-  growth: 0.3,
+  growth: 0.25,
   /**
    * Wann im Eimer gekippt wird, als Anteil seiner Dauer.
    *

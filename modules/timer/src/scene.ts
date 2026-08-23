@@ -40,7 +40,7 @@
  *
  * Breit und flach: eine Baustelle ist eine Zeile.
  */
-export const FIELD = { top: 26, width: 220, height: 58 } as const;
+export const FIELD = { top: 10, width: 220, height: 74 } as const;
 
 /** Wo der Boden liegt. Darunter bleibt Platz fuer Raeder und Raupen. */
 export const GROUND = 80;
@@ -65,7 +65,7 @@ export interface Box {
  * `left` ist sein Fuss auf der Baggerseite. Dort setzt die Abbaukante an, und
  * von dort wandert sie nach rechts durch den Haufen.
  */
-export const MOUNTAIN = { left: 150, width: 50, height: 46 } as const;
+export const MOUNTAIN = { left: 150, width: 66, height: 66 } as const;
 
 /**
  * Das Profil eines Haufens, auf 1 x 1 normiert.
@@ -132,7 +132,7 @@ function advanceAt(tau: number): number {
  * ist dabei nicht der Gipfel, sondern die steilste Stelle der linken Flanke —
  * dort kommt die Boeschung dem Profil am naechsten. Ein Test rechnet das nach.
  */
-const START_BACK = 0.17;
+const START_BACK = 0.205;
 
 /**
  * Unter dieser Hoehe ist der Berg keiner mehr.
@@ -394,6 +394,16 @@ export const POSE: Readonly<Record<'reach' | 'cut' | 'full' | 'raised' | 'tipped
  * Schaufel, die durch das eigene Fahrwerk faehrt, faellt sofort auf.
  */
 export const TRACK = { left: 96, right: 142, top: 66 } as const;
+
+/**
+ * Das Dach der Kabine.
+ *
+ * Steht hier, weil es das Mass ist, an dem sich der Berg messen lassen muss:
+ * ein Haufen, der niedriger ist als die Maschine davor, sieht nach Aufraeumen
+ * aus und nicht nach Arbeit. Die Zeichnung setzt ihr Dach auf genau diese
+ * Zahl, und ein Test haelt den kleinsten Berg dagegen.
+ */
+export const HOUSE = { roof: 40 } as const;
 
 /**
  * Die Achse, um die sich der Oberwagen dreht.
