@@ -25,7 +25,7 @@ const script = join(repoRoot, 'deploy/mirror-system.sh');
 // nur so ausgesehen, als wirke es.
 const dataDir = await mkdtemp(join(tmpdir(), 'mirror-system-'));
 process.env.MIRROR_DATA_DIR = dataDir;
-const { requestRestart } = await import('../dist/system-bridge.js');
+const { requestRestart, requestUpdaterRun } = await import('../dist/system-bridge.js');
 
 const anfrage = join(dataDir, 'system-request.json');
 
@@ -72,6 +72,26 @@ test('schreibt fuer "device" einen Auftrag, der das Geraet neu startet', async (
   assert.deepEqual((await ausfuehren()).aufrufe, ['--no-block reboot']);
 });
 
+test('stoesst den Updater an, ohne auf die Path-Unit angewiesen zu sein', async () => {
+  await sauber();
+  await requestUpdaterRun();
+
+  assert.equal(JSON.parse(await readFile(anfrage, 'utf8')).action, 'run-updater');
+  // Der eigentliche Auftrag liegt in update-request.json; hier faellt nur der
+  // Startschuss. Frueher gab ihn allein mirror-updater.path - blieb der aus,
+  // wirkte der Knopf "Jetzt pruefen" nie.
+  assert.deepEqual((await ausfuehren()).aufrufe, ['start --no-block mirror-updater.service']);
+});
+
+test('sagt nichts, wenn gar kein Auftrag vorliegt', async () => {
+  await sauber();
+  // Der Timer sieht alle zehn Sekunden nach. Eine Zeile pro Lauf waere ein
+  // volles Journal ohne jeden Erkenntnisgewinn.
+  const { ausgabe, aufrufe } = await ausfuehren();
+  assert.deepEqual(aufrufe, []);
+  assert.equal(ausgabe.trim(), '');
+});
+
 test('raeumt den Auftrag weg, bevor er ihn ausfuehrt', async () => {
   await sauber();
   await requestRestart('device');
@@ -101,7 +121,7 @@ test('verwirft einen Auftrag aus der Zukunft – die Uhr des Pi kann falsch steh
   assert.match(ausgabe, /Zukunft/);
 });
 
-test('fuehrt nur die beiden bekannten Auftraege aus', async () => {
+test('fuehrt nur die drei bekannten Auftraege aus', async () => {
   await sauber();
   await writeFile(anfrage, JSON.stringify({ action: 'halt', requestedAt: new Date().toISOString() }));
 
@@ -131,7 +151,3 @@ test('eine unlesbare Datei ist kein Grund, irgendetwas zu tun', async () => {
   assert.equal(existsSync(anfrage), false);
 });
 
-test('ohne Auftrag passiert nichts', async () => {
-  await sauber();
-  assert.deepEqual((await ausfuehren()).aufrufe, []);
-});

@@ -19,7 +19,7 @@ Drei Prozesse, bewusst getrennt:
 | **Core** | `mirror-core.service` | Node/Fastify. Modul-Backends, Zustand, WebSocket-Bus, Konfiguration, liefert die Handy-App aus. Läuft unprivilegiert. |
 | **Anzeige** | `mirror-shell.service` | Electron unter [`cage`](https://github.com/cage-kiosk/cage), einem Wayland-Compositor für genau ein Fenster. Kein Desktop, keine Browser-Bedienelemente. |
 | **Updater** | `mirror-updater.service` + `.timer` + `.path` | Prüft GitHub Releases, verifiziert Signaturen, tauscht Symlinks, rollt bei fehlgeschlagenem Healthcheck zurück. Der Timer prüft regelmäßig, die Path-Unit startet ihn sofort, wenn die App darum bittet. |
-| **Neustart** | `mirror-system.service` + `.path` | Startet auf Anforderung aus der App die Dienste neu oder bootet das Gerät. Kennt genau diese zwei Aufträge. |
+| **Neustart** | `mirror-system.service` + `.path` + `.timer` | Führt aus, worum die App bittet: Dienste neu starten, Gerät booten, Updater anstoßen. Kennt genau diese drei Aufträge. |
 | **Startbild** | `mirror-bootlook.service` | Sorgt bei jedem Start dafür, dass beim Booten der Spiegel zu sehen ist und nicht der Pi: Firmware-Splash aus, Textkonsole auf ein unsichtbares Terminal, Plymouth mit dem Wortzeichen. Ändert nur, was fehlt. |
 
 Der Updater ist ein eigener Dienst, weil er genau die Dateien ersetzt, aus
@@ -1100,10 +1100,30 @@ einen Fehlgriff.
 Ein `systemctl restart` von dort beantwortet polkit mit „Interactive
 authentication required", und ihm das Recht zu geben hieße, dem einzigen ans
 Netz gebundenen Dienst Kontrolle über das Gerät zu geben. Stattdessen schreibt
-er eine Auftragsdatei, `mirror-system.path` sieht sie, und
-`mirror-system.service` führt sie als root aus — derselbe Umweg wie beim Knopf
-„Jetzt prüfen", und aus demselben Grund. Das Skript dahinter
-(`deploy/mirror-system.sh`) kennt genau zwei Aufträge und lehnt alles andere ab.
+er eine Auftragsdatei, die `mirror-system.service` als root ausführt. Das Skript
+dahinter (`deploy/mirror-system.sh`) kennt genau drei Aufträge — Dienste neu
+starten, Gerät booten, Updater anstoßen — und lehnt alles andere ab.
+
+**Abgeholt wird der Auftrag von zwei Seiten.** `mirror-system.path` bemerkt ihn
+sofort, `mirror-system.timer` sieht alle zehn Sekunden nach. Das zweite gibt es
+nicht aus Vorsicht, sondern aus Erfahrung: auf einem Gerät im Feld feuerten die
+Path-Units nicht — weder „Jetzt prüfen" noch „Neustart" bewirkten etwas, während
+der 15-Minuten-Timer des Updaters ungerührt weiterlief und Updates brachte.
+Woran es lag, ließ sich aus der Ferne nicht klären; dass Timer auf demselben
+Gerät zuverlässig feuern, dagegen schon. Also beides: die Path-Unit ist der
+schnelle Weg, der Timer der, auf den Verlass ist.
+
+Aus demselben Vorfall stammt die dritte Aktion. Der Knopf **Jetzt prüfen** hing
+allein an `mirror-updater.path`; blieb die aus, passierte nichts — und weil der
+Core seinen optimistischen Zustand nie zurücknahm, stand in der App für immer
+„suche nach Updates …". Beides ist repariert: der Knopf geht jetzt über
+denselben Weg wie der Neustart, und **eine Anfrage, auf die niemand reagiert,
+wird nach einer Minute als Fehler gemeldet.** Ein Knopf, der nichts tut und
+nichts sagt, ist schlimmer als eine Fehlermeldung.
+
+Woran der Core merkt, ob der Updater gelaufen ist: dessen Statusdatei trägt ein
+`lastCheck` und ist damit bei jedem Lauf eine andere. Bleibt sie Byte für Byte
+dieselbe, war er nicht da.
 
 Ein Detail, das nicht wie eines aussieht: der Auftrag trägt einen Zeitstempel
 und gilt nur zwei Minuten. Ohne diese Grenze würde ein Stromausfall zwischen

@@ -1,6 +1,6 @@
 {
   "name": "@mirror/icons",
-  "version": "0.18.0",
+  "version": "0.19.0",
   "private": true,
   "type": "module",
   "description": "Flache Strichsymbole fuer Anzeige und Module, erzeugt aus Lucide (ISC)",
