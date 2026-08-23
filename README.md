@@ -573,9 +573,10 @@ und das mitten in der Partitions- und Systemkonfiguration.
 
 Der Installer legt den Dienstbenutzer an, installiert `cage`, Node und die
 systemd-Units, holt den Signierschlüssel und das neueste Release, setzt
-`vc4-kms-v3d` in der `config.txt` und den Hostnamen auf `smartmirror`. Ein
-zweiter Lauf aktualisiert nur, was sich geändert hat, und lässt Konfiguration
-und Kopplungen unberührt.
+`vc4-kms-v3d` in der `config.txt` und den Hostnamen auf `smartmirror`, und er
+legt die Textkonsole auf ein unsichtbares Terminal (siehe
+[Der Startbildschirm](#der-startbildschirm)). Ein zweiter Lauf aktualisiert nur,
+was sich geändert hat, und lässt Konfiguration und Kopplungen unberührt.
 
 Danach: **`http://smartmirror.local:8080`** auf dem Handy öffnen und zum
 Startbildschirm hinzufügen.
@@ -665,6 +666,59 @@ dieselbe Einstellung in der Handy-App unter **Anzeige → Ausrichtung** zu finde
 Die Drehung wirkt auch auf die Ränder aus Schritt 2: „oben“ ist immer oben aus
 Sicht des Betrachters, auf einem hochkant aufgehängten Bildschirm also die
 kurze Kante.
+
+### Der Startbildschirm
+
+Zwischen Einschalten und dem ersten Bild vergehen auf einem Pi gut zwanzig
+Sekunden. Bis Version 0.16 war in dieser Zeit das zu sehen, was jeder Linux
+zeigt: das Regenbogenquadrat der Firmware, danach Kernel- und systemd-Zeilen und
+zuletzt eine Anmeldeaufforderung, die stehen blieb, bis die Anzeige startete.
+
+Hinter halbdurchlässigem Glas ist das das Auffälligste am ganzen Gerät. Der
+Spiegel soll aussehen wie ein Spiegel — und ausgerechnet beim Einschalten, dem
+einzigen Moment, in dem jemand hinsieht, buchstabierte er, dass dahinter ein
+Rechner hängt.
+
+Jetzt zeigt er stattdessen sich selbst: schwarze Fläche, das Wort
+**Smartmirror** in Grau und drei atmende Punkte. Kein Fortschritt in Prozent und
+kein Kreisel — beides behauptet, jemand stünde davor und warte. Sobald der erste
+Schnappschuss des Cores da ist, blendet der Startbildschirm über in den Inhalt.
+
+Dafür sind vier Dinge nötig, drei davon macht der Installer:
+
+- **`disable_splash=1`** in der `config.txt`. Das Regenbogenquadrat ist die
+  einzige große helle Fläche im ganzen Startvorgang.
+- **`console=tty3`** in der `cmdline.txt`. Die Konsole wandert als Ganzes auf ein
+  Terminal, das nie angezeigt wird. Das ist gründlicher als `quiet`: es trifft
+  auch die Meldungen, die `quiet` durchlässt — Warnungen, Fehler, Dateisystemprüfungen.
+- **Die Anmeldeaufforderung zieht mit** auf `tty3`. Sie ganz abzuschalten wäre
+  kürzer, nähme aber den letzten Weg auf ein Gerät, dessen Netzwerk nicht mehr
+  geht. Mit Bildschirm und Tastatur führt **Alt+F3** weiterhin zur Anmeldung.
+- **Die Anzeige startet sofort**, ohne auf den Core zu warten. Vorher wartete sie
+  bis zu 30 Sekunden auf dessen `/healthz`, damit der Spiegel nicht kurz „keine
+  Verbindung“ zeigt — und genau diese halbe Minute war das Fenster, in dem
+  stattdessen die Konsole zu sehen war. Den Hinweis blendet sie jetzt aus,
+  solange der Startbildschirm liegt: dass die Verbindung beim Start noch nicht
+  steht, ist kein Fehler, sondern die Reihenfolge.
+
+Drehung und Nachtabsenkung stehen in der Konfiguration des Cores, und die ist
+beim allerersten Bild noch nicht da. Die Anzeige schreibt beide Werte deshalb
+mit und holt sie beim nächsten Start hervor — sonst läge das Wortzeichen auf
+einem hochkant aufgehängten Spiegel quer, und ein Update um drei Uhr nachts
+ließe ihn in voller Helligkeit aufleuchten. Nur beim allerersten Start nach der
+Installation fehlt der gemerkte Wert; danach stimmt er.
+
+Auf einem Spiegel, der schon hängt, kommen die drei System-Änderungen nicht per
+Update: der Updater fasst die Startdateien des Systems bewusst nicht an — er
+tauscht ein Release aus und nicht die Einrichtung des Geräts. Den eigenen
+Startbildschirm bringt das Update trotzdem mit; wer auch die Konsole loswerden
+will, lässt einmal den Installer erneut laufen.
+
+Die Änderungen an `config.txt` und `cmdline.txt` greifen erst nach einem
+Neustart. Wer sie gar nicht will — etwa weil der Pi noch für etwas anderes
+benutzt wird —, ruft den Installer mit `--skip-boot-config` auf; dann bleiben
+beide Dateien und die Konsole unberührt, und nur der Startbildschirm der Anzeige
+kommt dazu.
 
 ### Was der Installer mit dem Signierschlüssel macht
 

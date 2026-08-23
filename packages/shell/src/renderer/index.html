@@ -24,6 +24,14 @@
       <div id="dim" class="dim"></div>
       <div id="frame" class="frame" aria-hidden="true"></div>
       <div id="overlay" class="overlay"></div>
+      <!--
+        Startbildschirm. Steht fest im Dokument und nicht im Skript: er soll
+        mit dem ersten Bild da sein, nicht erst wenn der Renderer laeuft.
+      -->
+      <div id="boot" class="boot">
+        <p class="boot__mark">Smartmirror</p>
+        <p class="boot__pulse" aria-hidden="true"><span></span><span></span><span></span></p>
+      </div>
     </div>
     <script type="module" src="main.js"></script>
   </body>

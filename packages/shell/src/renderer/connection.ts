@@ -23,6 +23,8 @@ export class CoreConnection {
   #reconnectTimer: number | undefined;
   #keepAlive: number | undefined;
   #state: ConnectionState = 'connecting';
+  /** Stand diese Verbindung schon einmal? Entscheidet ueber die Wartezeit. */
+  #everConnected = false;
 
   constructor(options: ConnectionOptions) {
     this.#options = options;
@@ -41,6 +43,7 @@ export class CoreConnection {
     this.#socket = socket;
 
     socket.addEventListener('open', () => {
+      this.#everConnected = true;
       this.#retryDelay = 500;
       this.#setState('online');
       this.send({ t: 'hello', clientType: 'shell', appVersion: this.#options.appVersion });
@@ -75,7 +78,15 @@ export class CoreConnection {
     window.clearTimeout(this.#reconnectTimer);
     this.#reconnectTimer = window.setTimeout(() => this.connect(), this.#retryDelay);
     // Schneller Anfang fuer den Update-Neustart, dann zurueckhaltender.
-    this.#retryDelay = Math.min(this.#retryDelay * 1.7, 15_000);
+    //
+    // Vor der allerersten Verbindung bleibt die Wartezeit kurz. Beim Booten
+    // geht die Anzeige absichtlich auf, bevor der Core antwortet – sie zeigt
+    // so lange ihren Startbildschirm statt der Textkonsole. Mit der vollen
+    // Rueckhaltung stuende sie danach womoeglich noch fuenfzehn Sekunden vor
+    // einem Core, der laengst da ist. Ist die Verbindung dagegen schon einmal
+    // gestanden und faellt spaeter aus, hilft haeufiges Nachfragen nichts.
+    const cap = this.#everConnected ? 15_000 : 2_000;
+    this.#retryDelay = Math.min(this.#retryDelay * 1.7, cap);
   }
 
   #setState(state: ConnectionState): void {
