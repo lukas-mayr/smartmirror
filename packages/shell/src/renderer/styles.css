@@ -366,6 +366,116 @@ body {
   transition: opacity 1.2s ease;
 }
 
+/*
+ * Startbildschirm.
+ *
+ * Er fuellt die Sekunden zwischen dem Start der Anzeige und dem ersten
+ * Schnappschuss des Cores. Vorher stand dort die Textkonsole des Systems:
+ * Kernel-Meldungen und eine Anmeldeaufforderung, hinter halbdurchlaessigem
+ * Glas das Auffaelligste am ganzen Geraet.
+ *
+ * Deckend schwarz und nicht durchsichtig: er ist nicht die Ankuendigung des
+ * Inhalts, sondern dessen Platzhalter — was darunter liegt, ist noch leer.
+ *
+ * Ein Wortzeichen und drei atmende Punkte, sonst nichts. Kein Fortschritt in
+ * Prozent und kein Kreisel: beides behauptet, jemand saehe zu und warte. Und
+ * so wenig Licht wie moeglich, aus demselben Grund wie ueberall hier — eine
+ * helle Flaeche verraet den Bildschirm hinter dem Spiegel.
+ */
+.boot {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  background: #000000;
+  /* Ueber allem: solange er liegt, steht darunter noch nichts. */
+  z-index: 2;
+  transition: opacity var(--motion-screen) ease;
+}
+
+/*
+ * Zwei Klassen und nicht eine, weil Ausblenden zwei Dinge sind: `--done`
+ * blendet ab, `--gone` nimmt die Flaeche aus dem Weg. Ein sofortiges
+ * `display: none` wuerde die Ueberblendung ueberspringen, ein bloss
+ * durchsichtiges Element bliebe fuer immer ueber dem Inhalt liegen.
+ */
+.boot--done {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.boot--gone {
+  display: none;
+}
+
+/*
+ * Erst einblenden.
+ *
+ * Die Drehung fuer hochkant aufgehaengte Spiegel setzt das Skript, und das
+ * laeuft einen Wimpernschlag nach dem ersten Bild. Waere das Wortzeichen da
+ * schon sichtbar, kippte es einmal kurz von quer nach aufrecht. Die schwarze
+ * Flaeche liegt trotzdem sofort da — auf sie kommt es an.
+ */
+.boot__mark,
+.boot__pulse {
+  margin: 0;
+  animation: boot-fade-in 600ms ease both;
+}
+
+.boot__mark {
+  font-size: var(--mirror-text-m);
+  font-weight: var(--mirror-weight-value);
+  letter-spacing: var(--mirror-track-label-wide);
+  /* Letter-spacing schiebt optisch nach rechts – rechnerisch ausgleichen. */
+  text-indent: var(--mirror-track-label-wide);
+  color: var(--mirror-fg-dim);
+}
+
+.boot__pulse {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.boot__pulse span {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--mirror-radius-pill);
+  background: var(--mirror-fg-mute);
+  animation: mirror-breathe var(--motion-breathe);
+}
+
+.boot__pulse span:nth-child(2) {
+  animation-delay: 180ms;
+}
+
+.boot__pulse span:nth-child(3) {
+  animation-delay: 360ms;
+}
+
+@keyframes boot-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Nachts atmet nichts – dieselbe Regel wie beim Laden eines Blocks. */
+[data-night='1'] .boot__pulse span {
+  animation: none;
+  opacity: 0.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boot__pulse span {
+    animation: none;
+  }
+}
+
 .overlay {
   display: none;
   align-items: center;

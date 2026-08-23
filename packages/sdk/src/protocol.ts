@@ -116,6 +116,16 @@ export interface PairingState {
 
 /* ------------------------------- Client → Server ------------------------------- */
 
+/**
+ * Was ein Neustart umfasst.
+ *
+ * `services` ist Core und Anzeige, also die Software des Spiegels; `device`
+ * ist der Rechner darunter. Ausgefuehrt wird beides nicht vom Core — der
+ * laeuft unprivilegiert — sondern von einem Root-Dienst, den er ueber eine
+ * Datei anstoesst. Dieselbe Bruecke wie beim Updater, aus demselben Grund.
+ */
+export type RestartScope = 'services' | 'device';
+
 export type ClientMessage =
   | { t: 'hello'; clientType: ClientType; token?: string; appVersion: string }
   | { t: 'pair:request'; code: string; clientName: string }
@@ -171,6 +181,16 @@ export type ClientMessage =
   | { t: 'admin:revokeDevice'; deviceId: string }
   | { t: 'admin:checkUpdate' }
   | { t: 'admin:applyUpdate'; version?: string }
+  /**
+   * Neustart aus der Handy-App.
+   *
+   * Zwei Stufen, weil es zwei verschiedene Fehler sind: haengt die Anzeige,
+   * genuegen die Dienste und der Spiegel ist nach Sekunden wieder da. Haengt
+   * etwas darunter — Netzwerk, Grafik, Tonausgabe —, hilft nur das ganze
+   * Geraet. Die kleinere Stufe zuerst anzubieten erspart die groessere fast
+   * immer.
+   */
+  | { t: 'admin:restart'; scope: RestartScope }
   | { t: 'ping' };
 
 /* ------------------------------- Server → Client ------------------------------- */

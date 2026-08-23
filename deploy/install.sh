@@ -41,7 +41,8 @@ Optionen:
                            rechts gekippter 270. Die Angabe wirkt sofort und
                            damit auch fuer den Kopplungscode. Spaeter aendern:
                            sudo /opt/smartmirror/current/deploy/rotate.sh <grad>
-  --skip-boot-config       /boot/firmware/config.txt nicht anfassen
+  --skip-boot-config       Die Startdateien (/boot/firmware/config.txt und
+                           cmdline.txt) und die Textkonsole nicht anfassen
   -h, --help               Diese Hilfe
 USAGE
 }
@@ -356,7 +357,7 @@ log "Release $BUNDLE_VERSION nach $TARGET installieren"
 rm -rf "$TARGET"
 mkdir -p "$TARGET"
 cp -a "$STAGING/." "$TARGET/"
-chmod +x "$TARGET/deploy/cage-session.sh" "$TARGET/deploy/rotate.sh" 2>/dev/null || true
+chmod +x "$TARGET/deploy/cage-session.sh" "$TARGET/deploy/rotate.sh" "$TARGET/deploy/mirror-system.sh" 2>/dev/null || true
 chmod +x "$TARGET/shell/smartmirror-shell" 2>/dev/null || true
 
 # Electrons Sandbox-Helfer braucht setuid-root, sonst startet die Anwendung mit
@@ -445,14 +446,87 @@ if [[ "$SKIP_BOOT_CONFIG" == "no" && -f "$BOOT_CONFIG" ]]; then
   if ! grep -qE '^\s*disable_overscan=1' "$BOOT_CONFIG"; then
     printf 'disable_overscan=1\n' >> "$BOOT_CONFIG"
   fi
+  # Das Regenbogenquadrat der Firmware ist das erste Bild nach dem Einschalten
+  # und die einzige grosse helle Flaeche im ganzen Startvorgang.
+  if ! grep -qE '^\s*disable_splash=1' "$BOOT_CONFIG"; then
+    printf 'disable_splash=1\n' >> "$BOOT_CONFIG"
+  fi
 fi
 
-# Textkonsole nicht abdunkeln und keinen Blinkcursor zeigen: beides waere in den
-# Sekunden vor dem Start der Anzeige durch den Spiegel sichtbar.
+# Die Textkonsole verschwinden lassen.
+#
+# Zwischen Einschalten und dem ersten Bild des Spiegels liefen bisher
+# Kernel-Meldungen, systemd-Zeilen und am Ende eine Anmeldeaufforderung ueber
+# den Bildschirm. Hinter halbdurchlaessigem Glas ist das das Auffaelligste am
+# ganzen Geraet: weisse Textzeilen auf Schwarz, eine halbe Minute lang.
+#
+# Statt sie einzeln stummzuschalten wandert die Konsole als Ganzes auf tty3 –
+# ein Terminal, das nie angezeigt wird. Das ist gruendlicher als "quiet": es
+# trifft auch Meldungen, die "quiet" durchlaesst (Warnungen, Fehler, fsck), und
+# es kostet nichts, weil auf diesem Geraet ohnehin niemand mitliest.
+#
+# Was der Spiegel in diesen Sekunden zeigt, kommt jetzt aus der Anzeige selbst:
+# ein schwarzer Startbildschirm mit Wortzeichen (packages/shell).
 CMDLINE="/boot/firmware/cmdline.txt"
 [[ -f "$CMDLINE" ]] || CMDLINE="/boot/cmdline.txt"
-if [[ -f "$CMDLINE" ]] && ! grep -q 'vt.global_cursor_default=0' "$CMDLINE"; then
-  sed -i '1 s/$/ consoleblank=0 vt.global_cursor_default=0 logo.nologo quiet/' "$CMDLINE"
+
+# Steht am Ende im Abschlussbericht. Der Ausgangswert gilt, wenn die Konsole
+# unangetastet bleibt – dann laeuft sie beim Booten weiter ueber den Bildschirm,
+# und das soll dort stehen und nicht verschwiegen werden.
+CONSOLE_SUMMARY="  Startbildschirm Die Textkonsole bleibt unveraendert und laeuft beim Booten
+                  weiter ueber den Bildschirm."
+
+if [[ "$SKIP_BOOT_CONFIG" == "no" && -f "$CMDLINE" ]]; then
+  log "Textkonsole ruhigstellen ($CMDLINE)"
+  CMDLINE_BEFORE="$(cat "$CMDLINE")"
+
+  # Alle Parameter stehen in einer einzigen Zeile, durch Leerzeichen getrennt.
+  # Deshalb Wort fuer Wort pruefen und nur Fehlendes anhaengen: so bleibt ein
+  # zweiter Lauf folgenlos, und von Hand Eingetragenes bleibt stehen.
+  cmdline_add() {
+    local key="${1%%=*}"
+    grep -qE "(^|[[:space:]])${key}(=|[[:space:]]|\$)" "$CMDLINE" && return 0
+    sed -i "1 s|\$| $1|" "$CMDLINE"
+  }
+
+  # tty1 ist das Terminal, das beim Booten sichtbar ist. Steht dort schon ein
+  # anderes, wurde die Zeile von Hand angepasst – dann nicht hineinregieren.
+  if grep -qE '(^|[[:space:]])console=tty1([[:space:]]|$)' "$CMDLINE"; then
+    sed -i -E '1 s/(^|[[:space:]])console=tty1([[:space:]]|$)/\1console=tty3\2/' "$CMDLINE"
+  else
+    cmdline_add console=tty3
+  fi
+
+  # Der Rest deckt ab, was vor der Konsole kommt oder neben ihr laeuft:
+  # die Raspberry-Logos zeichnet der Framebuffer selbst, der Blinkcursor haengt
+  # am Terminal, und der Bildschirmschoner der Konsole wuerde spaeter mitten in
+  # den Betrieb hinein abdunkeln.
+  cmdline_add logo.nologo
+  cmdline_add vt.global_cursor_default=0
+  cmdline_add consoleblank=0
+  cmdline_add quiet
+
+  # Die Anmeldeaufforderung zieht mit.
+  #
+  # Sie ganz abzuschalten waere kuerzer, nimmt aber den letzten Weg auf ein
+  # Geraet, dessen Netzwerk nicht mehr geht: Bildschirm und Tastatur anstecken
+  # und sich anmelden. Auf tty3 bleibt genau das moeglich – mit Alt+F3 –, nur
+  # sieht es beim Booten niemand mehr.
+  if systemctl is-enabled getty@tty1.service >/dev/null 2>&1; then
+    systemctl disable --now getty@tty1.service >/dev/null 2>&1 \
+      || warn "getty auf tty1 liess sich nicht abschalten – beim Booten bleibt die Anmeldezeile sichtbar."
+  fi
+  systemctl enable --now getty@tty3.service >/dev/null 2>&1 \
+    || warn "getty auf tty3 liess sich nicht einrichten – eine lokale Anmeldung am Bildschirm gibt es dann nicht mehr."
+  log "Anmeldung am Bildschirm liegt auf tty3 (Alt+F3)."
+  # Die Kernel-Zeile liest nur der Bootloader – geaenderte Parameter greifen
+  # deshalb erst beim naechsten Start, anders als die getty-Umstellung.
+  if [[ "$CMDLINE_BEFORE" != "$(cat "$CMDLINE")" ]]; then
+    warn "Startdateien geaendert – die stille Konsole greift nach einem Neustart."
+  fi
+  CONSOLE_SUMMARY="  Startbildschirm Die Textkonsole liegt auf tty3 und ist beim Booten nicht
+                  mehr zu sehen – der Spiegel zeigt stattdessen seinen eigenen
+                  Startbildschirm. Anmeldung am Bildschirm: Alt+F3."
 fi
 
 if [[ "$(hostname)" != "smartmirror" ]]; then
@@ -472,11 +546,14 @@ systemctl daemon-reload
 # Die .path-Unit ist der Knopf "Jetzt pruefen" in der Handy-App: der Core kann
 # den Updater nicht selbst starten (unprivilegiert), also loest die Datei aus,
 # die er schreibt. Der Timer bleibt die regelmaessige Pruefung.
-systemctl enable mirror-guard.service mirror-core.service mirror-shell.service mirror-updater.timer mirror-updater.path >/dev/null
+# mirror-system.path gehoert dazu: ohne sie bleiben die Neustart-Knoepfe in der
+# App wirkungslos – der Core schreibt seine Auftragsdatei, und niemand liest sie.
+systemctl enable mirror-guard.service mirror-core.service mirror-shell.service mirror-updater.timer mirror-updater.path mirror-system.path >/dev/null
 systemctl restart mirror-core.service
 systemctl restart mirror-shell.service
 systemctl start mirror-updater.timer
 systemctl start mirror-updater.path
+systemctl start mirror-system.path
 
 # --------------------------------- Abschluss ----------------------------------
 
@@ -509,6 +586,7 @@ Fertig. Version $BUNDLE_VERSION ist installiert.
                      nicht mittig hinter dem Spiegelrahmen sitzt.
   Drehung         ${ROTATION_NOW}°. Steht der Kopplungscode quer:
                   sudo $INSTALL_ROOT/current/deploy/rotate.sh 90
+${CONSOLE_SUMMARY}
   Logs            journalctl -u mirror-core -u mirror-shell -u mirror-updater -f
   Stromausfall    Ein beschaedigtes Release faellt beim Booten von selbst auf
                   das vorige zurueck: journalctl -u mirror-guard -b
