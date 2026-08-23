@@ -206,6 +206,26 @@ test('meldet den ausstehenden Neustart – und nimmt ihn nach einem Start zuruec
   assert.deepEqual(nachNeustart.changed, []);
 });
 
+test(
+  'lehnt ab, wenn sich das Boot-Verzeichnis nicht beschreiben laesst',
+  // Als root ist alles beschreibbar – die Eigenschaft laesst sich dann nicht
+  // pruefen. In der CI laeuft der Test, dort ist der Benutzer ein gewoehnlicher.
+  { skip: process.getuid?.() === 0 ? 'als root ist jedes Verzeichnis beschreibbar' : false },
+  async () => {
+    const u = await umgebung();
+    await chmod(u.boot, 0o555);
+    try {
+      // Frueher stand hier eine Pruefung auf die Benutzerkennung. Die sperrte
+      // auch Laeufe aus, die gar nichts am System anfassen – und damit diese
+      // Tests. Geprueft wird jetzt, worauf es ankommt.
+      await assert.rejects(() => u.ausfuehren(), /Command failed/);
+      assert.equal((await readFile(u.cmdlineDatei, 'utf8')).trim(), CMDLINE_PI);
+    } finally {
+      await chmod(u.boot, 0o755);
+    }
+  },
+);
+
 test('laeuft ohne Plymouth durch und sagt es', async () => {
   const u = await umgebung({ plymouth: false });
   await u.ausfuehren();

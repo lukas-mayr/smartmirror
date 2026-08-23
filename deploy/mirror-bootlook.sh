@@ -319,8 +319,18 @@ schreibe_status() {
 
 # ------------------------------------------------------------------------ Ablauf
 
-if [[ $EUID -ne 0 ]]; then
-  log "Braucht Root-Rechte."
+# Geschrieben wird an /boot und an den systemd-Units – auf einem Pi braucht
+# beides Root. Gefragt wird hier trotzdem nicht nach der Benutzerkennung,
+# sondern nach der Sache: ob sich die Dateien anfassen lassen, um die es geht.
+#
+# Der Unterschied ist keiner der Eleganz. "$EUID -ne 0" sperrt auch einen Lauf
+# aus, der gar nichts am System anfasst – etwa den der Tests, die das Skript
+# gegen nachgebaute /boot-Dateien in einem Temporaerverzeichnis fahren. Eine
+# Pruefung, die nur unter root durchlaeuft, kann von einer CI nicht ausgefuehrt
+# werden, und damit pruefte niemand mehr das Skript, das an der Kernel-Zeile
+# schreibt.
+if [[ -d "$BOOT_DIR" && ! -w "$BOOT_DIR" ]]; then
+  log "Keine Schreibrechte auf $BOOT_DIR – bitte als root ausfuehren."
   exit 1
 fi
 
