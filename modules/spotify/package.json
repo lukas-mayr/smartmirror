@@ -1,6 +1,6 @@
 {
   "name": "@mirror/module-spotify",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,8 +8,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@mirror/sdk": "0.16.0",
+    "@mirror/sdk": "0.17.0",
     "lit": "^3.2.1",
-    "@mirror/icons": "0.16.0"
+    "@mirror/icons": "0.17.0"
   }
 }
