@@ -499,17 +499,22 @@ install -m 0644 "$INSTALL_ROOT/current/deploy/systemd/"*.service /etc/systemd/sy
 install -m 0644 "$INSTALL_ROOT/current/deploy/systemd/"*.timer   /etc/systemd/system/
 install -m 0644 "$INSTALL_ROOT/current/deploy/systemd/"*.path    /etc/systemd/system/
 systemctl daemon-reload
-# Die .path-Unit ist der Knopf "Jetzt pruefen" in der Handy-App: der Core kann
-# den Updater nicht selbst starten (unprivilegiert), also loest die Datei aus,
-# die er schreibt. Der Timer bleibt die regelmaessige Pruefung.
+# Die .path-Units sind die Knoepfe in der Handy-App: der Core kann weder den
+# Updater starten noch neu booten (unprivilegiert), also loest die Datei aus,
+# die er schreibt. Der Update-Timer bleibt die regelmaessige Pruefung.
+#
+# mirror-system.timer ist die Rueckfallebene dazu. Auf einem Geraet im Feld
+# feuerten die Path-Units nicht, waehrend Timer weiterliefen - die Knoepfe
+# blieben wirkungslos, ohne dass irgendwo etwas davon stand.
 # mirror-system.path gehoert dazu: ohne sie bleiben die Neustart-Knoepfe in der
 # App wirkungslos – der Core schreibt seine Auftragsdatei, und niemand liest sie.
-systemctl enable mirror-guard.service mirror-core.service mirror-shell.service mirror-updater.timer mirror-updater.path mirror-system.path mirror-bootlook.service >/dev/null
+systemctl enable mirror-guard.service mirror-core.service mirror-shell.service mirror-updater.timer mirror-updater.path mirror-system.path mirror-system.timer mirror-bootlook.service >/dev/null
 systemctl restart mirror-core.service
 systemctl restart mirror-shell.service
 systemctl start mirror-updater.timer
 systemctl start mirror-updater.path
 systemctl start mirror-system.path
+systemctl start mirror-system.timer
 
 # --------------------------------- Abschluss ----------------------------------
 
