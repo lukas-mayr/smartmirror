@@ -51,7 +51,7 @@ modules/
   notifications/ Die Fläche für Mitteilungen; den Inhalt melden die Module
   timer/         Ein Bagger trägt einen Berg ab; ist er weg, ist die Zeit um
 deploy/      systemd-Units, Compositor-Start, Installer, Drehung, Neustart,
-             Plymouth-Thema fuer den Start
+             Plymouth-Thema fuer den Start, unsichtbarer Mauszeiger
 scripts/     Build-, Bundle- und Generator-Skripte
 ```
 
@@ -880,7 +880,12 @@ selben Takt. Damit zwischen beiden kein Schwarz aufblitzt, endet Plymouth erst
 nach dem Start der Anzeige und mit `--retain-splash`: das letzte Bild bleibt
 stehen, bis `cage` darüber zeichnet.
 
-Nötig sind dafür sechs Dinge, und vier davon liegen außerhalb des Releases:
+Ganz ohne Naht geht es trotzdem nicht: `cage` braucht die Grafikausgabe für
+sich, Plymouth muss sie also freigeben, bevor Electron sein erstes Bild hat.
+Diese Sekunden bleiben schwarz — aber wenigstens nur schwarz, ohne Zeiger und
+ohne Textzeilen.
+
+Nötig sind dafür sieben Dinge, und vier davon liegen außerhalb des Releases:
 
 - **`disable_splash=1`** in der `config.txt`. Das Regenbogenquadrat ist die
   einzige große helle Fläche im ganzen Startvorgang.
@@ -907,6 +912,15 @@ Nötig sind dafür sechs Dinge, und vier davon liegen außerhalb des Releases:
 - **Die Anmeldeaufforderung zieht mit** auf `tty3`. Sie ganz abzuschalten wäre
   kürzer, nähme aber den letzten Weg auf ein Gerät, dessen Netzwerk nicht mehr
   geht. Mit Bildschirm und Tastatur führt **Alt+F3** weiterhin zur Anmeldung.
+- **Ein unsichtbarer Mauszeiger** für `cage`. Zwischen dem Ende von Plymouth und
+  dem ersten Bild von Electron ist der Compositor ein paar Sekunden allein auf
+  dem Bildschirm: keine Fensterfläche, aber ein Zeiger, den er aus dem
+  Cursor-Thema des Systems lädt und mitten auf das Schwarz setzt. `cursor: none`
+  im Stylesheet greift dort noch nicht — es gibt die Anzeige ja noch nicht —,
+  und einen Schalter zum Ausblenden hat `cage` nicht. Also bekommt es unter
+  `XCURSOR_PATH` ein eigenes Thema untergeschoben, in dem jeder Zeiger aus
+  lauter durchsichtigen Bildpunkten besteht (`deploy/cursor/`, erzeugt von
+  `scripts/generate-cursor.mjs`).
 - **Die Anzeige startet sofort**, ohne auf den Core zu warten. Vorher wartete sie
   bis zu 30 Sekunden auf dessen `/healthz`, damit der Spiegel nicht kurz „keine
   Verbindung" zeigt — und genau diese halbe Minute war das Fenster, in dem

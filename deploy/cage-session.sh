@@ -27,13 +27,38 @@ fi
 # blendet sie so lange aus – dass die Verbindung beim Start noch nicht steht,
 # ist kein Fehler, sondern die Reihenfolge.
 
+# Kein Mauszeiger, auch nicht in den Sekunden vor dem ersten Bild.
+#
+# Zwischen dem Ende von Plymouth und dem ersten Bild von Electron ist cage
+# allein auf dem Bildschirm: es hat noch keine Fensterflaeche zu zeichnen, aber
+# einen Zeiger, den es aus dem Cursor-Thema des Systems laedt und mitten auf das
+# Schwarz setzt. Hinter halbdurchlaessigem Glas ist ein weisser Pfeil das
+# Auffaelligste, was dort passieren kann.
+#
+# `cursor: none` im Stylesheet greift dort noch nicht – es gibt die Anzeige ja
+# noch nicht –, und einen Schalter zum Ausblenden hat cage nicht. Also bekommt
+# es ein Thema untergeschoben, in dem jeder Zeiger aus lauter durchsichtigen
+# Bildpunkten besteht (erzeugt von scripts/generate-cursor.mjs).
+#
+# XCURSOR_PATH ersetzt den Suchpfad vollstaendig, damit nicht doch eines der
+# Themen des Systems gefunden wird. "default" ist der Name, unter dem wlroots
+# sucht, wenn ihm keiner genannt wurde.
+HIER="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -d "$HIER/cursor/default/cursors" ]]; then
+  export XCURSOR_PATH="$HIER/cursor"
+  export XCURSOR_THEME=default
+  export XCURSOR_SIZE=24
+else
+  echo "Kein Zeiger-Thema unter $HIER/cursor – vor dem ersten Bild kann kurz ein Pfeil stehen." >&2
+fi
+
 # Bewusst ohne zusaetzliche cage-Optionen.
 #
 # Die Optionsnamen haben sich zwischen cage-Versionen geaendert, und eine
 # unbekannte Option laesst cage sofort beenden – auf einem Spiegel ohne
 # Tastatur heisst das: schwarzer Bildschirm ohne Hinweis. Gebraucht wird hier
-# ohnehin keine: VT-Umschaltung braucht ein Geraet ohne Tastatur nicht, und der
-# Mauszeiger ist bereits per CSS ausgeblendet.
+# ohnehin keine: VT-Umschaltung braucht ein Geraet ohne Tastatur nicht, und den
+# Mauszeiger nimmt das Thema oben weg.
 exec cage -- "$APP" \
   --ozone-platform=wayland \
   --enable-features=UseOzonePlatform \
