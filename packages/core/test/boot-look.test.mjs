@@ -26,7 +26,13 @@ const script = join(repoRoot, 'deploy/mirror-bootlook.sh');
 const CMDLINE_PI = 'console=serial0,115200 console=tty1 root=PARTUUID=abc123-02 rootfstype=ext4 fsck.repair=yes rootwait';
 const CONFIG_PI = '[cm4]\notg_mode=1\n\n[all]\ndtoverlay=vc4-kms-v3d\n';
 
-async function umgebung({ cmdline = CMDLINE_PI, config = CONFIG_PI, rotation = 0, plymouth = true } = {}) {
+async function umgebung({
+  cmdline = CMDLINE_PI,
+  config = CONFIG_PI,
+  rotation = 0,
+  plymouth = true,
+  initramfs = false,
+} = {}) {
   const dir = await mkdtemp(join(tmpdir(), 'mirror-bootlook-'));
   const boot = join(dir, 'boot');
   const data = join(dir, 'data');
@@ -37,6 +43,9 @@ async function umgebung({ cmdline = CMDLINE_PI, config = CONFIG_PI, rotation = 0
   await writeFile(join(boot, 'cmdline.txt'), `${cmdline}\n`);
   await writeFile(join(boot, 'config.txt'), config);
   await writeFile(join(data, 'config.json'), JSON.stringify({ display: { rotation } }));
+  // Ein Pi mit Startabbild: Plymouth startet daraus, und das Thema muss darin
+  // liegen. Ohne die Datei soll das Skript das Abbild gar nicht erst anfassen.
+  if (initramfs) await writeFile(join(boot, 'initramfs8'), 'abbild');
 
   const protokoll = join(dir, 'aufrufe.log');
   const attrappe = (name, body) =>
@@ -70,6 +79,9 @@ async function umgebung({ cmdline = CMDLINE_PI, config = CONFIG_PI, rotation = 0
   );
   // apt-get darf in einem Test niemals wirklich etwas installieren.
   await attrappe('apt-get', 'exit 1');
+  // Und update-initramfs erst recht nicht: es schriebe an das Startabbild des
+  // Rechners, auf dem der Test laeuft.
+  await attrappe('update-initramfs', 'exit 0');
   if (plymouth) await attrappe('plymouth-set-default-theme', 'printf "smartmirror"\nexit 0');
 
   return {
@@ -177,14 +189,58 @@ test('verlegt die Anmeldeaufforderung von tty1 auf tty3', async () => {
   assert.ok(aufrufe.some((zeile) => zeile.includes('enable --now getty@tty3.service')));
 });
 
-test('waehlt das Bild passend zur Drehung des Spiegels', async () => {
+test('waehlt die Bilder passend zur Drehung des Spiegels', async () => {
   for (const rotation of [0, 90, 180, 270]) {
     const u = await umgebung({ rotation });
     await u.ausfuehren();
-    const gewaehlt = await readFile(join(u.theme, 'splash.png'));
-    const erwartet = await readFile(join(repoRoot, `deploy/plymouth/splash-${rotation}.png`));
-    assert.deepEqual(gewaehlt, erwartet, `Drehung ${rotation}° bekommt das falsche Bild`);
+    // Vier Ebenen, weil die Punkte atmen und das Wortzeichen nicht. Sie
+    // muessen alle aus derselben Drehung stammen – ein gerades Wort ueber
+    // gedrehten Punkten waere schlimmer als ein ganz quer stehendes Bild.
+    for (const ebene of ['mark', 'dot1', 'dot2', 'dot3']) {
+      const gewaehlt = await readFile(join(u.theme, `${ebene}.png`));
+      const erwartet = await readFile(join(repoRoot, `deploy/plymouth/${ebene}-${rotation}.png`));
+      assert.deepEqual(gewaehlt, erwartet, `Drehung ${rotation}°: ${ebene}.png ist das falsche Bild`);
+    }
   }
+});
+
+test('vermeidet den Moduswechsel, ueber den der Bildschirm blau wird', async () => {
+  // Raspberry Pi OS liefert die Zeile mit 1 aus. Die Firmware richtet die
+  // Anzeige dann nicht ein, der Kernel tut es Sekunden spaeter – und der
+  // Bildschirm zeigt dazwischen sein eigenes Menue.
+  const u = await umgebung({ config: '[all]\ndtoverlay=vc4-kms-v3d\ndisable_fw_kms_setup=1\n' });
+  await u.ausfuehren();
+
+  const config = await readFile(u.configDatei, 'utf8');
+  // Die spaetere Zeile gewinnt, deshalb reicht das Anhaengen – die
+  // vorgefundene Zeile bleibt unangetastet stehen.
+  assert.match(config, /\[all\]\n(disable_splash=1\n)?disable_fw_kms_setup=0/);
+  assert.equal(config.trimEnd().split('\n').at(-1), 'disable_fw_kms_setup=0');
+
+  // Und beim zweiten Lauf steht sie schon da.
+  await u.ausfuehren();
+  assert.equal((await readFile(u.configDatei, 'utf8')).match(/disable_fw_kms_setup=0/g).length, 1);
+});
+
+test('baut das Startabbild neu, damit das Wortzeichen von Anfang an steht', async () => {
+  // Plymouth startet aus dem initramfs und behaelt fuer den ganzen Start das
+  // Thema, das darin liegt. Ohne diesen Schritt waere das Wortzeichen erst zu
+  // sehen, wenn die Anzeige selbst zeichnet – also nie beim Booten.
+  const u = await umgebung({ initramfs: true });
+  await u.ausfuehren('sitzung-1');
+  assert.equal((await u.aufrufe()).filter((zeile) => zeile.startsWith('update-initramfs')).length, 1);
+  assert.ok((await u.status()).changed.some((eintrag) => eintrag.includes('initramfs')));
+
+  // Ein zweiter Lauf baut nicht noch einmal: das Abbild kostet eine halbe
+  // Minute, und der Dienst laeuft bei jedem Start.
+  await u.ausfuehren('sitzung-2');
+  assert.equal((await u.aufrufe()).filter((zeile) => zeile.startsWith('update-initramfs')).length, 1);
+});
+
+test('laesst das Startabbild in Ruhe, wo es keins gibt', async () => {
+  const u = await umgebung();
+  await u.ausfuehren();
+  assert.equal((await u.aufrufe()).filter((zeile) => zeile.startsWith('update-initramfs')).length, 0);
 });
 
 test('meldet den ausstehenden Neustart – und nimmt ihn nach einem Start zurueck', async () => {

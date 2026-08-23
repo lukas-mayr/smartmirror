@@ -1,21 +1,83 @@
 # Startbildschirm des Spiegels, solange Plymouth laeuft.
 #
 # Er zeigt dasselbe Bild, das die Anzeige gleich darauf selbst zeichnet:
-# Wortzeichen und drei Punkte auf Schwarz. Der Uebergang soll nicht als Wechsel
-# auffallen, sondern nur daran, dass die Punkte zu atmen anfangen.
+# Wortzeichen und drei atmende Punkte auf Schwarz. Der Uebergang soll nicht als
+# Wechsel auffallen - vom Einschalten bis zum ersten Schnappschuss steht
+# durchgehend dasselbe da.
 #
-# Das Bild kommt fertig gedreht aus deploy/plymouth/splash-<grad>.png; welche
+# Die Bilder kommen fertig gedreht aus deploy/plymouth/<name>-<grad>.png; welche
 # Fassung hier liegt, entscheidet mirror-bootlook.sh anhand der Konfiguration
 # des Spiegels. Plymouth selbst kann sie nicht lesen.
+#
+# Vier Bilder statt einem, damit die Punkte atmen koennen: Wortzeichen und
+# Punkte muessen getrennt sein, um getrennt durchsichtig zu werden. Jedes der
+# vier ist so gross wie das ganze Wortzeichen und sonst leer - so liegen sie
+# uebereinander, sobald jedes fuer sich mittig sitzt, und dieses Skript braucht
+# keine Koordinaten zu kennen, die je nach Drehung ohnehin anders lauteten.
 
 Window.SetBackgroundTopColor(0, 0, 0);
 Window.SetBackgroundBottomColor(0, 0, 0);
 
-splash.image = Image("splash.png");
-splash.sprite = Sprite(splash.image);
-splash.sprite.SetX((Window.GetWidth() - splash.image.GetWidth()) / 2);
-splash.sprite.SetY((Window.GetHeight() - splash.image.GetHeight()) / 2);
-splash.sprite.SetZ(1);
+fun mittig(datei) {
+  # local., damit die Namen nicht ausserhalb stehen bleiben: in dieser Sprache
+  # ist ohne dieses Wort jede Zuweisung global, auch die in einer Funktion.
+  local.bild = Image(datei);
+  local.sprite = Sprite(local.bild);
+  local.sprite.SetX((Window.GetWidth() - local.bild.GetWidth()) / 2);
+  local.sprite.SetY((Window.GetHeight() - local.bild.GetHeight()) / 2);
+  local.sprite.SetZ(1);
+  return local.sprite;
+}
+
+wortzeichen = mittig("mark.png");
+punkt1 = mittig("dot1.png");
+punkt2 = mittig("dot2.png");
+punkt3 = mittig("dot3.png");
+
+# Dieselben Werte wie mirror-breathe im Stylesheet der Anzeige: 1400 ms hin und
+# zurueck, die drei Punkte um je 180 ms versetzt, zwischen 30 % und voll.
+#
+# Gerechnet wird in Aufrufen von refresh_callback. Plymouth ruft sie fuenfzig
+# Mal je Sekunde auf; laeuft es einmal langsamer, atmen die Punkte langsamer -
+# mehr haengt daran nicht.
+TAKT = 50;
+DAUER = 1.4 * TAKT;
+VERSATZ = 0.18 * TAKT;
+schritt = 0;
+
+fun phase(nummer) {
+  local.wert = schritt + nummer * VERSATZ;
+  if (local.wert >= DAUER) {
+    local.wert = local.wert - DAUER;
+  }
+  return local.wert;
+}
+
+fun deckkraft(wert) {
+  # Dreieck: die erste Haelfte hinauf, die zweite hinunter.
+  local.anteil = wert / DAUER;
+  if (local.anteil > 0.5) {
+    local.anteil = 1 - local.anteil;
+  }
+  local.anteil = local.anteil * 2;
+  # Und weich an den Enden, damit es nicht knickt - dasselbe tut die Kurve
+  # ease-in-out im Stylesheet an derselben Stelle.
+  return 0.3 + 0.7 * local.anteil * local.anteil * (3 - 2 * local.anteil);
+}
+
+fun refresh_callback() {
+  schritt = schritt + 1;
+  if (schritt >= DAUER) {
+    schritt = schritt - DAUER;
+  }
+  # Ausgeschrieben und nicht in einer Schleife: drei Zeilen sind kuerzer als
+  # jede Schleife, und was hier steht, muss auf einem Geraet laufen, auf dem
+  # niemand nachsehen kann, warum es nicht laeuft.
+  punkt1.SetOpacity(deckkraft(phase(0)));
+  punkt2.SetOpacity(deckkraft(phase(1)));
+  punkt3.SetOpacity(deckkraft(phase(2)));
+}
+Plymouth.SetRefreshFunction(refresh_callback);
 
 # Plymouth ruft diese Funktionen auf, wenn es etwas mitzuteilen haette:
 # Fortschritt, Meldungen, eine Passwortabfrage fuer eine verschluesselte
@@ -23,9 +85,6 @@ splash.sprite.SetZ(1);
 # dort weder jemanden, der es liest, noch eine Tastatur, um zu antworten.
 # Leere Funktionen sind die Art, das zu sagen; ohne sie zeichnet Plymouth
 # seine Voreinstellung.
-fun refresh_callback() { }
-Plymouth.SetRefreshFunction(refresh_callback);
-
 fun message_callback(text) { }
 Plymouth.SetMessageFunction(message_callback);
 

@@ -20,7 +20,7 @@ Drei Prozesse, bewusst getrennt:
 | **Anzeige** | `mirror-shell.service` | Electron unter [`cage`](https://github.com/cage-kiosk/cage), einem Wayland-Compositor für genau ein Fenster. Kein Desktop, keine Browser-Bedienelemente. |
 | **Updater** | `mirror-updater.service` + `.timer` + `.path` | Prüft GitHub Releases, verifiziert Signaturen, tauscht Symlinks, rollt bei fehlgeschlagenem Healthcheck zurück. Der Timer prüft regelmäßig, die Path-Unit startet ihn sofort, wenn die App darum bittet. |
 | **Neustart** | `mirror-system.service` + `.path` + `.timer` | Führt aus, worum die App bittet: Dienste neu starten, Gerät booten, Updater anstoßen. Kennt genau diese drei Aufträge. |
-| **Startbild** | `mirror-bootlook.service` | Sorgt bei jedem Start dafür, dass beim Booten der Spiegel zu sehen ist und nicht der Pi: Firmware-Splash aus, Textkonsole auf ein unsichtbares Terminal, Plymouth mit dem Wortzeichen. Ändert nur, was fehlt. |
+| **Startbild** | `mirror-bootlook.service` | Sorgt bei jedem Start dafür, dass beim Booten der Spiegel zu sehen ist und nicht der Pi: Firmware-Splash aus, kein Moduswechsel, Textkonsole auf ein unsichtbares Terminal, Plymouth mit dem Wortzeichen — bis ins Startabbild hinein. Ändert nur, was fehlt. |
 
 Der Updater ist ein eigener Dienst, weil er genau die Dateien ersetzt, aus
 denen der Core läuft, und ihn danach neu startet — im selben Prozess würde er
@@ -679,7 +679,7 @@ kurze Kante.
 
 ### Der Startbildschirm
 
-Zwischen Einschalten und dem ersten Bild vergehen auf einem Pi gut zwanzig
+Zwischen Einschalten und dem ersten Bild vergehen auf einem Pi gut vierzig
 Sekunden. Ohne Zutun zeigt Linux darin, was jeder Linux zeigt: das
 Regenbogenquadrat der Firmware, danach Kernel- und systemd-Zeilen und zuletzt
 eine Anmeldeaufforderung, die stehen bleibt, bis die Anzeige startet.
@@ -695,15 +695,31 @@ Kreisel — beides behauptet, jemand stünde davor und warte.
 
 **In zwei Etappen, die ineinander übergehen.** Bis die Anzeige läuft, zeichnet
 Plymouth das Bild; danach zeichnet die Anzeige es selbst weiter. Dass gewechselt
-wurde, ist nur daran zu erkennen, dass die drei Punkte anfangen zu atmen. Damit
-zwischen beiden kein Schwarz aufblitzt, endet Plymouth erst nach dem Start der
-Anzeige und mit `--retain-splash`: das letzte Bild bleibt stehen, bis `cage`
-darüber zeichnet.
+wurde, soll man gar nicht merken: die drei Punkte atmen auf beiden Seiten im
+selben Takt. Damit zwischen beiden kein Schwarz aufblitzt, endet Plymouth erst
+nach dem Start der Anzeige und mit `--retain-splash`: das letzte Bild bleibt
+stehen, bis `cage` darüber zeichnet.
 
-Nötig sind dafür vier Dinge, und drei davon liegen außerhalb des Releases:
+Nötig sind dafür sechs Dinge, und vier davon liegen außerhalb des Releases:
 
 - **`disable_splash=1`** in der `config.txt`. Das Regenbogenquadrat ist die
   einzige große helle Fläche im ganzen Startvorgang.
+- **`disable_fw_kms_setup=0`** in derselben Datei. Raspberry Pi OS liefert die
+  Zeile mit `1` aus: die Firmware richtet die Anzeige dann nicht ein, der Kernel
+  tut es Sekunden später selbst — und dazwischen liegt ein Moduswechsel. Für den
+  Bildschirm heißt das: Signal weg, eigenes Menü an („kein Signal", blau),
+  Signal wieder da, mitten im Startbildschirm. Mit `0` stellt die Firmware den
+  Modus ein und der Kernel übernimmt ihn unverändert; es gibt keinen Wechsel
+  mehr, über den der Bildschirm stolpern könnte.
+- **Das Thema muss ins Startabbild.** Plymouth startet aus dem `initramfs`, das
+  Raspberry Pi OS seit Bookworm baut (`auto_initramfs=1`) — lange bevor das
+  Wurzeldateisystem eingehängt ist. Es behält für den ganzen Start das Thema,
+  das beim Bauen des Abbilds hineinkopiert wurde. Ein Thema, das nur unter
+  `/usr/share/plymouth/themes` liegt, kommt deshalb nie auf den Bildschirm: zu
+  sehen bliebe bis zum Schluss das, was die Distribution mitbringt. Der Dienst
+  ruft dafür `update-initramfs -u` auf — aber nur, wenn sich am Thema wirklich
+  etwas geändert hat, gemessen an einer Prüfsumme über seine Dateien. Sonst
+  baute jedes Update ein Abbild neu, das es nicht braucht.
 - **`console=tty3`** in der `cmdline.txt`. Die Konsole wandert als Ganzes auf
   ein Terminal, das nie angezeigt wird. Das ist gründlicher als `quiet`: es
   trifft auch die Meldungen, die `quiet` durchlässt — Warnungen, Fehler,
@@ -751,6 +767,13 @@ Terminal in Reichweite, ist der Grund, warum es ihn gibt. Vier Vorkehrungen:
 - Geschrieben wird daneben und dann umbenannt — ein Stromausfall mitten im
   Schreiben hinterlässt keine halbe Kernel-Zeile.
 
+An der `config.txt` wird nur angehängt, und zwar in einem eigenen
+`[all]`-Abschnitt am Ende: die Firmware liest die Datei von oben nach unten, die
+spätere Zeile gewinnt. Vorgefundene Zeilen bleiben deshalb stehen, auch
+`disable_fw_kms_setup=1`. Wer die alte Einrichtung zurück will — etwa weil der
+Bildschirm mit dem von der Firmware gewählten Modus schlechter zurechtkommt —,
+löscht den angehängten Block wieder heraus.
+
 #### Der Neustart, der noch fehlt
 
 `config.txt` und `cmdline.txt` wirken erst beim nächsten Start. Wer nicht ans
@@ -773,15 +796,22 @@ Spiegel quer, und ein Update um drei Uhr nachts ließe ihn in voller Helligkeit
 aufleuchten.
 
 Plymouth kann die Konfiguration gar nicht lesen. Sein Bild liegt deshalb fertig
-gedreht in vier Fassungen bei (`deploy/plymouth/splash-<grad>.png`); welche gilt,
-legt `mirror-bootlook.sh` an die Stelle, die das Thema lädt — und `rotate.sh`
-zieht sie mit, wenn sich die Drehung ändert. Fertig gedreht und nicht zur
-Laufzeit, weil eine Drehung um ein Vielfaches von 90 Grad dann pixelgenau bleibt.
+gedreht in vier Fassungen bei (`deploy/plymouth/<ebene>-<grad>.png`); welche
+gilt, legt `mirror-bootlook.sh` an die Stelle, die das Thema lädt — und
+`rotate.sh` zieht sie mit, wenn sich die Drehung ändert. Fertig gedreht und nicht
+zur Laufzeit, weil eine Drehung um ein Vielfaches von 90 Grad dann pixelgenau
+bleibt.
+
+Vier Ebenen je Drehung — `mark`, `dot1`, `dot2`, `dot3` —, weil die Punkte atmen
+und das Wortzeichen nicht: in einem einzigen Bild ließe sich das nicht trennen.
+Jede Ebene ist so groß wie das ganze Wortzeichen und sonst leer. Damit liegen sie
+übereinander, sobald jede für sich mittig sitzt, und das Thema muss keine
+Koordinaten kennen, die je nach Drehung anders lauteten.
 
 Die Bilder entstehen mit `scripts/generate-splash.mjs` aus derselben Schrift und
 denselben Werten wie der Startbildschirm der Anzeige — sonst spränge das Bild
 beim Übergang. Das Skript läuft von Hand und nicht in der CI: es braucht einen
-Browser, und die vier Dateien ändern sich nur, wenn sich das Wortzeichen ändert.
+Browser, und die Dateien ändern sich nur, wenn sich das Wortzeichen ändert.
 
 #### Abschalten
 
