@@ -11,15 +11,21 @@
  * hier einmal mit derselben Schrift und denselben Werten gesetzt wie dort und
  * als Bild mitgeliefert.
  *
- * Warum vier Bilder: Der Spiegel kann hochkant haengen. Plymouth kennt die
+ * Warum vier Drehungen: Der Spiegel kann hochkant haengen. Plymouth kennt die
  * Konfiguration des Spiegels nicht und kann sie auch nicht lesen – der
  * Installer legt deshalb die passende Fassung an die Stelle, die das Thema
  * laedt. Fertig gedreht und nicht zur Laufzeit, weil eine Drehung um ein
  * Vielfaches von 90 Grad dann pixelgenau bleibt: kein Skalieren, keine weiche
  * Kante. Dieselbe Ueberlegung steht im Stylesheet der Anzeige.
  *
+ * Warum vier Ebenen je Drehung: Die Punkte atmen, das Wortzeichen nicht - in
+ * einem einzigen Bild ginge das nicht getrennt. Jede Ebene ist deshalb so
+ * gross wie das ganze Wortzeichen und sonst leer. Damit liegen sie im Thema
+ * uebereinander, sobald jede fuer sich mittig sitzt, und das Thema muss keine
+ * Koordinaten kennen, die je nach Drehung anders lauten.
+ *
  * Das Skript laeuft von Hand und nicht in der CI: es braucht einen Browser,
- * und die vier Dateien aendern sich nur, wenn sich das Wortzeichen aendert.
+ * und die Dateien aendern sich nur, wenn sich das Wortzeichen aendert.
  */
 import { createServer } from 'node:http';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -117,6 +123,20 @@ const box = await page.evaluate(() => {
 
 await mkdir(outDir, { recursive: true });
 
+/*
+ * Die Ebenen. Sichtbar bleibt jeweils genau eine; die anderen werden auf
+ * `visibility: hidden` gesetzt und nicht auf `display: none`, damit das Layout
+ * dabei stehen bleibt. Nur so sitzt jede Ebene genau dort, wo sie auch im
+ * vollstaendigen Wortzeichen saesse - und nur deshalb duerfen sie im Thema
+ * einfach uebereinandergelegt werden.
+ */
+const EBENEN = [
+  { name: 'mark', sichtbar: '#word' },
+  { name: 'dot1', sichtbar: '#dots span:nth-child(1)' },
+  { name: 'dot2', sichtbar: '#dots span:nth-child(2)' },
+  { name: 'dot3', sichtbar: '#dots span:nth-child(3)' },
+];
+
 for (const rotation of [0, 90, 180, 270]) {
   const quer = rotation % 180 === 0;
   const width = quer ? box.width : box.height;
@@ -140,10 +160,18 @@ for (const rotation of [0, 90, 180, 270]) {
     [rotation, width, height, box.width, box.height],
   );
 
-  const png = await page.screenshot({ omitBackground: true });
-  const file = join(outDir, `splash-${rotation}.png`);
-  await writeFile(file, png);
-  console.log(`  · splash-${rotation}.png (${width}x${height}, ${png.length} Bytes)`);
+  for (const ebene of EBENEN) {
+    await page.evaluate((sichtbar) => {
+      for (const element of document.querySelectorAll('#word, #dots span')) {
+        element.style.visibility = element.matches(sichtbar) ? 'visible' : 'hidden';
+      }
+    }, ebene.sichtbar);
+
+    const png = await page.screenshot({ omitBackground: true });
+    const file = join(outDir, `${ebene.name}-${rotation}.png`);
+    await writeFile(file, png);
+    console.log(`  · ${ebene.name}-${rotation}.png (${width}x${height}, ${png.length} Bytes)`);
+  }
 }
 
 await browser.close();

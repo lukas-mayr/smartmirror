@@ -2,14 +2,18 @@
 #
 # Sorgt dafuer, dass beim Booten der Spiegel zu sehen ist und nicht der Pi.
 #
-# Drei Dinge, die alle ausserhalb des Releases liegen und die ein Update
+# Vier Dinge, die alle ausserhalb des Releases liegen und die ein Update
 # deshalb sonst nie erreichen wuerde:
 #
-#   1. Das Regenbogenquadrat der Firmware abschalten (config.txt).
+#   1. Das Regenbogenquadrat der Firmware abschalten und den Moduswechsel
+#      zwischen Firmware und Kernel vermeiden, ueber den der Bildschirm mit
+#      seinem blauen "kein Signal" stolpert (config.txt).
 #   2. Die Textkonsole auf ein Terminal legen, das nie angezeigt wird
 #      (cmdline.txt und die Anmeldeaufforderung).
 #   3. Plymouth mit dem Wortzeichen des Spiegels bestuecken, damit in den
-#      zwanzig Sekunden bis zur Anzeige nicht nur Schwarz dasteht.
+#      vierzig Sekunden bis zur Anzeige nicht nur Schwarz dasteht.
+#   4. Das Startabbild neu bauen, damit dieses Wortzeichen schon dann steht,
+#      wenn Plymouth aus dem initramfs startet - und nicht erst danach.
 #
 # Warum das ein Dienst ist und nicht nur ein Teil des Installers: ein Spiegel
 # haengt an der Wand, oft ohne dass jemand kurzfristig per SSH drankommt. Wer
@@ -64,17 +68,49 @@ lies_drehung() {
 
 # ------------------------------------------------------------------- config.txt
 
+letzter_wert() {
+  # Die Firmware liest die Datei von oben nach unten, die letzte Zuweisung
+  # gewinnt. Auskommentiertes zaehlt nicht mit.
+  #
+  # Genau genommen gilt das nur innerhalb der Abschnitte, die auf das Modell
+  # passen - eine Zeile unter [pi4] zaehlt auf einem Pi 5 nicht. Fuer das, was
+  # hier davon abhaengt, reicht die einfache Lesart trotzdem: gefragt wird, ob
+  # der Block weiter unten schon steht, den dieses Skript selbst anhaengt.
+  grep -E "^[[:space:]]*$1=" "$CONFIG_TXT" 2>/dev/null | tail -1 \
+    | sed -E "s/^[[:space:]]*$1=//" | tr -d '[:space:]'
+}
+
 setze_config_txt() {
   [[ -f "$CONFIG_TXT" ]] || { log "Keine $CONFIG_TXT - uebersprungen."; return; }
 
+  local fehlend=()
+
   # Das Regenbogenquadrat der Firmware ist das erste Bild nach dem Einschalten
   # und die einzige grosse helle Flaeche im ganzen Startvorgang.
-  grep -qE '^[[:space:]]*disable_splash=1' "$CONFIG_TXT" && return 0
+  [[ "$(letzter_wert disable_splash)" == '1' ]] || fehlend+=('disable_splash=1')
 
-  # Ans Ende, aber mit eigenem [all]-Abschnitt davor. Ohne den koennte die
-  # Zeile hinter einem Filter wie [pi4] landen und gaelte dann nur fuer ein
+  # Und der blaue Hinweis des Bildschirms mitten im Start.
+  #
+  # Raspberry Pi OS setzt disable_fw_kms_setup=1. Die Firmware richtet die
+  # Anzeige dann nicht ein, der Kernel tut es Sekunden spaeter selbst - und
+  # dazwischen liegt ein Moduswechsel. Fuer den Bildschirm heisst das: Signal
+  # weg, eigenes Menue an ("kein Signal", blau), Signal wieder da. Mitten im
+  # Startbildschirm ist das das Auffaelligste am ganzen Vorgang.
+  #
+  # Mit 0 stellt die Firmware den Modus ein und der Kernel uebernimmt ihn
+  # unveraendert. Es gibt keinen Wechsel mehr, ueber den der Bildschirm
+  # stolpern koennte, und das Bild steht durchgehend.
+  [[ "$(letzter_wert disable_fw_kms_setup)" == '0' ]] || fehlend+=('disable_fw_kms_setup=0')
+
+  (( ${#fehlend[@]} > 0 )) || return 0
+
+  # Ans Ende, aber mit eigenem [all]-Abschnitt davor. Ohne den koennten die
+  # Zeilen hinter einem Filter wie [pi4] landen und gaelten dann nur fuer ein
   # Modell - ein Fehler, den man erst am fertig aufgehaengten Spiegel sieht.
-  printf '\n# Smartmirror: kein Regenbogenquadrat beim Start\n[all]\ndisable_splash=1\n' >> "$CONFIG_TXT"
+  {
+    printf '\n# Smartmirror: kein Regenbogenquadrat, kein Moduswechsel beim Start\n[all]\n'
+    printf '%s\n' "${fehlend[@]}"
+  } >> "$CONFIG_TXT"
   merke 'config.txt'
 }
 
@@ -212,9 +248,20 @@ setze_plymouth_thema() {
 
   local drehung
   drehung="$(lies_drehung)"
-  local quelle="$THEME_SOURCE/splash-$drehung.png"
-  [[ -f "$quelle" ]] || quelle="$THEME_SOURCE/splash-0.png"
-  [[ -f "$quelle" ]] || { log "Kein Bild fuer den Startbildschirm gefunden."; return 0; }
+
+  # Die vier Ebenen des Wortzeichens: das Wort und die drei Punkte einzeln,
+  # damit das Thema die Punkte atmen lassen kann, ohne das Wort mitzunehmen.
+  # Jede liegt fertig gedreht bei; das Thema legt sie mittig uebereinander.
+  local ebenen=(mark dot1 dot2 dot3) ebene
+  for ebene in "${ebenen[@]}"; do
+    # Fehlt auch nur eine Fassung fuer diese Drehung, gilt fuer alle die quere:
+    # ein halb gedrehtes Wortzeichen waere schlimmer als ein gerades.
+    [[ -f "$THEME_SOURCE/$ebene-$drehung.png" ]] || { drehung=0; break; }
+  done
+  for ebene in "${ebenen[@]}"; do
+    [[ -f "$THEME_SOURCE/$ebene-$drehung.png" ]] \
+      || { log "Kein Bild fuer den Startbildschirm gefunden."; return 0; }
+  done
 
   mkdir -p "$THEME_DIR"
   local geaendert='nein' datei
@@ -224,14 +271,19 @@ setze_plymouth_thema() {
       geaendert='ja'
     fi
   done
-  if ! cmp -s "$quelle" "$THEME_DIR/splash.png"; then
-    install -m 0644 "$quelle" "$THEME_DIR/splash.png"
-    geaendert='ja'
-  fi
+  for ebene in "${ebenen[@]}"; do
+    if ! cmp -s "$THEME_SOURCE/$ebene-$drehung.png" "$THEME_DIR/$ebene.png"; then
+      install -m 0644 "$THEME_SOURCE/$ebene-$drehung.png" "$THEME_DIR/$ebene.png"
+      geaendert='ja'
+    fi
+  done
+  # Bis Version 0.19 lag hier ein einziges Bild. Bleibt es liegen, verwirrt es
+  # nur den, der spaeter in das Verzeichnis sieht.
+  rm -f "$THEME_DIR/splash.png"
 
-  # Das Thema auch wirklich einschalten. plymouth-set-default-theme baut auf
-  # Systemen mit initramfs zusaetzlich das Abbild neu; auf Raspberry Pi OS Lite
-  # gibt es keins, dann ist es nur ein Symlink.
+  # Das Thema auch wirklich einschalten. Ohne Argument gibt der Befehl nur aus,
+  # was gerade gilt; das Setzen ist ein Symlink auf die .plymouth-Datei. Um das
+  # Startabbild kuemmert sich erneuere_initramfs weiter unten.
   if [[ "$(plymouth-set-default-theme 2>/dev/null || true)" != 'smartmirror' ]]; then
     plymouth-set-default-theme smartmirror >/dev/null 2>&1 \
       && geaendert='ja' \
@@ -261,7 +313,68 @@ setze_plymouth_thema() {
   fi
 
   [[ "$geaendert" == 'ja' ]] && merke "Plymouth-Thema (Drehung ${drehung}°)"
+
+  # Und einmal aufschreiben, was tatsaechlich gilt. Wenn beim Booten etwas
+  # anderes zu sehen ist als das Wortzeichen, ist das die erste Frage – und die
+  # einzige Stelle, an der sie sich ohne Bildschirm beantworten laesst, ist
+  # "journalctl -u mirror-bootlook".
+  log "Plymouth-Thema in Betrieb: $(plymouth-set-default-theme 2>/dev/null || echo unbekannt)"
   return 0
+}
+
+# ------------------------------------------------------------------- initramfs
+
+# Das Thema muss ins Startabbild, sonst ist es nie zu sehen.
+#
+# Raspberry Pi OS baut seit Bookworm ein initramfs (auto_initramfs=1). Plymouth
+# startet daraus - lange bevor das Wurzeldateisystem eingehaengt ist - und
+# behaelt fuer den ganzen Start das Thema, das beim Bauen des Abbilds
+# hineinkopiert wurde. Ein Thema, das nur unter /usr/share/plymouth liegt,
+# kommt deshalb nie auf den Bildschirm: zu sehen ist bis zum Schluss das, was
+# im Abbild steht - auf einem frischen Pi das Vorgefundene der Distribution.
+#
+# Genau das ist der Grund, warum beim Booten die Punkte einer fremden Anzeige
+# standen und das Wortzeichen erst am Ende kam, als die Anzeige selbst zeichnete.
+
+initramfs_im_einsatz() {
+  compgen -G "$BOOT_DIR/initramfs*" >/dev/null && return 0
+  compgen -G "$BOOT_DIR/initrd.img*" >/dev/null && return 0
+  [[ -f "$CONFIG_TXT" ]] \
+    && grep -qE '^[[:space:]]*(auto_initramfs=1|initramfs[[:space:]])' "$CONFIG_TXT"
+}
+
+thema_fingerabdruck() {
+  # Ueber den Inhalt und nicht ueber Zeitstempel: der Updater legt bei jedem
+  # Release neue Dateien an, gleich ob sich am Wortzeichen etwas geaendert hat.
+  # Waere die Zeit das Mass, baute der Spiegel bei jedem Update ein Abbild neu,
+  # das er nicht braucht.
+  cat "$THEME_DIR"/smartmirror.plymouth "$THEME_DIR"/smartmirror.script "$THEME_DIR"/*.png 2>/dev/null \
+    | sha256sum 2>/dev/null | cut -d' ' -f1
+}
+
+erneuere_initramfs() {
+  [[ "$PLYMOUTH_STATE" != 'missing' ]] || return 0
+  command -v update-initramfs >/dev/null 2>&1 || return 0
+  initramfs_im_einsatz || return 0
+
+  local fingerabdruck stempel="$DATA_DIR/.bootlook-initramfs"
+  fingerabdruck="$(thema_fingerabdruck)"
+  # Ohne Fingerabdruck liesse sich nicht sagen, wann es genug ist - dann lieber
+  # nichts tun, als bei jedem Start ein Abbild neu zu bauen.
+  [[ -n "$fingerabdruck" ]] || { log "Fingerabdruck des Themas nicht zu bilden."; return 0; }
+  [[ -f "$stempel" && "$(cat "$stempel" 2>/dev/null)" == "$fingerabdruck" ]] && return 0
+
+  log "Startabbild neu bauen, damit das Wortzeichen von Anfang an steht ..."
+  # Grosszuegig, aber nicht unbegrenzt: auf einem Pi dauert das eine halbe
+  # Minute. Haengt es, soll der Dienst trotzdem irgendwann fertig werden.
+  if timeout 300 update-initramfs -u >/dev/null 2>&1; then
+    printf '%s' "$fingerabdruck" > "$stempel"
+    merke 'Startabbild (initramfs)'
+  else
+    # Kein Abbruch: alles andere wirkt weiterhin, nur die erste Sekunde des
+    # Starts zeigt dann noch das alte Bild.
+    log "update-initramfs schlug fehl - der Start zeigt bis zum Wurzeldateisystem das alte Bild."
+  fi
 }
 
 # ----------------------------------------------------------------------- Bericht
@@ -339,6 +452,7 @@ setze_cmdline_txt
 setze_getty
 hole_plymouth
 setze_plymouth_thema
+erneuere_initramfs
 schreibe_status
 
 if (( ${#CHANGED[@]} > 0 )); then
