@@ -1,8 +1,11 @@
 import { html, render, nothing } from 'lit';
 import { keyed } from 'lit/directives/keyed.js';
 import { activeNotifications, defineFrontend, type ModuleView } from '@mirror/sdk';
+import { icon } from '@mirror/icons';
 import {
   ADVANCE_SECONDS,
+  feedDescription,
+  feedIcon,
   fitCount,
   restOpacity,
   slotCount,
@@ -110,6 +113,17 @@ export default defineFrontend<NotificationsState, NotificationsConfig>({
             <div class="feed__list">
               ${window.map((item, index) => {
                 const lead = index === 0;
+                const description = feedDescription(item);
+                /*
+                 * Eine Zeile: Symbol, Titel, Beschreibung.
+                 *
+                 * Das Symbol steht vorn und in fester Breite, damit die Titel
+                 * alle an derselben Kante beginnen — eine Liste mit einer Kante
+                 * liest man im Vorbeigehen, eine ohne muss man zeilenweise
+                 * abtasten. Es traegt die Herkunft, die frueher als Wort in
+                 * Versalien ueber dem Titel stand: eine Zeile weniger je
+                 * Eintrag, und erkannt ist es schneller als gelesen.
+                 */
                 const body = html`
                   <div
                     class="feed__item ${lead ? 'feed__item--lead' : 'feed__item--rest'} ${lead &&
@@ -118,9 +132,13 @@ export default defineFrontend<NotificationsState, NotificationsConfig>({
                       : ''}"
                     style=${lead ? nothing : `opacity:${restOpacity(index, rest)}`}
                   >
-                    ${item.label ? html`<span class="feed__label">${item.label}</span>` : nothing}
-                    <span class="feed__title">${item.title}</span>
-                    ${item.meta ? html`<span class="feed__meta">${item.meta}</span>` : nothing}
+                    <span class="feed__icon">${icon(feedIcon(item), { size: '1em' })}</span>
+                    <span class="feed__body">
+                      <span class="feed__title">${item.title}</span>
+                      ${description
+                        ? html`<span class="feed__desc">${description}</span>`
+                        : nothing}
+                    </span>
                   </div>
                 `;
                 /*

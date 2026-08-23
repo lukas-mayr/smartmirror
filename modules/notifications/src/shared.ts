@@ -1,12 +1,19 @@
 import { FEED, type FeedNotification } from '@mirror/sdk';
+import type { IconName } from '@mirror/icons';
 
 /**
  * Der Mitteilungsfeed.
  *
- * Er zeigt eine Mitteilung gross und mit Flaeche und darunter so viele als
- * Ausblick, wie in den Block passen. Damit liest man aus 3 m nur die oberste
- * Zeile und weiss trotzdem, dass mehr wartet — der Rest ist kein Text, den man
- * lesen soll, sondern die Auskunft "da kommt noch was".
+ * Eine Mitteilung ist eine Zeile: Symbol, Titel, Beschreibung. Die oberste
+ * traegt die Flaeche, die darunter stehen frei und nach unten hin blasser —
+ * damit liest man aus 3 m nur die oberste Zeile und weiss trotzdem, dass mehr
+ * wartet.
+ *
+ * Die Zeile ist bewusst schmal gesetzt. Ein Mitteilungsblock ist kein Wert,
+ * fuer den man hinsieht, sondern eine Liste, die man ueberfliegt: sie steht
+ * naeher an den Wochentagen der Wettervorschau als an der Temperatur darueber.
+ * Das Symbol traegt, was frueher eine eigene Zeile in Versalien war — woher
+ * die Mitteilung kommt, erkennt man daran schneller als an dem Wort "Termin".
  *
  * Dieses Modul ist eine Flaeche und keine Quelle. Es holt nichts: was eine
  * Mitteilung ist, weiss der Kalender, das Wetter oder die Abfahrtstafel, und
@@ -114,6 +121,48 @@ export function parseEntries(entries: string): FeedNotification[] {
     .split('\n')
     .map((line, index) => parseEntry(line, index))
     .filter((entry): entry is FeedNotification => entry !== null);
+}
+
+/**
+ * Das Symbol, das eine Mitteilung traegt.
+ *
+ * Es kommt aus der Quelle und nicht aus der Mitteilung: ein Modul meldet, was
+ * es zu sagen hat, und nicht, wie es aussehen soll — sonst haette jede Quelle
+ * eine Meinung zur Gestaltung des Feeds, und der Block saehe je nach
+ * Absender anders aus. Wer hier nicht steht, bekommt die Glocke; das ist kein
+ * Notbehelf, sondern die richtige Auskunft fuer "eine Mitteilung, sonst weiss
+ * ich nichts".
+ *
+ * Dringendes bekommt das Warndreieck, egal woher es kommt. Es ist die eine
+ * Auszeichnung, die vor der Herkunft kommt: bei einer Sturmwarnung ist das
+ * Dringende die Nachricht und die Wolke nur die Adresse.
+ */
+const SOURCE_ICONS: Readonly<Record<string, IconName>> = {
+  calendar: 'calendar-days',
+  weather: 'cloud',
+  sbb: 'train-front',
+  spotify: 'music',
+  notifications: 'bell',
+};
+
+export function feedIcon(item: Pick<FeedNotification, 'source' | 'urgent'>): IconName {
+  if (item.urgent) return 'triangle-alert';
+  return SOURCE_ICONS[item.source] ?? 'bell';
+}
+
+/**
+ * Die Beschreibung unter dem Titel.
+ *
+ * Herkunft und Zusatz stehen in einer Zeile und nicht mehr in zweien:
+ * "Termin · 09:30 · Kueche" ist eine Auskunft, "TERMIN" darueber und "09:30 ·
+ * Kueche" darunter sind zwei Zeilen fuer dieselbe. Die Zeile darf fehlen —
+ * eine Mitteilung ohne Zusatz ist ein Titel und kein halber Eintrag.
+ */
+export function feedDescription(item: Pick<FeedNotification, 'label' | 'meta'>): string {
+  return [item.label, item.meta]
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0)
+    .join(' · ');
 }
 
 /**

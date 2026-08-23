@@ -289,13 +289,21 @@ export const MOTION = {
 /* ------------------------------ Mitteilungsfeed ---------------------------- */
 
 /**
- * Der Feed zeigt eine Mitteilung gross und darunter so viele als Ausblick, wie
+ * Der Feed zeigt eine Mitteilung oben und darunter so viele als Ausblick, wie
  * in den Block passen.
  *
- * Die oberste traegt die Flaeche und die volle Groesse, die darunter stehen
- * frei und nach unten hin blasser. Damit liest man aus 3 m nur die oberste
- * Zeile und weiss trotzdem, dass mehr wartet. Ein leerer Feed heisst leere
- * Hauptzone – kein "Keine Mitteilungen".
+ * Eine Mitteilung ist eine schmale Zeile: Symbol, Titel, Beschreibung. Die
+ * oberste traegt die Flaeche, die darunter stehen frei und nach unten hin
+ * blasser. Damit liest man aus 3 m nur die oberste Zeile und weiss trotzdem,
+ * dass mehr wartet. Ein leerer Feed heisst leere Hauptzone – kein "Keine
+ * Mitteilungen".
+ *
+ * Die Masse sind bewusst klein. Bis 0.13 stand die oberste Mitteilung in 72 px
+ * auf 232 px Hoehe – das ist die Groesse eines Wertes, und eine Mitteilung ist
+ * keiner: man sieht nicht hin, um sie abzulesen, man ueberfliegt sie. Der
+ * Titel liegt jetzt bei den kleinen Stufen, naeher an den Wochentagen der
+ * Wettervorschau als an der Temperatur darueber – und in dieselbe Hauptzone
+ * passt statt dreien eine ganze Liste.
  *
  * Wieviele Positionen es sind, steht bewusst nicht hier: das entscheidet die
  * Blockhoehe. Eine feste Zahl waere in einem hohen Block eine halbleere Liste
@@ -316,9 +324,9 @@ export const FEED = {
   /** Wie lange, bis die Liste eine Position nachrueckt. */
   advance: 3400,
   /** Hoehe der obersten Position in Pixeln. */
-  itemHeight: 232,
+  itemHeight: 84,
   /** Hoehe jeder weiteren. */
-  itemHeightRest: 148,
+  itemHeightRest: 64,
   /**
    * Anteil der Blockhoehe, den eine Position hoechstens einnimmt.
    *
@@ -328,12 +336,20 @@ export const FEED = {
    * besetzen darf – rechnete sie anders als das Stylesheet legt, waere die
    * unterste Zeile mal angeschnitten und mal fehlte eine.
    */
-  itemShare: 0.3,
-  itemShareRest: 0.19,
-  gap: 32,
+  itemShare: 0.12,
+  itemShareRest: 0.09,
+  /**
+   * Abstand zwischen zwei Zeilen.
+   *
+   * Die Haelfte des Blockabstands: zwischen zwei Bloecken trennt der Abstand
+   * zwei Themen, zwischen zwei Zeilen desselben Blocks nur zwei Zeilen. Auf
+   * dem vollen Rasterabstand fiele eine Liste in lauter Einzelmeldungen
+   * auseinander.
+   */
+  gap: 16,
   /** Schriftgroesse des Titels oben bzw. auf den Ausblick-Positionen. */
-  titleSize: 72,
-  titleSizeRest: 56,
+  titleSize: 30,
+  titleSizeRest: 26,
   /**
    * Deckkraft der Ausblick-Positionen: die erste darunter, die unterste.
    *

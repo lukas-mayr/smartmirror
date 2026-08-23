@@ -2,7 +2,7 @@
   "id": "notifications",
   "name": "Mitteilungen",
   "version": "0.1.0",
-  "description": "Die Flaeche fuer Mitteilungen: die oberste gross und mit Flaeche, darunter so viele als Ausblick, wie in den Block passen. Den Inhalt melden die anderen Module — dazu feste Zeilen aus den Einstellungen und alles, was per Kommando hereinkommt.",
+  "description": "Die Flaeche fuer Mitteilungen: je eine schmale Zeile aus Symbol, Titel und Beschreibung, die oberste mit Flaeche, darunter so viele als Ausblick, wie in den Block passen. Den Inhalt melden die anderen Module — dazu feste Zeilen aus den Einstellungen und alles, was per Kommando hereinkommt.",
   "author": "smartmirror",
   "singleton": true,
   "sizes": [

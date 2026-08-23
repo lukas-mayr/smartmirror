@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  feedDescription,
+  feedIcon,
   fitCount,
   parseEntries,
   parseEntry,
@@ -116,11 +118,11 @@ test('gibt fuer eine leere Liste nichts zurueck', () => {
 /* --------------------------------- Plaetze -------------------------------- */
 
 test('fuellt einen hohen Block mit mehr Positionen als einen flachen', () => {
-  // Dieselbe Rechnung wie im Stylesheet: oben 232 px, darunter je 148 px plus
-  // 32 px Abstand.
-  assert.equal(fitCount(726, 800), 3);
-  assert.equal(fitCount(1400, 1400), 7);
-  assert.ok(fitCount(400, 400) < fitCount(900, 900));
+  // Dieselbe Rechnung wie im Stylesheet: oben 84 px, darunter je 64 px plus
+  // 16 px Abstand.
+  assert.equal(fitCount(244, 800), 3);
+  assert.equal(fitCount(500, 800), 6);
+  assert.ok(fitCount(200, 400) < fitCount(900, 900));
 });
 
 test('gibt auch ohne brauchbares Mass noch die oberste Position her', () => {
@@ -135,10 +137,16 @@ test('schneidet keine Position an', () => {
   // Eine halbe Zeile am unteren Rand liest sich als Fehler und nicht als
   // Ausblick: was nicht ganz hineinpasst, wird nicht gezeigt.
   const block = 1000;
-  const lead = Math.min(232, block * 0.3);
-  const row = Math.min(148, block * 0.19);
-  const list = lead + 2 * (row + 32) + row / 2;
+  const lead = Math.min(84, block * 0.12);
+  const row = Math.min(64, block * 0.09);
+  const list = lead + 2 * (row + 16) + row / 2;
   assert.equal(fitCount(list, block), 3);
+});
+
+test('zeigt in derselben Hauptzone mehr Zeilen als die klobige Fassung', () => {
+  // Der ganze Zweck der schmalen Zeile: eine Hauptzone von 1060 px fasste mit
+  // 232-px-Zeilen drei Mitteilungen, jetzt ist sie voll besetzt.
+  assert.equal(fitCount(1060, 1060), VISIBLE_MAX);
 });
 
 test('haelt sich an die Obergrenze aus dem Design-System', () => {
@@ -170,4 +178,42 @@ test('laesst eine einzelne Ausblick-Position hell', () => {
   // Sie ist die erste darunter und nicht die letzte – als "letzte" fiele sie
   // sofort auf den blassesten Wert.
   assert.equal(restOpacity(1, 1), 0.8);
+});
+
+/* --------------------------------- Zeile ---------------------------------- */
+
+test('gibt jeder Quelle ihr Symbol', () => {
+  // Die Herkunft steht nicht mehr als Wort ueber dem Titel, sondern als
+  // Symbol davor.
+  assert.equal(feedIcon(item('a', { source: 'calendar' })), 'calendar-days');
+  assert.equal(feedIcon(item('a', { source: 'sbb' })), 'train-front');
+  assert.equal(feedIcon(item('a', { source: 'weather' })), 'cloud');
+  assert.equal(feedIcon(item('a', { source: 'spotify' })), 'music');
+  assert.equal(feedIcon(item('a', { source: 'notifications' })), 'bell');
+});
+
+test('gibt einer unbekannten Quelle die Glocke', () => {
+  // Kein Notbehelf: "eine Mitteilung, sonst weiss ich nichts" ist genau das,
+  // was eine Glocke sagt.
+  assert.equal(feedIcon(item('a', { source: 'irgendwas' })), 'bell');
+});
+
+test('stellt das Warndreieck vor die Herkunft', () => {
+  // Bei einer Sturmwarnung ist das Dringende die Nachricht und die Wolke nur
+  // die Adresse.
+  assert.equal(feedIcon(item('a', { source: 'weather', urgent: true })), 'triangle-alert');
+});
+
+test('legt Herkunft und Zusatz in eine Zeile', () => {
+  assert.equal(
+    feedDescription({ label: 'Termin', meta: '09:30 · Kueche' }),
+    'Termin · 09:30 · Kueche',
+  );
+});
+
+test('laesst die Beschreibung weg, wo nichts steht', () => {
+  // Eine Mitteilung ohne Zusatz ist ein Titel und keine halbe Zeile.
+  assert.equal(feedDescription({ label: '', meta: '' }), '');
+  assert.equal(feedDescription({ label: 'Termin', meta: '' }), 'Termin');
+  assert.equal(feedDescription({ label: '  ', meta: '09:30' }), '09:30');
 });
