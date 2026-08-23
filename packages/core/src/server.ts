@@ -24,6 +24,7 @@ import {
   type MirrorConfig,
   type PairedDevice,
   type PairingState,
+  type RestartScope,
   type ServerMessage,
   type Viewport,
   type Zone,
@@ -37,6 +38,7 @@ import type { SecretStore } from './secrets.js';
 import type { UpdateBridge } from './update-bridge.js';
 import { createLogger } from './logger.js';
 import { appVersion, remoteDistDir } from './paths.js';
+import { requestRestart } from './system-bridge.js';
 
 const log = createLogger('server');
 
@@ -799,6 +801,17 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
       case 'admin:applyUpdate':
         await deps.updates.requestApply(message.version);
         return;
+
+      case 'admin:restart': {
+        // Enger Wertebereich, obwohl der Absender angemeldet ist: was hier
+        // durchkommt, landet in einer Datei, die ein Root-Dienst liest.
+        const scopes: RestartScope[] = ['services', 'device'];
+        if (!scopes.includes(message.scope)) {
+          return fail(client, 'bad-request', `Unbekannter Neustart "${String(message.scope)}"`);
+        }
+        await requestRestart(message.scope);
+        return;
+      }
 
       default:
         return fail(client, 'bad-request', `Unbekannte Nachricht "${(message as { t: string }).t}"`);

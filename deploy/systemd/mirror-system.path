@@ -1,0 +1,30 @@
+[Unit]
+Description=Fuehrt Neustarts aus, die die Handy-App anfordert
+After=mirror-core.service
+
+[Path]
+# Der Core schreibt diese Datei, wenn in der App "Anzeige neu starten" oder
+# "Spiegel neu starten" gedrueckt wird. systemd startet daraufhin den Dienst,
+# der es ausfuehrt.
+#
+# Derselbe Umweg wie beim Updater und aus demselben Grund: der Core laeuft
+# unprivilegiert und darf weder Dienste neu starten noch das Geraet booten –
+# polkit quittiert jeden Versuch mit "Interactive authentication required".
+# Ihm das Recht zu geben hiesse, dem einzigen ans Netz gebundenen Dienst
+# Kontrolle ueber das Geraet zu geben. Eine Datei zu schreiben, die er ohnehin
+# schreiben darf, reicht.
+#
+# PathExists und nicht PathChanged: die Datei entsteht durch Umbenennen einer
+# Temporaerdatei (atomares Schreiben), und mirror-system.sh loescht sie zu
+# Beginn wieder. Damit ist ihre blosse Existenz das Signal, und das Loeschen
+# schaerft den Ausloeser fuer das naechste Mal.
+#
+# Dass sie auch beim Booten gefunden werden kann, ist eingeplant: nach einem
+# Stromausfall mitten im Auftrag laege sie noch da. mirror-system.sh verwirft
+# deshalb alles, was aelter als zwei Minuten ist – sonst startete sich der
+# Spiegel beim Booten endlos selbst neu.
+PathExists=/opt/smartmirror/data/system-request.json
+Unit=mirror-system.service
+
+[Install]
+WantedBy=paths.target

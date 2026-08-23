@@ -18,11 +18,17 @@ Drei Prozesse, bewusst getrennt:
 |---|---|---|
 | **Core** | `mirror-core.service` | Node/Fastify. Modul-Backends, Zustand, WebSocket-Bus, Konfiguration, liefert die Handy-App aus. Läuft unprivilegiert. |
 | **Anzeige** | `mirror-shell.service` | Electron unter [`cage`](https://github.com/cage-kiosk/cage), einem Wayland-Compositor für genau ein Fenster. Kein Desktop, keine Browser-Bedienelemente. |
-| **Updater** | `mirror-updater.service` + `.timer` + `.path` | Prüft GitHub Releases, verifiziert Signaturen, tauscht Symlinks, rollt bei fehlgeschlagenem Healthcheck zurück. Einziger Teil mit Root-Rechten. Der Timer prüft regelmäßig, die Path-Unit startet ihn sofort, wenn die App darum bittet. |
+| **Updater** | `mirror-updater.service` + `.timer` + `.path` | Prüft GitHub Releases, verifiziert Signaturen, tauscht Symlinks, rollt bei fehlgeschlagenem Healthcheck zurück. Der Timer prüft regelmäßig, die Path-Unit startet ihn sofort, wenn die App darum bittet. |
+| **Neustart** | `mirror-system.service` + `.path` | Startet auf Anforderung aus der App die Dienste neu oder bootet das Gerät. Kennt genau diese zwei Aufträge. |
 
 Der Updater ist ein eigener Dienst, weil er genau die Dateien ersetzt, aus
 denen der Core läuft, und ihn danach neu startet — im selben Prozess würde er
 sich selbst unter den Füßen wegziehen.
+
+Die beiden letzten sind die einzigen Teile mit Root-Rechten, und beide werden
+über eine Datei angestoßen statt über einen Aufruf: der Core läuft
+unprivilegiert und soll das auch bleiben (siehe
+[Neustart aus der Handy-App](#neustart-aus-der-handy-app)).
 
 ```
 packages/
@@ -40,7 +46,7 @@ modules/
   calendar/      ICS-Kalender (iCloud, Gemeinde, Schule), Zeitraum einstellbar
   sbb/           Abfahrten einer Haltestelle, von der Fahrplanauskunft search.ch
   notifications/ Die Fläche für Mitteilungen; den Inhalt melden die Module
-deploy/      systemd-Units, Compositor-Start, Installer, Drehung
+deploy/      systemd-Units, Compositor-Start, Installer, Drehung, Neustart
 scripts/     Build-, Bundle- und Generator-Skripte
 ```
 
@@ -883,6 +889,47 @@ systemctl restart mirror-shell        # nur die Anzeige neu starten
 Der Spiegel bleibt bei Verbindungsverlust bewusst ruhig: kleiner Hinweis unten
 rechts statt Fehlerseite. Während eines Updates ist der Core einige Sekunden
 weg — das ist kein Zustand, der Aufmerksamkeit verdient.
+
+### Neustart aus der Handy-App
+
+Ein Spiegel hängt an der Wand, oft im Bad, und hat weder Tastatur noch Knopf.
+Wenn etwas klemmt, ist die Frage nicht, *ob* man neu startet, sondern womit man
+das ohne Leiter und Laptop tut. Unter **System → Neustart** stehen dafür zwei
+Stufen:
+
+- **Anzeige neu starten** — Core und Anzeige. Nach ein paar Sekunden ist der
+  Spiegel wieder da, Einstellungen und Kopplungen bleiben. Das ist der Griff für
+  eine Anzeige, die hängt oder ein Modul, das nicht mehr zeichnet.
+- **Spiegel neu starten** — das ganze Gerät, etwa eine Minute. Der Griff, wenn
+  auch die kleinere Stufe nichts geändert hat: Netzwerk, Grafiktreiber, alles
+  unterhalb der Software des Spiegels.
+
+Die kleinere Stufe steht oben, weil sie die größere fast immer erspart. Beide
+fragen einmal nach — nicht weil ein Neustart Schaden anrichtet, sondern weil er
+dauert: wer im Bad steht und die Uhrzeit lesen will, hat keine Minute Zeit für
+einen Fehlgriff.
+
+**Warum das nicht einfach `systemctl` aufruft.** Der Core läuft unprivilegiert.
+Ein `systemctl restart` von dort beantwortet polkit mit „Interactive
+authentication required", und ihm das Recht zu geben hieße, dem einzigen ans
+Netz gebundenen Dienst Kontrolle über das Gerät zu geben. Stattdessen schreibt
+er eine Auftragsdatei, `mirror-system.path` sieht sie, und
+`mirror-system.service` führt sie als root aus — derselbe Umweg wie beim Knopf
+„Jetzt prüfen", und aus demselben Grund. Das Skript dahinter
+(`deploy/mirror-system.sh`) kennt genau zwei Aufträge und lehnt alles andere ab.
+
+Ein Detail, das nicht wie eines aussieht: der Auftrag trägt einen Zeitstempel
+und gilt nur zwei Minuten. Ohne diese Grenze würde ein Stromausfall zwischen
+Schreiben und Ausführen zur Endlosschleife — die Datei läge beim nächsten Start
+noch da, die Path-Unit löste sofort wieder aus, und der Spiegel startete sich
+beim Booten immer wieder selbst neu.
+
+Über SSH geht beides weiterhin von Hand:
+
+```bash
+sudo systemctl restart mirror-core mirror-shell
+sudo reboot
+```
 
 ### Stecker ziehen
 

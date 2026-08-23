@@ -1,0 +1,26 @@
+[Unit]
+Description=Smartmirror Neustart (Dienste oder Geraet, angefordert aus der Handy-App)
+
+[Service]
+Type=oneshot
+# Laeuft als root, weil er Dienste neu startet und das Geraet booten koennen
+# muss. Das Skript ist deshalb bewusst klein und kennt genau zwei Auftraege.
+User=root
+Environment=MIRROR_DATA_DIR=/opt/smartmirror/data
+ExecStart=/bin/bash /opt/smartmirror/current/deploy/mirror-system.sh
+
+# Ueber /bin/bash und nicht direkt: das Ausfuehrungsrecht am Skript im Release
+# haengt daran, wie das Archiv entpackt wurde. Der Aufruf ueber die Shell ist
+# davon unabhaengig – dieselbe Ueberlegung wie bei mirror-guard.service.
+
+# "restart mirror-core mirror-shell" wartet, bis beide wieder stehen. Laenger
+# als eine Minute darf das nicht dauern; danach ist ohnehin etwas anderes kaputt
+# als das, was ein Neustart richtet.
+TimeoutStartSec=90
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mirror-system
+
+# Kein [Install]: gestartet wird dieser Dienst ausschliesslich von
+# mirror-system.path, nie beim Booten.

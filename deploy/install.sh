@@ -357,7 +357,7 @@ log "Release $BUNDLE_VERSION nach $TARGET installieren"
 rm -rf "$TARGET"
 mkdir -p "$TARGET"
 cp -a "$STAGING/." "$TARGET/"
-chmod +x "$TARGET/deploy/cage-session.sh" "$TARGET/deploy/rotate.sh" 2>/dev/null || true
+chmod +x "$TARGET/deploy/cage-session.sh" "$TARGET/deploy/rotate.sh" "$TARGET/deploy/mirror-system.sh" 2>/dev/null || true
 chmod +x "$TARGET/shell/smartmirror-shell" 2>/dev/null || true
 
 # Electrons Sandbox-Helfer braucht setuid-root, sonst startet die Anwendung mit
@@ -546,11 +546,14 @@ systemctl daemon-reload
 # Die .path-Unit ist der Knopf "Jetzt pruefen" in der Handy-App: der Core kann
 # den Updater nicht selbst starten (unprivilegiert), also loest die Datei aus,
 # die er schreibt. Der Timer bleibt die regelmaessige Pruefung.
-systemctl enable mirror-guard.service mirror-core.service mirror-shell.service mirror-updater.timer mirror-updater.path >/dev/null
+# mirror-system.path gehoert dazu: ohne sie bleiben die Neustart-Knoepfe in der
+# App wirkungslos – der Core schreibt seine Auftragsdatei, und niemand liest sie.
+systemctl enable mirror-guard.service mirror-core.service mirror-shell.service mirror-updater.timer mirror-updater.path mirror-system.path >/dev/null
 systemctl restart mirror-core.service
 systemctl restart mirror-shell.service
 systemctl start mirror-updater.timer
 systemctl start mirror-updater.path
+systemctl start mirror-system.path
 
 # --------------------------------- Abschluss ----------------------------------
 
