@@ -8,19 +8,24 @@
 set -euo pipefail
 
 APP="/opt/smartmirror/current/shell/smartmirror-shell"
-CORE_URL="${MIRROR_CORE_URL:-http://127.0.0.1:8080}"
 
 if [[ ! -x "$APP" ]]; then
   echo "Anzeige-Anwendung nicht gefunden: $APP" >&2
   exit 1
 fi
 
-# Auf den Core warten, bevor das Fenster aufgeht: sonst zeigt der Spiegel beim
-# Booten fuer ein paar Sekunden den Verbindungshinweis.
-for _ in $(seq 1 30); do
-  if curl -sf --max-time 2 "$CORE_URL/healthz" >/dev/null 2>&1; then break; fi
-  sleep 1
-done
+# Nicht auf den Core warten.
+#
+# Hier stand eine Schleife, die bis zu 30 Sekunden auf /healthz wartete, damit
+# der Spiegel beim Booten nicht kurz "keine Verbindung" zeigt. Genau diese halbe
+# Minute war aber das Fenster, in dem stattdessen die Textkonsole zu sehen war:
+# Kernel-Meldungen und die Anmeldeaufforderung, hinter halbdurchlaessigem Glas
+# das Auffaelligste am ganzen Geraet.
+#
+# Jetzt geht die Anzeige sofort auf und deckt den Bildschirm mit ihrem eigenen
+# Startbildschirm ab, bis der erste Schnappschuss des Cores da ist. Den Hinweis
+# blendet sie so lange aus – dass die Verbindung beim Start noch nicht steht,
+# ist kein Fehler, sondern die Reihenfolge.
 
 # Bewusst ohne zusaetzliche cage-Optionen.
 #

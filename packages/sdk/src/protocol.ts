@@ -114,7 +114,40 @@ export interface PairingState {
   expiresAt: string | null;
 }
 
+/**
+ * Wie der Spiegel beim Booten aussieht – und ob das schon greift.
+ *
+ * Die Einstellungen dafuer liegen ausserhalb des Releases (in /boot und in den
+ * Units), und sie wirken erst beim naechsten Start. Ein Spiegel haengt aber an
+ * der Wand: wer nicht ans Terminal kann, saehe sonst nirgends, dass sich etwas
+ * geaendert hat und noch ein Neustart fehlt. Deshalb steht es in der App.
+ */
+export interface BootLookStatus {
+  /** Wann der Dienst zuletzt nachgesehen hat. */
+  appliedAt: string;
+  /** Wurde seit der letzten Aenderung noch nicht neu gestartet? */
+  pendingReboot: boolean;
+  /** Was zuletzt geaendert wurde. Leer heisst: es stand schon alles. */
+  changed: string[];
+  /**
+   * Ob Plymouth das Wortzeichen waehrend des Startens zeigen kann. `missing`
+   * ist kein Fehler, nur weniger: dann bleibt der Bildschirm bis zur Anzeige
+   * schwarz – was hinter einem Spiegel immer noch besser aussieht als Text.
+   */
+  plymouth: 'ready' | 'installed' | 'missing';
+}
+
 /* ------------------------------- Client → Server ------------------------------- */
+
+/**
+ * Was ein Neustart umfasst.
+ *
+ * `services` ist Core und Anzeige, also die Software des Spiegels; `device`
+ * ist der Rechner darunter. Ausgefuehrt wird beides nicht vom Core — der
+ * laeuft unprivilegiert — sondern von einem Root-Dienst, den er ueber eine
+ * Datei anstoesst. Dieselbe Bruecke wie beim Updater, aus demselben Grund.
+ */
+export type RestartScope = 'services' | 'device';
 
 export type ClientMessage =
   | { t: 'hello'; clientType: ClientType; token?: string; appVersion: string }
@@ -171,6 +204,16 @@ export type ClientMessage =
   | { t: 'admin:revokeDevice'; deviceId: string }
   | { t: 'admin:checkUpdate' }
   | { t: 'admin:applyUpdate'; version?: string }
+  /**
+   * Neustart aus der Handy-App.
+   *
+   * Zwei Stufen, weil es zwei verschiedene Fehler sind: haengt die Anzeige,
+   * genuegen die Dienste und der Spiegel ist nach Sekunden wieder da. Haengt
+   * etwas darunter — Netzwerk, Grafik, Tonausgabe —, hilft nur das ganze
+   * Geraet. Die kleinere Stufe zuerst anzubieten erspart die groessere fast
+   * immer.
+   */
+  | { t: 'admin:restart'; scope: RestartScope }
   | { t: 'ping' };
 
 /* ------------------------------- Server → Client ------------------------------- */
@@ -188,7 +231,7 @@ export type ServerMessage
       /** Nur fuer ungekoppelte Clients: laeuft gerade eine Kopplung? */
       pairing?: PairingState;
     }
-  | { t: 'snapshot'; config: MirrorConfig; modules: ModuleDescriptor[]; state: Record<string, ModuleStateEnvelope>; power: { on: boolean }; update: UpdateStatus; viewport: Viewport | null; previewScreenId: string | null }
+  | { t: 'snapshot'; config: MirrorConfig; modules: ModuleDescriptor[]; state: Record<string, ModuleStateEnvelope>; power: { on: boolean }; update: UpdateStatus; bootLook: BootLookStatus | null; viewport: Viewport | null; previewScreenId: string | null }
   | { t: 'state:patch'; envelope: ModuleStateEnvelope }
   | { t: 'config:update'; config: MirrorConfig }
   | { t: 'modules:update'; modules: ModuleDescriptor[] }
@@ -196,6 +239,7 @@ export type ServerMessage
   | { t: 'display:viewport'; viewport: Viewport | null }
   | { t: 'display:previewScreen'; screenId: string | null }
   | { t: 'update:status'; status: UpdateStatus }
+  | { t: 'bootlook:status'; status: BootLookStatus | null }
   | { t: 'pair:result'; ok: true; token: string; deviceId: string }
   /** Nur an die Anzeige: der Code zum Abschreiben. Leer heisst "wieder wegnehmen". */
   | { t: 'pair:code'; code: string; expiresAt: string }

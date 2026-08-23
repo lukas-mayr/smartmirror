@@ -1,0 +1,33 @@
+[Unit]
+Description=Richtet ein, wie der Spiegel beim Booten aussieht
+# Nach dem Netz, weil hier notfalls Plymouth nachinstalliert wird. Alles andere
+# haette auch frueher laufen koennen – aber Aenderungen an /boot wirken ohnehin
+# erst beim naechsten Start, da kommt es auf ein paar Sekunden nicht an.
+After=network-online.target
+Wants=network-online.target
+RequiresMountsFor=/opt/smartmirror
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Laeuft als root: schreibt an /boot und schaltet getty um. Zusammen mit dem
+# Updater und dem Neustart-Dienst der dritte und letzte Teil mit Root-Rechten.
+User=root
+Environment=MIRROR_INSTALL_ROOT=/opt/smartmirror
+Environment=MIRROR_DATA_DIR=/opt/smartmirror/data
+ExecStart=/bin/bash /opt/smartmirror/current/deploy/mirror-bootlook.sh
+
+# Ueber /bin/bash und nicht direkt: das Ausfuehrungsrecht am Skript im Release
+# haengt daran, wie das Archiv entpackt wurde – dieselbe Ueberlegung wie bei
+# mirror-guard.service.
+
+# Grosszuegig, weil im schlechtesten Fall ein apt-Lauf darin steckt. Der Dienst
+# haelt nichts auf: weder Core noch Anzeige warten auf ihn.
+TimeoutStartSec=600
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mirror-bootlook
+
+[Install]
+WantedBy=multi-user.target

@@ -3,6 +3,8 @@ import {
   FONT_STACKS,
   INSET_SIDES,
   isNightNow,
+  normalizeNightMode,
+  normalizeRotation,
   rectFor,
   validate,
   ZONES,
@@ -12,6 +14,7 @@ import {
   type ModuleInstance,
   type ModuleStateEnvelope,
   type ModuleView,
+  type NightModeSettings,
   type ServerMessage,
   type Zone,
 } from '@mirror/sdk';
@@ -42,6 +45,21 @@ interface MountedInstance {
  */
 const NIGHT_CHECK_INTERVAL_MS = 60_000;
 
+/**
+ * Was der Startbildschirm vom letzten Lauf wissen muss.
+ *
+ * Er ist das erste Bild ueberhaupt – da hat der Core noch nicht geantwortet,
+ * und Drehung wie Nachtabsenkung stehen in dessen Konfiguration. Beide einmal
+ * mitzuschreiben ist gut genug: die Drehung aendert sich beim Aufhaengen und
+ * danach nie wieder, und das Nachtfenster steht in Stunden, nicht in Minuten.
+ * Stimmt der gemerkte Wert doch einmal nicht, korrigiert ihn der erste
+ * Schnappschuss ein paar Sekunden spaeter.
+ */
+const BOOT_MEMORY_KEY = 'mirror.boot';
+
+/** Wie lange die Ueberblendung des Startbildschirms braucht (--motion-screen). */
+const BOOT_FADE_MS = 900;
+
 const BURN_IN_INTERVAL_MS = 15 * 60_000;
 /** Wanderpfad des Einbrennschutzes in Pixeln. Klein genug, um nicht aufzufallen. */
 const BURN_IN_PATH: readonly [number, number][] = [
@@ -60,6 +78,7 @@ export class MirrorApp {
   #dim: HTMLElement;
   #frame: HTMLElement;
   #overlay: HTMLElement;
+  #boot: HTMLElement;
   #status: HTMLElement;
   #connection: CoreConnection;
   #coreUrl: string;
@@ -78,6 +97,8 @@ export class MirrorApp {
   #ready = false;
   /** Was gerade ueber der Buehne liegt, damit nur das Passende wieder weggeht. */
   #overlayVariant: 'full' | 'badge' | null = null;
+  /** Liegt der Startbildschirm noch? Solange: kein Verbindungshinweis. */
+  #booting = true;
 
   constructor(stage: HTMLElement, connection: CoreConnection, coreUrl: string) {
     this.#stage = stage;
@@ -85,8 +106,13 @@ export class MirrorApp {
     this.#dim = stage.querySelector('#dim') as HTMLElement;
     this.#frame = stage.querySelector('#frame') as HTMLElement;
     this.#overlay = stage.querySelector('#overlay') as HTMLElement;
+    this.#boot = stage.querySelector('#boot') as HTMLElement;
     this.#connection = connection;
     this.#coreUrl = coreUrl;
+
+    // Vor allem anderen: der Startbildschirm steht schon im Dokument und soll
+    // gleich richtig herum und in der richtigen Helligkeit dastehen.
+    this.#recallBootMemory();
 
     this.#status = document.createElement('div');
     this.#status.className = 'status';
@@ -118,6 +144,7 @@ export class MirrorApp {
         this.#applyConfig(message.config);
         this.#applyPower();
         this.#hideOverlay();
+        this.#hideBoot();
         if (!this.#ready) {
           this.#ready = true;
           // Signal fuer den Healthcheck des Updaters: die Anzeige rendert
@@ -196,7 +223,10 @@ export class MirrorApp {
   setConnectionState(state: ConnectionState): void {
     // Waehrend eines Updates ist der Core kurz weg. Das ist kein Fehler, den
     // man gross anzeigen muesste – ein kleiner Hinweis unten rechts genuegt.
-    const visible = state !== 'online';
+    //
+    // Beim Start dagegen gar nichts: dass noch keine Verbindung steht, ist
+    // dort der Normalfall und steht ohnehin auf dem Startbildschirm.
+    const visible = state !== 'online' && !this.#booting;
     this.#status.textContent = state === 'connecting' ? 'verbinde …' : 'keine Verbindung';
     this.#status.classList.toggle('status--visible', visible);
   }
@@ -205,6 +235,68 @@ export class MirrorApp {
 
   #appVersion(): string {
     return (window as unknown as { mirror?: { version: string } }).mirror?.version ?? '0.0.0';
+  }
+
+  /**
+   * Blendet den Startbildschirm aus, sobald etwas darunter steht.
+   *
+   * Erst beim Schnappschuss und nicht schon beim Verbindungsaufbau: dazwischen
+   * liegt das Laden der Modul-Frontends, und ein leerer schwarzer Spiegel sieht
+   * aus wie ein ausgeschalteter. Die Ueberblendung deckt den Rest ab – die
+   * ersten Bloecke bauen sich darunter auf, waehrend sie laeuft.
+   */
+  #hideBoot(): void {
+    if (!this.#booting) return;
+    this.#booting = false;
+    this.#boot.classList.add('boot--done');
+    // Danach ganz aus dem Weg raeumen: ein durchsichtiges Element bliebe sonst
+    // fuer immer ueber der Buehne liegen.
+    window.setTimeout(() => this.#boot.classList.add('boot--gone'), BOOT_FADE_MS);
+  }
+
+  /**
+   * Stellt Drehung und Nachtabsenkung des letzten Laufs wieder her.
+   *
+   * Ohne die Drehung laege das Wortzeichen auf einem hochkant aufgehaengten
+   * Spiegel quer – derselbe Fehler, den die Drehung in der Konfiguration
+   * (statt in der Handy-App) gerade vermeiden soll. Und ohne die Absenkung
+   * leuchtete der Spiegel nach einem naechtlichen Update in voller Helligkeit
+   * auf, statt dunkel zu bleiben.
+   *
+   * Fehlt der Wert, gilt das Standardfenster: das faellt im Zweifel dunkler
+   * aus, und dunkler ist hinter einem Spiegel nie der Fehler.
+   */
+  #recallBootMemory(): void {
+    let stored: unknown;
+    try {
+      const raw = window.localStorage.getItem(BOOT_MEMORY_KEY);
+      if (!raw) return;
+      stored = JSON.parse(raw);
+    } catch {
+      // Gesperrter oder beschaedigter Speicher: dann startet der Spiegel eben
+      // ungedreht und hell. Der erste Schnappschuss richtet beides.
+      return;
+    }
+    const memory = (typeof stored === 'object' && stored !== null ? stored : {}) as {
+      rotation?: unknown;
+      nightMode?: unknown;
+    };
+    document.documentElement.dataset.rotation = String(normalizeRotation(memory.rotation));
+    if (isNightNow(normalizeNightMode(memory.nightMode))) document.documentElement.dataset.night = '1';
+  }
+
+  /** Schreibt mit, was der Startbildschirm beim naechsten Mal wissen muss. */
+  #rememberBootMemory(config: MirrorConfig): void {
+    const memory: { rotation: number; nightMode: NightModeSettings } = {
+      rotation: config.display.rotation,
+      nightMode: config.display.nightMode,
+    };
+    try {
+      window.localStorage.setItem(BOOT_MEMORY_KEY, JSON.stringify(memory));
+    } catch {
+      // Ohne Speicher steht der Startbildschirm beim naechsten Mal wieder
+      // ungedreht da – kein Grund, deswegen irgendetwas abzubrechen.
+    }
   }
 
   /**
@@ -241,6 +333,7 @@ export class MirrorApp {
     // bekommt ihre Konfiguration direkt beim Verbinden, lange bevor ein Handy
     // ueberhaupt gekoppelt ist.
     document.documentElement.dataset.rotation = String(config.display.rotation);
+    this.#rememberBootMemory(config);
     for (const side of INSET_SIDES) {
       document.documentElement.style.setProperty(`--mirror-inset-${side}`, `${config.display.insets[side]}%`);
     }

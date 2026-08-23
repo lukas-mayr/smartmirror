@@ -65,6 +65,17 @@ export const keyFile = join(dataDir, 'device.key');
 /** Der Updater legt hier seinen Zustand ab; der Core liest ihn nur. */
 export const updateStatusFile = join(dataDir, 'update-status.json');
 export const updateRequestFile = join(dataDir, 'update-request.json');
+/**
+ * Auftrag an den Root-Dienst, der Dienste neu startet oder das Geraet bootet.
+ * Der Core schreibt nur; gelesen und geloescht wird die Datei von
+ * deploy/mirror-system.sh.
+ */
+export const systemRequestFile = join(dataDir, 'system-request.json');
+/**
+ * Bericht von deploy/mirror-bootlook.sh: wie der Spiegel beim Booten aussieht
+ * und ob dafuer noch ein Neustart aussteht. Der Core liest nur.
+ */
+export const bootLookStatusFile = join(dataDir, 'bootlook-status.json');
 
 export function appVersion(): string {
   for (const file of [join(appRoot, 'VERSION'), join(appRoot, 'package.json')]) {

@@ -41,7 +41,8 @@ Optionen:
                            rechts gekippter 270. Die Angabe wirkt sofort und
                            damit auch fuer den Kopplungscode. Spaeter aendern:
                            sudo /opt/smartmirror/current/deploy/rotate.sh <grad>
-  --skip-boot-config       /boot/firmware/config.txt nicht anfassen
+  --skip-boot-config       Die Startdateien (/boot/firmware/config.txt und
+                           cmdline.txt) und die Textkonsole nicht anfassen
   -h, --help               Diese Hilfe
 USAGE
 }
@@ -356,7 +357,8 @@ log "Release $BUNDLE_VERSION nach $TARGET installieren"
 rm -rf "$TARGET"
 mkdir -p "$TARGET"
 cp -a "$STAGING/." "$TARGET/"
-chmod +x "$TARGET/deploy/cage-session.sh" "$TARGET/deploy/rotate.sh" 2>/dev/null || true
+chmod +x "$TARGET/deploy/cage-session.sh" "$TARGET/deploy/rotate.sh" \
+  "$TARGET/deploy/mirror-system.sh" "$TARGET/deploy/mirror-bootlook.sh" 2>/dev/null || true
 chmod +x "$TARGET/shell/smartmirror-shell" 2>/dev/null || true
 
 # Electrons Sandbox-Helfer braucht setuid-root, sonst startet die Anwendung mit
@@ -447,12 +449,40 @@ if [[ "$SKIP_BOOT_CONFIG" == "no" && -f "$BOOT_CONFIG" ]]; then
   fi
 fi
 
-# Textkonsole nicht abdunkeln und keinen Blinkcursor zeigen: beides waere in den
-# Sekunden vor dem Start der Anzeige durch den Spiegel sichtbar.
-CMDLINE="/boot/firmware/cmdline.txt"
-[[ -f "$CMDLINE" ]] || CMDLINE="/boot/cmdline.txt"
-if [[ -f "$CMDLINE" ]] && ! grep -q 'vt.global_cursor_default=0' "$CMDLINE"; then
-  sed -i '1 s/$/ consoleblank=0 vt.global_cursor_default=0 logo.nologo quiet/' "$CMDLINE"
+# Aussehen des Starts einrichten.
+#
+# Zwischen Einschalten und dem ersten Bild des Spiegels liefen frueher
+# Kernel-Meldungen, systemd-Zeilen und am Ende eine Anmeldeaufforderung ueber
+# den Bildschirm. Hinter halbdurchlaessigem Glas ist das das Auffaelligste am
+# ganzen Geraet: weisse Textzeilen auf Schwarz, eine halbe Minute lang.
+#
+# Was dagegen zu tun ist, steht nicht hier, sondern in mirror-bootlook.sh – und
+# zwar aus einem Grund, der wichtiger ist als die Ersparnis an Zeilen: dasselbe
+# Skript laeuft als Dienst bei jedem Start. Ein Spiegel haengt an der Wand,
+# oft ohne dass jemand kurzfristig per SSH drankommt; wer nicht ans Terminal
+# kann, bekaeme Aenderungen an /boot sonst nie zu sehen, denn der Updater
+# tauscht das Release und nichts sonst. Stuende die Logik hier, gaebe es zwei
+# Fassungen davon, und die zweite waere irgendwann die falsche.
+if [[ "$SKIP_BOOT_CONFIG" == "no" ]]; then
+  log "Aussehen des Starts einrichten"
+
+  # Plymouth zeigt das Wortzeichen des Spiegels, waehrend das System hochfaehrt
+  # – die zwanzig Sekunden, in denen die Anzeige noch startet. Ohne Plymouth
+  # bleibt der Bildschirm in dieser Zeit schwarz; das ist kein Fehler, nur
+  # weniger. Deshalb hier versuchen und nicht darauf bestehen.
+  apt-get install -y --no-install-recommends plymouth >/dev/null 2>&1 \
+    || warn "Plymouth nicht installierbar – der Start bleibt bis zur Anzeige schwarz."
+
+  MIRROR_INSTALL_ROOT="$INSTALL_ROOT" MIRROR_DATA_DIR="$INSTALL_ROOT/data" \
+    MIRROR_SERVICE_USER="$SERVICE_USER" \
+    bash "$INSTALL_ROOT/current/deploy/mirror-bootlook.sh" \
+    || warn "Der Startbildschirm liess sich nicht einrichten – der Spiegel laeuft trotzdem."
+
+  CONSOLE_SUMMARY="  Startbildschirm Textkonsole auf tty3, beim Booten unsichtbar; Plymouth zeigt
+                  das Wortzeichen bis die Anzeige da ist. Anmeldung: Alt+F3."
+else
+  CONSOLE_SUMMARY="  Startbildschirm Unveraendert (--skip-boot-config): beim Booten laeuft
+                  weiterhin die Textkonsole ueber den Bildschirm."
 fi
 
 if [[ "$(hostname)" != "smartmirror" ]]; then
@@ -472,11 +502,14 @@ systemctl daemon-reload
 # Die .path-Unit ist der Knopf "Jetzt pruefen" in der Handy-App: der Core kann
 # den Updater nicht selbst starten (unprivilegiert), also loest die Datei aus,
 # die er schreibt. Der Timer bleibt die regelmaessige Pruefung.
-systemctl enable mirror-guard.service mirror-core.service mirror-shell.service mirror-updater.timer mirror-updater.path >/dev/null
+# mirror-system.path gehoert dazu: ohne sie bleiben die Neustart-Knoepfe in der
+# App wirkungslos – der Core schreibt seine Auftragsdatei, und niemand liest sie.
+systemctl enable mirror-guard.service mirror-core.service mirror-shell.service mirror-updater.timer mirror-updater.path mirror-system.path mirror-bootlook.service >/dev/null
 systemctl restart mirror-core.service
 systemctl restart mirror-shell.service
 systemctl start mirror-updater.timer
 systemctl start mirror-updater.path
+systemctl start mirror-system.path
 
 # --------------------------------- Abschluss ----------------------------------
 
@@ -509,6 +542,7 @@ Fertig. Version $BUNDLE_VERSION ist installiert.
                      nicht mittig hinter dem Spiegelrahmen sitzt.
   Drehung         ${ROTATION_NOW}°. Steht der Kopplungscode quer:
                   sudo $INSTALL_ROOT/current/deploy/rotate.sh 90
+${CONSOLE_SUMMARY}
   Logs            journalctl -u mirror-core -u mirror-shell -u mirror-updater -f
   Stromausfall    Ein beschaedigtes Release faellt beim Booten von selbst auf
                   das vorige zurueck: journalctl -u mirror-guard -b

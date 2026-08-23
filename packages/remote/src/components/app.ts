@@ -45,6 +45,7 @@ import {
   type ModuleDescriptor,
   type ModuleInstance,
   type PairedDevice,
+  type RestartScope,
   type Zone,
   type ScreenInsets,
   type SetupStep,
@@ -1932,8 +1933,117 @@ export class MirrorRemote extends LitElement {
           : nothing}
       </section>
 
+      <h2>Neustart</h2>
+      ${this.#renderRestart()}
+
       <h2>Gekoppelte Geraete</h2>
       ${this.#renderDevices()}
+    `;
+  }
+
+  /**
+   * Zwei Stufen, weil es zwei verschiedene Fehler sind.
+   *
+   * Haengt die Anzeige – ein Modul, das nicht mehr zeichnet, eine Verbindung,
+   * die nicht zurueckkommt –, genuegen die Dienste, und der Spiegel ist nach
+   * ein paar Sekunden wieder da. Haengt etwas darunter, hilft nur das ganze
+   * Geraet. Die kleinere Stufe zuerst zu zeigen erspart die groessere fast
+   * immer; deshalb steht sie oben und traegt den Hauptknopf.
+   *
+   * Beide fragen nach, bevor sie ausloesen. Nicht weil ein Neustart Schaden
+   * anrichtet, sondern weil er dauert: wer im Bad steht und die Uhr ablesen
+   * will, hat nicht eine Minute Zeit, sich einen Fehlgriff anzusehen.
+   */
+  #renderRestart(): TemplateResult {
+    const offline = this.snapshot.status !== 'ready';
+    return html`
+      <section class="panel">
+        ${this.#renderBootLookHint()}
+        ${this.#renderRestartAction(
+          'services',
+          'Anzeige neu starten',
+          'Startet Core und Anzeige neu. Der Spiegel ist nach ein paar Sekunden wieder da; die Einstellungen bleiben.',
+          offline,
+        )}
+        ${this.#renderRestartAction(
+          'device',
+          'Spiegel neu starten',
+          'Startet das ganze Geraet neu. Dauert etwa eine Minute – der richtige Griff, wenn auch ein Neustart der Anzeige nichts geaendert hat.',
+          offline,
+        )}
+      </section>
+    `;
+  }
+
+  /**
+   * Der einzige Ort, an dem ein ausstehender Neustart sichtbar wird.
+   *
+   * Wie der Spiegel beim Booten aussieht, steht in /boot und in den Units –
+   * ausserhalb des Releases, und wirksam erst beim naechsten Start. Wer nicht
+   * ans Terminal kann, saehe sonst nirgends, dass sich etwas geaendert hat und
+   * nur noch der Neustart fehlt. Deshalb steht der Hinweis hier: direkt ueber
+   * dem Knopf, der ihn erledigt.
+   */
+  #renderBootLookHint(): TemplateResult | typeof nothing {
+    const bootLook = this.snapshot.bootLook;
+    if (!bootLook?.pendingReboot) return nothing;
+    return html`
+      <p class="banner banner--hint">
+        Der Startbildschirm wurde eingerichtet${bootLook.plymouth === 'missing'
+          ? ' (ohne Wortzeichen – Plymouth fehlt auf diesem Geraet)'
+          : nothing}. Sichtbar wird das beim naechsten Neustart des Spiegels.
+      </p>
+    `;
+  }
+
+  #renderRestartAction(
+    scope: RestartScope,
+    label: string,
+    hint: string,
+    offline: boolean,
+  ): TemplateResult {
+    const confirming = this.pendingDelete === `restart:${scope}`;
+    return html`
+      <div class="field">
+        <span class="field__label">
+          ${label}
+          <span class="field__hint">${hint}</span>
+        </span>
+        ${confirming
+          ? html`
+              <div class="card__actions">
+                <button @click=${() => (this.pendingDelete = null)}>Abbrechen</button>
+                <button
+                  class="primary"
+                  @click=${() => {
+                    this.pendingDelete = null;
+                    store.send({ t: 'admin:restart', scope });
+                    // Die Bestaetigung muss von hier kommen: gleich darauf
+                    // reisst die Verbindung ab, und der Spiegel kann nichts
+                    // mehr zuruecksagen. Ohne sie saehe der Knopfdruck aus
+                    // wie einer, der ins Leere ging – und der naechste Toast
+                    // meldet nur noch "nicht erreichbar".
+                    this.#toast(
+                      scope === 'device' ? 'Spiegel startet neu …' : 'Anzeige startet neu …',
+                    );
+                  }}
+                >
+                  Jetzt neu starten
+                </button>
+              </div>
+            `
+          : html`
+              <div class="card__actions">
+                <button
+                  ?disabled=${offline}
+                  aria-label=${label}
+                  @click=${() => (this.pendingDelete = `restart:${scope}`)}
+                >
+                  Neu starten
+                </button>
+              </div>
+            `}
+      </div>
     `;
   }
 
