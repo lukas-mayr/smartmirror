@@ -5,6 +5,7 @@ export * from './design.js';
 export * from './duration.js';
 export * from './fonts.js';
 export * from './frontend.js';
+export * from './hold.js';
 export * from './insets.js';
 export * from './layout.js';
 export * from './manifest.js';

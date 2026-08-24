@@ -1239,6 +1239,37 @@ export class MirrorRemote extends LitElement {
                     </div>
                   `
                 : nothing}
+
+              <!--
+                Vorrang steht am Ende und nicht oben: es ist die seltenste der
+                Einstellungen an einem Block, und sie beantwortet eine Frage,
+                die man erst stellt, wenn Platz, Groesse und Band stehen.
+              -->
+              ${descriptor?.holds
+                ? html`
+                    <label class="field field--switch">
+                      <span class="field__label">
+                        Vorrang
+                        <span class="field__hint">
+                          Solange bei diesem Block etwas laeuft, bleibt der Spiegel bei ihm stehen: kein
+                          Screenwechsel, und im Fussband kein Weiterschalten. Ist es vorbei, laeuft alles
+                          weiter wie zuvor.
+                        </span>
+                      </span>
+                      <input
+                        type="checkbox"
+                        .checked=${instance.priority === true}
+                        @change=${(event: Event) =>
+                          store.send({
+                            t: 'admin:setLayout',
+                            instances: [
+                              { id: instance.id, priority: (event.target as HTMLInputElement).checked },
+                            ],
+                          })}
+                      />
+                    </label>
+                  `
+                : nothing}
                 `
           }
 

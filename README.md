@@ -349,6 +349,28 @@ schwarz und sähe kaputt aus. Alle Screens bleiben dabei im Dokument und werden
 nur überblendet: die Module laufen weiter und holen ihre Daten nicht bei jedem
 Wechsel neu.
 
+**Vorrang: ein Block darf den Spiegel anhalten.** Weiterschalten ist richtig,
+solange nichts läuft — und falsch in dem einen Moment, in dem doch etwas läuft.
+Ein Timer, der bei 3:41 weggeschaltet wird, ist kein Timer mehr, sondern eine
+Zahl, die man verpasst hat. Ein Block mit *Vorrang* hält den Spiegel deshalb an,
+solange bei ihm etwas läuft: kein Screenwechsel, im Fußband kein
+Weiterschalten — und gezeigt wird sein Screen, nicht der gerade laufende. „Bleibt
+sichtbar" heißt, dass man ihn sieht. Ist es vorbei, läuft alles weiter wie zuvor.
+
+Der Vorgang hat zwei Hälften, und die gehören verschiedenen Parteien. **Der
+Block bittet:** er schreibt `data-hold` an sein Host-Element, solange bei ihm
+etwas läuft. Nur das Modul weiß, wann das ist — beim Timer ist es nicht „der
+Block zeigt etwas" (nach Ablauf steht dort weiter „Fertig"), sondern „die Zeit
+läuft noch". **Der Nutzer erlaubt:** ohne den Schalter *Vorrang* am Block bleibt
+die Bitte folgenlos. Ein Modul, das den Spiegel von sich aus anhalten könnte,
+wäre ein Modul, das die Anzeige übernimmt — und die gehört dem, der davorsteht.
+Voreingestellt ist der Schalter aus, und die Handy-App zeigt ihn nur bei
+Modulen, die im Manifest `"holds": true` stehen haben; sonst stünde an jedem
+Block eine Einstellung, die bei den meisten folgenlos bleibt.
+
+Über dem Vorrang steht nur eines: die Vorschau. Wer am Handy gerade an einem
+Screen arbeitet, ist ein Mensch im Raum, und ein Mensch schlägt eine Regel.
+
 **Angeordnet wird am Handy**, auf einem Brett, das den Spiegel im Kleinen zeigt
 — gleiches Seitenverhältnis, gleiche Ränder, gleiches Raster. Ein Block wird mit
 dem Finger gezogen und rastet ein; ein Umriss zeigt dabei, wo er landet, und
@@ -745,6 +767,14 @@ Inhalt und die Zahl die Beschriftung dazu.
 
 Läuft kein Timer, bleibt der Block leer. Kein „kein Timer": eine leere Fläche
 auf einem Spiegel ist ein Spiegel.
+
+**Der Timer kann den Spiegel anhalten** — der Schalter *Vorrang* am Block, siehe
+oben. Solange die Zeit läuft, schaltet der Spiegel nicht weiter und zeigt den
+Screen, auf dem der Timer steht; ist sie um, läuft alles weiter wie zuvor. Die
+Bitte endet mit der Zeit und nicht mit dem Block: danach steht dort weiter
+„Fertig", und das ist eine Meldung und kein Vorgang. Ein Spiegel, der auf einem
+abgelaufenen Timer stehen bliebe, wäre von einem hängenden nicht zu
+unterscheiden.
 
 ### Nachts eine Stufe dunkler
 

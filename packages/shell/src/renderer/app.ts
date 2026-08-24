@@ -4,6 +4,7 @@ import {
   DEFAULT_SCREEN_DURATION,
   FONT_STACKS,
   INSET_SIDES,
+  isHolding,
   isNightNow,
   nextCarouselId,
   normalizeNightMode,
@@ -110,6 +111,8 @@ export class MirrorApp {
   /** Fuer wen der laufende Timer gestellt ist – und wie lang. */
   #footTimerFor: string | null = null;
   #footSlotMs = 0;
+  /** Wer den Spiegel zuletzt festgehalten hat – damit nur Wechsel zaehlen. */
+  #heldBy: string | null = null;
   #powerOn = true;
   #burnInIndex = 0;
   #ready = false;
@@ -140,6 +143,7 @@ export class MirrorApp {
     this.#watchViewport();
     this.#startBurnInProtection();
     this.#startNightWatch();
+    this.#watchHold();
   }
 
   handle(message: ServerMessage): void {
@@ -559,6 +563,20 @@ export class MirrorApp {
     // Waehrend am Handy an einem Screen gearbeitet wird, steht die Runde.
     if (this.#previewScreenId) return;
 
+    /*
+     * Und sie steht auch, solange ein Block mit Vorrang danach fragt.
+     *
+     * Gezeigt wird dann sein Screen, nicht der gerade laufende: "bleibt
+     * sichtbar" heisst, dass man ihn sieht, und ein Timer, der auf einem
+     * anderen Screen ablaeuft, ist keiner. Die Vorschau steht darueber — dort
+     * arbeitet gerade jemand am Handy, und ein Mensch schlaegt eine Regel.
+     */
+    const holder = this.#holder();
+    if (holder) {
+      this.#showScreen(holder.instance.screenId);
+      return;
+    }
+
     const visible = this.#visibleScreens();
     if (visible.length < 2) return;
 
@@ -573,6 +591,61 @@ export class MirrorApp {
       this.#showScreen(next[(position + 1) % next.length]!.id);
       this.#scheduleCycle();
     }, current.durationSeconds * 1000);
+  }
+
+  /* ------------------------------- Vorrang ---------------------------------- */
+
+  /**
+   * Der Block, der den Spiegel gerade festhaelt – wenn es einen gibt.
+   *
+   * Zwei Bedingungen, weil es zwei Parteien sind (siehe hold.ts im SDK): der
+   * Block bittet mit `data-hold`, und der Nutzer hat es dieser Instanz mit
+   * `priority` erlaubt. Eines allein reicht nie.
+   *
+   * Halten zwei gleichzeitig, gewinnt der zuerst aufgehaengte. Eine Regel
+   * musste es sein, und jede andere waere genauso willkuerlich – wer zwei
+   * Timer mit Vorrang stellt, hat ohnehin eine Frage gestellt, auf die es
+   * keine richtige Antwort gibt.
+   */
+  #holder(): MountedInstance | null {
+    for (const mounted of this.#mounted.values()) {
+      if (mounted.instance.priority && isHolding(mounted.host)) return mounted;
+    }
+    return null;
+  }
+
+  /**
+   * Hoert darauf, dass ein Block anfaengt oder aufhoert zu halten.
+   *
+   * `data-hold` steht im DOM und nicht in der Konfiguration: es ist ein
+   * Zustand von jetzt, den das Modul selbst kennt und sonst niemand. Also
+   * wird auch dort zugehoert – ein Beobachter ueber der ganzen Buehne, der
+   * ausschliesslich auf dieses eine Attribut sieht.
+   */
+  #watchHold(): void {
+    new MutationObserver(() => this.#applyHold()).observe(this.#screens, {
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['data-hold'],
+    });
+  }
+
+  /**
+   * Ein Halter kommt oder geht.
+   *
+   * Nur der Wechsel zaehlt. Ein Modul, das sein Attribut bei jedem Zeichnen
+   * erneut setzt, wuerde sonst viermal je Sekunde den Screen-Timer neu
+   * stellen – und ein Timer, der staendig neu gestellt wird, laeuft nie ab.
+   * (`setHold` schreibt aus demselben Grund nur bei Aenderung; hier steht die
+   * zweite Haelfte derselben Vorsicht, denn das Attribut kann auch von Hand
+   * gesetzt werden.)
+   */
+  #applyHold(): void {
+    const holder = this.#holder()?.instance.id ?? null;
+    if (holder === this.#heldBy) return;
+    this.#heldBy = holder;
+    this.#scheduleCycle();
+    this.#syncFoot();
   }
 
   /* --------------------------- Fussband: Durchschaltung ---------------------- */
@@ -646,6 +719,24 @@ export class MirrorApp {
     }
 
     band.classList.add('zone--cycling');
+
+    /*
+     * Haelt einer der Bloecke im Band den Spiegel fest, gehoert ihm das Band.
+     *
+     * Ohne Punktreihe: sie kuendigt an, dass gleich etwas anderes kommt, und
+     * genau das ist hier nicht der Fall. Ein Zeichen, das etwas ankuendigt,
+     * was nicht passiert, ist schlechter als keines.
+     */
+    const holder = hosts.find(
+      (host) => this.#mounted.get(host.dataset.instance ?? '')?.instance.priority && isHolding(host),
+    );
+    if (holder) {
+      this.#footShown = holder.dataset.instance ?? null;
+      for (const host of hosts) host.classList.toggle('module--current', host === holder);
+      this.#syncFootDots(band, 0, -1);
+      this.#stopFoot();
+      return;
+    }
 
     const order = hosts.map((host) => host.dataset.instance ?? '');
     const eligible = hosts

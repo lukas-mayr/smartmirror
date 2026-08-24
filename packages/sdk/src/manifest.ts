@@ -81,6 +81,20 @@ export interface ModuleManifest {
   /** Wenn true, ist nur eine Instanz erlaubt. */
   singleton?: boolean;
   /**
+   * Das Modul kann den Spiegel anhalten (siehe hold.ts).
+   *
+   * Eine Aussage ueber das Modul und keine Einstellung: entweder es gibt bei
+   * diesem Modul etwas, das laeuft und zu Ende geht, oder nicht. Ein Wetter
+   * laeuft nie ab, ein Timer schon. Die Handy-App bietet den Schalter
+   * "Vorrang" nur dort an, wo er ueberhaupt etwas bewirken kann — sonst
+   * stuende an jedem Block eine Einstellung, die bei den meisten folgenlos
+   * bleibt.
+   *
+   * Erlaubt wird damit nichts: anhalten darf ein Block erst, wenn jemand am
+   * Handy den Schalter umlegt.
+   */
+  holds?: boolean;
+  /**
    * Blockgroessen, in denen es das Modul gibt. Fehlt die Angabe, sind es alle.
    *
    * Eine Groesse ist keine Einstellung, sondern eine Aussage ueber den Inhalt:
@@ -108,6 +122,8 @@ export interface ModuleDescriptor {
   version: string;
   description?: string;
   singleton: boolean;
+  /** Kann den Spiegel anhalten, wenn der Nutzer es der Instanz erlaubt. */
+  holds: boolean;
   /** Immer gefuellt und in kanonischer Reihenfolge, auch ohne Angabe im Manifest. */
   sizes: readonly WidgetSize[];
   /** Immer eine Groesse aus `sizes`. */

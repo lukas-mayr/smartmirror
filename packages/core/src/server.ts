@@ -592,6 +592,7 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
             }
             if (typeof update.enabled === 'boolean') instance.enabled = update.enabled;
             if (typeof update.visible === 'boolean') instance.visible = update.visible;
+            if (typeof update.priority === 'boolean') instance.priority = update.priority;
           }
         });
         return;
@@ -656,6 +657,9 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
               size,
               enabled: true,
               visible,
+              // Vorrang ist eine Entscheidung und keine Voreinstellung: ein
+              // frisch hinzugefuegter Block haelt nichts an.
+              priority: false,
               config: {},
             });
             return;
@@ -684,6 +688,7 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
             size,
             enabled: true,
             visible,
+            priority: false,
             config: {},
           });
         });

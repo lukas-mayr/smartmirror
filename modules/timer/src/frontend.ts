@@ -1,5 +1,5 @@
 import { html, render, svg, nothing, type TemplateResult } from 'lit';
-import { defineFrontend, DIG, type ModuleView } from '@mirror/sdk';
+import { defineFrontend, DIG, setHold, type ModuleView } from '@mirror/sdk';
 import {
   ARM,
   FIELD,
@@ -326,6 +326,7 @@ export default defineFrontend<TimerState, TimerConfig>({
         // muesste, heisst auch nichts, was getaktet werden muesste.
         stop();
         phaseFor = null;
+        setHold(host, false);
         render(html``, host);
         return;
       }
@@ -363,6 +364,18 @@ export default defineFrontend<TimerState, TimerConfig>({
        * in allen anderen zu klein.
        */
       const value = done ? 'Fertig' : formatRemaining(run.end - now);
+
+      /*
+       * Solange die Zeit laeuft, bittet der Block darum, stehen bleiben zu
+       * duerfen (siehe hold.ts im SDK). Ob die Bitte etwas bewirkt,
+       * entscheidet der Schalter "Vorrang" an der Instanz.
+       *
+       * Die Bitte endet mit der Zeit und nicht mit dem Block: danach steht
+       * dort weiter "Fertig", und das ist eine Meldung und kein Vorgang. Ein
+       * Spiegel, der auf einem abgelaufenen Timer stehen bliebe, waere von
+       * einem haengenden nicht zu unterscheiden.
+       */
+      setHold(host, !done);
 
       render(
         html`
