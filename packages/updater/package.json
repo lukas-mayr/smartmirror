@@ -1,6 +1,6 @@
 {
   "name": "@mirror/updater",
-  "version": "0.25.0",
+  "version": "0.25.1",
   "private": true,
   "type": "module",
   "description": "OTA-Agent: prueft GitHub Releases, installiert, verifiziert, rollt zurueck",
@@ -11,6 +11,6 @@
     "clean": "tsc --build --clean"
   },
   "dependencies": {
-    "@mirror/sdk": "0.25.0"
+    "@mirror/sdk": "0.25.1"
   }
 }
