@@ -73,7 +73,7 @@ export default defineFrontend<SbbState, SbbConfig>({
                     </span>
                     ${departure.track
                       ? html`<span class="board__track">
-                          ${icon('signpost', { size: '1.1em' })}${departure.track}
+                          ${icon('signpost', { size: '1.25em' })}${departure.track}
                         </span>`
                       : nothing}
                     <span class="board__when">
