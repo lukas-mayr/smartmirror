@@ -201,7 +201,17 @@ export default defineBackend<WeatherConfig, WeatherState>({
 
         const response = await ctx.fetch(url);
         if (!response.ok) throw new Error(`Warnungen nicht abrufbar (HTTP ${response.status})`);
-        const warnings = selectWarnings(parseWarnings(await response.text()), ctx.config.warningRegion);
+        const payload = (await response.json()) as { warnings?: unknown };
+        // Die Koordinaten kommen mit: MeteoAlarm warnt fuer ein ganzes Land,
+        // und ohne den Ort daneben stuende die Lawinenwarnung fuer Tirol auf
+        // einem Spiegel in Wien.
+        const warnings = selectWarnings(
+          parseWarnings(payload, {
+            language: ctx.locale.split('-')[0] ?? 'de',
+            place: { latitude: coordinates.latitude, longitude: coordinates.longitude },
+          }),
+          ctx.config.warningRegion,
+        );
 
         ctx.setState({ warnings });
         // Der Schalter entscheidet nur ueber den Feed. Im eigenen Block steht
@@ -209,7 +219,17 @@ export default defineBackend<WeatherConfig, WeatherState>({
         if (ctx.config.warningsNotify) {
           ctx.notify(warningNotifications(warnings, formatWarningTime));
         }
-        ctx.log.debug(`${warnings.length} Warnung(en) fuer ${coordinates.label}.`);
+        /*
+         * Gezaehlt wird beides: was ankam und was uebrig blieb.
+         *
+         * "0 Warnungen" ist die eine Auskunft, die auch dann richtig aussieht,
+         * wenn das Lesen kaputt ist – genau daran ist die Vorgaengerfassung
+         * lange unbemerkt vorbeigelaufen. Steht daneben, wieviel die Quelle
+         * geschickt hat, ist der Unterschied zwischen "ruhiges Wetter" und
+         * "wir verstehen die Antwort nicht mehr" eine Zeile im Log.
+         */
+        const delivered = Array.isArray(payload.warnings) ? payload.warnings.length : 0;
+        ctx.log.debug(`${warnings.length} von ${delivered} Meldung(en) fuer ${coordinates.label} uebrig.`);
       } catch (error) {
         ctx.log.warn(`Warnungen konnten nicht geholt werden: ${String(error)}`);
       }
