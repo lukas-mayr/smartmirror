@@ -854,7 +854,18 @@ export class MirrorRemote extends LitElement {
    */
   #renderZoneBoard(config: MirrorConfig, screen: MirrorScreen, aspect: number): TemplateResult {
     const insets = config.display.insets;
-    const instances = config.instances.filter((entry) => entry.screenId === screen.id);
+    /*
+     * Auch hier gilt: aufs Brett kommt nur, was einen Platz belegt.
+     *
+     * Ein Block, der bloss meldet, steht auf dem Spiegel in keinem Band – auf
+     * dem Brett stand er trotzdem, und zwar in dem Band, das seine Instanz
+     * zufaellig mitschreibt. Damit zaehlte er in der Warnung "zu voll" mit,
+     * fuer eine Enge, die es an der Wand gar nicht gibt. Erreichbar bleibt er
+     * ueber die Liste unter dem Brett.
+     */
+    const instances = config.instances.filter(
+      (entry) => entry.screenId === screen.id && entry.visible !== false,
+    );
 
     return html`
       <div class="board" style=${`aspect-ratio: ${aspect}`}>
@@ -870,7 +881,7 @@ export class MirrorRemote extends LitElement {
                   ? 'is-overfull'
                   : ''}"
               >
-                <span class="board__zone-name">${zone.name}</span>
+                <span class="board__zone-name">${zone.name}${this.#zoneTiming(zone.id, screen, inZone.length)}</span>
                 ${inZone.map(
                   (entry) => html`
                     <button
@@ -899,6 +910,20 @@ export class MirrorRemote extends LitElement {
   }
 
   /**
+   * Wie lange ein Element im Fussband steht.
+   *
+   * Nur dort und nur ab zwei Bloecken: das Fussband stellt nicht nebeneinander,
+   * sondern schaltet durch, und die Standzeit dafuer kommt aus dem Screen. Wer
+   * hier einen dritten Block hineinlegt, macht damit die Zeit der beiden
+   * anderen kuerzer – ohne diese Zahl waere das eine Auswirkung, die man erst
+   * an der Wand bemerkt.
+   */
+  #zoneTiming(zone: Zone, screen: MirrorScreen, count: number): string {
+    if (zone !== 'foot' || count < 2) return '';
+    return ` · je ${formatScreenDuration(Math.round(screen.durationSeconds / count))}`;
+  }
+
+  /**
    * Zu voll ist kein Fehler, sondern ein Hinweis.
    *
    * Ein Band, in dem mehr steht, als hineingehoert, wird auf dem Spiegel
@@ -906,6 +931,10 @@ export class MirrorRemote extends LitElement {
    * lehnt die App das nicht ab, sondern sagt es: das Design-System nennt drei
    * Elemente je Szene als Obergrenze, und ob die vierte Zeile es wert ist,
    * entscheidet, wer davorsteht.
+   *
+   * Im Fussband ist die Folge eine andere: dort wird nicht enger gestellt,
+   * sondern schneller durchgeschaltet. Beides steht deshalb im Hinweis, denn
+   * "zu voll" heisst hier zwei verschiedene Dinge.
    */
   #zoneWarning(instances: readonly ModuleInstance[]): TemplateResult | typeof nothing {
     const full = ZONE_OPTIONS.filter(
@@ -913,8 +942,9 @@ export class MirrorRemote extends LitElement {
     );
     if (full.length === 0) return nothing;
     return html`<p class="banner banner--hint small">
-      ${full.map((zone) => zone.name).join(' und ')} traegt mehr Bloecke als vorgesehen. Auf dem Spiegel
-      ruecken sie zusammen – eine Szene liest sich mit hoechstens drei Elementen am schnellsten.
+      ${full.map((zone) => zone.name).join(' und ')} traegt mehr Bloecke als vorgesehen. Im Kopf und in der
+      Hauptzone ruecken sie dann zusammen, im Fussband wird der Durchlauf kuerzer – eine Szene liest sich mit
+      hoechstens drei Elementen am schnellsten.
     </p>`;
   }
 

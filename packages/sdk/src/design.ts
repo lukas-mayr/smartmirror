@@ -250,7 +250,7 @@ export const ZONE_SPECS: Record<Zone, ZoneSpec> = {
     name: 'Fussband',
     height: 328,
     share: 20,
-    note: 'Nur laengliche Elemente. Darf leer bleiben.',
+    note: 'Nur laengliche Elemente. Mehrere schalten der Reihe nach durch. Darf leer bleiben.',
   },
 };
 
@@ -265,8 +265,22 @@ export const ZONE_GAP = 32;
  */
 export const SCENE_MAX_ELEMENTS = 3;
 
-/** Wieviele Bloecke ein Band traegt, bevor es zu voll wird. */
-export const ZONE_CAPACITY: Record<Zone, number> = { head: 2, main: 2, foot: 1 };
+/**
+ * Wieviele Bloecke ein Band traegt, bevor es zu voll wird.
+ *
+ * Kopf und Hauptzone stellen nebeneinander: dort ist die Obergrenze eine
+ * Frage der Breite, und zwei Bloecke sind das letzte, was auf 994 px noch in
+ * lesbarer Schrift nebeneinander steht.
+ *
+ * Das Fussband stellt nicht nebeneinander, sondern schaltet durch (siehe
+ * carousel.ts). Dort kostet ein weiteres Element deshalb keine Breite,
+ * sondern Standzeit – und die Grenze ist nicht, wann es zu eng wird, sondern
+ * wann ein Durchlauf zu schnell wird. Drei Elemente sind auf der
+ * voreingestellten Standzeit knapp sieben Sekunden pro Element – lang genug,
+ * um eine Zeile zu ueberfliegen. Ab dem vierten wird aus dem Weiterschalten
+ * ein Flackern.
+ */
+export const ZONE_CAPACITY: Record<Zone, number> = { head: 2, main: 2, foot: 3 };
 
 export function isZone(value: unknown): value is Zone {
   return typeof value === 'string' && (ZONES as readonly string[]).includes(value);

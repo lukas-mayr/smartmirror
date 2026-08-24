@@ -1,4 +1,5 @@
 export * from './backend.js';
+export * from './carousel.js';
 export * from './config.js';
 export * from './design.js';
 export * from './duration.js';

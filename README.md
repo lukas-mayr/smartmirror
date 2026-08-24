@@ -283,6 +283,32 @@ als viertes nur, wenn es etwas Laufendes zeigt. Wo kein vierter Platz ist,
 landet auch kein vierter Block — das ist der Unterschied zu einer Regel, an die
 man sich halten muss.
 
+**Das Fußband stellt nicht nebeneinander, sondern schaltet durch.** Zwei Blöcke
+nebeneinander sind dort zwei halbe Bänder, und ein halbes Band ist zu schmal für
+die Zeile, für die das Fußband da ist („Läuft gerade", die nächste Verbindung).
+Nacheinander bekommt jedes das ganze Band — bezahlt wird mit Zeit statt mit
+Breite. Und die Zeit dafür ist keine zweite Zahl, sondern **die Standzeit des
+Screens, geteilt durch die Anzahl**: ein Durchlauf ist genau so lang wie der
+Screen, den er begleitet. Wer hinsieht, bis weitergeschaltet wird, hat jedes
+Element genau einmal gesehen; ein eigener Takt daneben ließe mal das letzte
+Element ungesehen und zeigte mal das erste zweimal. Am Handy steht die Zahl am
+Band („Fußband · je 7 s"), damit man sieht, was ein dritter Block die beiden
+anderen kostet.
+
+**Mitgezählt wird nur, was gerade etwas zeigt.** Ein Spotify-Block ohne laufende
+Musik ist ein leerer Platz, und ein leerer Platz im Durchlauf sieht nicht aus wie
+Ruhe, sondern wie ein Aussetzer. Er fällt deshalb aus der Rechnung — und kommt
+von selbst wieder hinein, sobald etwas läuft. Gefragt wird dafür die Anzeige
+selbst und nicht das Modul: wer nichts anzeigen will, zeichnet nichts, und ein
+zusätzliches „ich bin gerade leer" im Protokoll wäre ein zweiter Zustand neben
+dem ersten — einer, der falsch stehen kann.
+
+Angekündigt wird der Wechsel wie beim Wetter: eine **senkrechte Punktreihe an
+der rechten Kante** des Bandes, der lange Punkt ist das laufende Element. Bringt
+ein Block eine eigene Punktreihe mit, tritt sie für diese Zeit zurück — zwei
+Reihen an derselben Kante zählen zwei verschiedene Dinge und sind aus 3 m eine
+Reihe mit zufälligen Lücken.
+
 **Ein Modul sieht in beiden Anordnungen gleich aus.** Welche Form ein Block
 zeigt, hängt an seiner Größe und an sonst nichts — nicht daran, ob er im freien
 Raster liegt oder in einem Band. Ein Modul, das je nach Aufhängung etwas anderes
