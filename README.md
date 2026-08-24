@@ -283,6 +283,32 @@ als viertes nur, wenn es etwas Laufendes zeigt. Wo kein vierter Platz ist,
 landet auch kein vierter Block — das ist der Unterschied zu einer Regel, an die
 man sich halten muss.
 
+**Das Fußband stellt nicht nebeneinander, sondern schaltet durch.** Zwei Blöcke
+nebeneinander sind dort zwei halbe Bänder, und ein halbes Band ist zu schmal für
+die Zeile, für die das Fußband da ist („Läuft gerade", die nächste Verbindung).
+Nacheinander bekommt jedes das ganze Band — bezahlt wird mit Zeit statt mit
+Breite. Und die Zeit dafür ist keine zweite Zahl, sondern **die Standzeit des
+Screens, geteilt durch die Anzahl**: ein Durchlauf ist genau so lang wie der
+Screen, den er begleitet. Wer hinsieht, bis weitergeschaltet wird, hat jedes
+Element genau einmal gesehen; ein eigener Takt daneben ließe mal das letzte
+Element ungesehen und zeigte mal das erste zweimal. Am Handy steht die Zahl am
+Band („Fußband · je 7 s"), damit man sieht, was ein dritter Block die beiden
+anderen kostet.
+
+**Mitgezählt wird nur, was gerade etwas zeigt.** Ein Spotify-Block ohne laufende
+Musik ist ein leerer Platz, und ein leerer Platz im Durchlauf sieht nicht aus wie
+Ruhe, sondern wie ein Aussetzer. Er fällt deshalb aus der Rechnung — und kommt
+von selbst wieder hinein, sobald etwas läuft. Gefragt wird dafür die Anzeige
+selbst und nicht das Modul: wer nichts anzeigen will, zeichnet nichts, und ein
+zusätzliches „ich bin gerade leer" im Protokoll wäre ein zweiter Zustand neben
+dem ersten — einer, der falsch stehen kann.
+
+Angekündigt wird der Wechsel wie beim Wetter: eine **senkrechte Punktreihe an
+der rechten Kante** des Bandes, der lange Punkt ist das laufende Element. Bringt
+ein Block eine eigene Punktreihe mit, tritt sie für diese Zeit zurück — zwei
+Reihen an derselben Kante zählen zwei verschiedene Dinge und sind aus 3 m eine
+Reihe mit zufälligen Lücken.
+
 **Ein Modul sieht in beiden Anordnungen gleich aus.** Welche Form ein Block
 zeigt, hängt an seiner Größe und an sonst nichts — nicht daran, ob er im freien
 Raster liegt oder in einem Band. Ein Modul, das je nach Aufhängung etwas anderes
@@ -322,6 +348,28 @@ Screens ohne Inhalt werden übersprungen, sonst stünde die Wand zwanzig Sekunde
 schwarz und sähe kaputt aus. Alle Screens bleiben dabei im Dokument und werden
 nur überblendet: die Module laufen weiter und holen ihre Daten nicht bei jedem
 Wechsel neu.
+
+**Vorrang: ein Block darf den Spiegel anhalten.** Weiterschalten ist richtig,
+solange nichts läuft — und falsch in dem einen Moment, in dem doch etwas läuft.
+Ein Timer, der bei 3:41 weggeschaltet wird, ist kein Timer mehr, sondern eine
+Zahl, die man verpasst hat. Ein Block mit *Vorrang* hält den Spiegel deshalb an,
+solange bei ihm etwas läuft: kein Screenwechsel, im Fußband kein
+Weiterschalten — und gezeigt wird sein Screen, nicht der gerade laufende. „Bleibt
+sichtbar" heißt, dass man ihn sieht. Ist es vorbei, läuft alles weiter wie zuvor.
+
+Der Vorgang hat zwei Hälften, und die gehören verschiedenen Parteien. **Der
+Block bittet:** er schreibt `data-hold` an sein Host-Element, solange bei ihm
+etwas läuft. Nur das Modul weiß, wann das ist — beim Timer ist es nicht „der
+Block zeigt etwas" (nach Ablauf steht dort weiter „Fertig"), sondern „die Zeit
+läuft noch". **Der Nutzer erlaubt:** ohne den Schalter *Vorrang* am Block bleibt
+die Bitte folgenlos. Ein Modul, das den Spiegel von sich aus anhalten könnte,
+wäre ein Modul, das die Anzeige übernimmt — und die gehört dem, der davorsteht.
+Voreingestellt ist der Schalter aus, und die Handy-App zeigt ihn nur bei
+Modulen, die im Manifest `"holds": true` stehen haben; sonst stünde an jedem
+Block eine Einstellung, die bei den meisten folgenlos bleibt.
+
+Über dem Vorrang steht nur eines: die Vorschau. Wer am Handy gerade an einem
+Screen arbeitet, ist ein Mensch im Raum, und ein Mensch schlägt eine Regel.
 
 **Angeordnet wird am Handy**, auf einem Brett, das den Spiegel im Kleinen zeigt
 — gleiches Seitenverhältnis, gleiche Ränder, gleiches Raster. Ein Block wird mit
@@ -719,6 +767,14 @@ Inhalt und die Zahl die Beschriftung dazu.
 
 Läuft kein Timer, bleibt der Block leer. Kein „kein Timer": eine leere Fläche
 auf einem Spiegel ist ein Spiegel.
+
+**Der Timer kann den Spiegel anhalten** — der Schalter *Vorrang* am Block, siehe
+oben. Solange die Zeit läuft, schaltet der Spiegel nicht weiter und zeigt den
+Screen, auf dem der Timer steht; ist sie um, läuft alles weiter wie zuvor. Die
+Bitte endet mit der Zeit und nicht mit dem Block: danach steht dort weiter
+„Fertig", und das ist eine Meldung und kein Vorgang. Ein Spiegel, der auf einem
+abgelaufenen Timer stehen bliebe, wäre von einem hängenden nicht zu
+unterscheiden.
 
 ### Nachts eine Stufe dunkler
 

@@ -43,6 +43,19 @@ export interface ModuleInstance {
    * bei `zone` neben `x`/`y`.
    */
   visible: boolean;
+  /**
+   * Darf dieser Block den Spiegel anhalten?
+   *
+   * Wenn ja, bleibt der Spiegel stehen, solange der Block danach fragt (siehe
+   * hold.ts): kein Screenwechsel, im Fussband kein Weiterschalten. Gefragt
+   * wird nur von Modulen, bei denen etwas laeuft und zu Ende geht — der Timer
+   * ist der Fall, fuer den es das gibt.
+   *
+   * Voreingestellt aus, und zwar ohne Ausnahme. Ein Block, der die Anzeige
+   * uebernimmt, ist genau dann richtig, wenn jemand das so wollte; wer es nie
+   * eingeschaltet hat, hat es nicht gewollt.
+   */
+  priority: boolean;
   config: Record<string, unknown>;
 }
 
@@ -258,6 +271,7 @@ export function createDefaultConfig(): MirrorConfig {
         size: 'l',
         enabled: true,
         visible: true,
+        priority: false,
         config: {},
       },
       {
@@ -270,6 +284,7 @@ export function createDefaultConfig(): MirrorConfig {
         size: 'l',
         enabled: true,
         visible: true,
+        priority: false,
         config: {},
       },
     ],

@@ -1,8 +1,12 @@
 import {
+  carouselSlotMs,
   DEFAULT_FONT,
+  DEFAULT_SCREEN_DURATION,
   FONT_STACKS,
   INSET_SIDES,
+  isHolding,
   isNightNow,
+  nextCarouselId,
   normalizeNightMode,
   normalizeRotation,
   rectFor,
@@ -92,6 +96,23 @@ export class MirrorApp {
   /** Screen, den die Handy-App gerade bearbeitet. Solange gesetzt: kein Weiterschalten. */
   #previewScreenId: string | null = null;
   #cycleTimer: number | undefined;
+  /*
+   * Die Durchschaltung im Fussband der laufenden Szene.
+   *
+   * Immer nur eine: sichtbar ist genau ein Screen, und ein Band, das niemand
+   * sieht, braucht weder Timer noch Beobachter. Was hier steht, gehoert
+   * deshalb zum aktiven Screen und wird beim Weiterschalten neu gesetzt.
+   */
+  #footBand: HTMLElement | null = null;
+  #footWatcher: MutationObserver | null = null;
+  #footTimer: number | undefined;
+  /** Instanz, die im Fussband gerade dran ist. */
+  #footShown: string | null = null;
+  /** Fuer wen der laufende Timer gestellt ist – und wie lang. */
+  #footTimerFor: string | null = null;
+  #footSlotMs = 0;
+  /** Wer den Spiegel zuletzt festgehalten hat – damit nur Wechsel zaehlen. */
+  #heldBy: string | null = null;
   #powerOn = true;
   #burnInIndex = 0;
   #ready = false;
@@ -122,6 +143,7 @@ export class MirrorApp {
     this.#watchViewport();
     this.#startBurnInProtection();
     this.#startNightWatch();
+    this.#watchHold();
   }
 
   handle(message: ServerMessage): void {
@@ -381,6 +403,9 @@ export class MirrorApp {
     }
 
     this.#scheduleCycle();
+    // Die Standzeit des Screens ist der Takt der Durchschaltung: aendert sie
+    // sich am Handy, muss das Fussband es sofort merken.
+    this.#syncFoot();
   }
 
   /**
@@ -512,10 +537,16 @@ export class MirrorApp {
   }
 
   #showScreen(id: string | null): void {
+    const changed = id !== this.#activeScreenId;
     this.#activeScreenId = id;
     for (const [screenId, element] of this.#screenElements) {
       element.classList.toggle('screen--active', screenId === id);
     }
+    // Ein neuer Screen faengt sein Fussband von vorn an: nur so ist ein
+    // Durchlauf genau so lang wie der Screen und niemand sieht das erste
+    // Element zweimal, bevor er das letzte einmal gesehen hat.
+    if (changed) this.#footShown = null;
+    this.#syncFoot();
   }
 
   /**
@@ -532,6 +563,20 @@ export class MirrorApp {
     // Waehrend am Handy an einem Screen gearbeitet wird, steht die Runde.
     if (this.#previewScreenId) return;
 
+    /*
+     * Und sie steht auch, solange ein Block mit Vorrang danach fragt.
+     *
+     * Gezeigt wird dann sein Screen, nicht der gerade laufende: "bleibt
+     * sichtbar" heisst, dass man ihn sieht, und ein Timer, der auf einem
+     * anderen Screen ablaeuft, ist keiner. Die Vorschau steht darueber — dort
+     * arbeitet gerade jemand am Handy, und ein Mensch schlaegt eine Regel.
+     */
+    const holder = this.#holder();
+    if (holder) {
+      this.#showScreen(holder.instance.screenId);
+      return;
+    }
+
     const visible = this.#visibleScreens();
     if (visible.length < 2) return;
 
@@ -546,6 +591,308 @@ export class MirrorApp {
       this.#showScreen(next[(position + 1) % next.length]!.id);
       this.#scheduleCycle();
     }, current.durationSeconds * 1000);
+  }
+
+  /* ------------------------------- Vorrang ---------------------------------- */
+
+  /**
+   * Der Block, der den Spiegel gerade festhaelt – wenn es einen gibt.
+   *
+   * Zwei Bedingungen, weil es zwei Parteien sind (siehe hold.ts im SDK): der
+   * Block bittet mit `data-hold`, und der Nutzer hat es dieser Instanz mit
+   * `priority` erlaubt. Eines allein reicht nie.
+   *
+   * Halten zwei gleichzeitig, gewinnt der zuerst aufgehaengte. Eine Regel
+   * musste es sein, und jede andere waere genauso willkuerlich – wer zwei
+   * Timer mit Vorrang stellt, hat ohnehin eine Frage gestellt, auf die es
+   * keine richtige Antwort gibt.
+   */
+  #holder(): MountedInstance | null {
+    for (const mounted of this.#mounted.values()) {
+      if (mounted.instance.priority && isHolding(mounted.host)) return mounted;
+    }
+    return null;
+  }
+
+  /**
+   * Hoert darauf, dass ein Block anfaengt oder aufhoert zu halten.
+   *
+   * `data-hold` steht im DOM und nicht in der Konfiguration: es ist ein
+   * Zustand von jetzt, den das Modul selbst kennt und sonst niemand. Also
+   * wird auch dort zugehoert – ein Beobachter ueber der ganzen Buehne, der
+   * ausschliesslich auf dieses eine Attribut sieht.
+   */
+  #watchHold(): void {
+    new MutationObserver(() => this.#applyHold()).observe(this.#screens, {
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['data-hold'],
+    });
+  }
+
+  /**
+   * Ein Halter kommt oder geht.
+   *
+   * Nur der Wechsel zaehlt. Ein Modul, das sein Attribut bei jedem Zeichnen
+   * erneut setzt, wuerde sonst viermal je Sekunde den Screen-Timer neu
+   * stellen – und ein Timer, der staendig neu gestellt wird, laeuft nie ab.
+   * (`setHold` schreibt aus demselben Grund nur bei Aenderung; hier steht die
+   * zweite Haelfte derselben Vorsicht, denn das Attribut kann auch von Hand
+   * gesetzt werden.)
+   */
+  #applyHold(): void {
+    const holder = this.#holder()?.instance.id ?? null;
+    if (holder === this.#heldBy) return;
+    this.#heldBy = holder;
+    this.#scheduleCycle();
+    this.#syncFoot();
+  }
+
+  /* --------------------------- Fussband: Durchschaltung ---------------------- */
+
+  /**
+   * Das Fussband des laufenden Screens – falls es eine Szene ist.
+   *
+   * Ein Raster hat keine Baender, und ein Screen, den gerade niemand sieht,
+   * hat nichts durchzuschalten.
+   */
+  #activeFoot(): HTMLElement | null {
+    const screen = this.#activeScreenId ? this.#screenElements.get(this.#activeScreenId) : undefined;
+    if (!screen?.classList.contains('screen--zones')) return null;
+    return screen.querySelector<HTMLElement>('.zone--foot');
+  }
+
+  /**
+   * Schaltet die Elemente des Fussbandes nacheinander durch.
+   *
+   * Zwei Bloecke nebeneinander sind im Fussband zwei halbe Baender – jedes zu
+   * schmal fuer die Zeile, fuer die es gedacht ist. Nacheinander bekommt jedes
+   * das ganze Band, und bezahlt wird mit Zeit statt mit Breite: die Standzeit
+   * des Screens, geteilt durch die Anzahl (siehe `carouselSlotMs`).
+   *
+   * Mitgezaehlt wird nur, was gerade etwas zeigt. Ein Spotify-Block ohne
+   * laufende Musik ist ein leerer Platz, und ein leerer Platz im Durchlauf
+   * sieht aus wie ein Aussetzer des Spiegels. Er faellt deshalb aus der
+   * Rechnung – und kommt von selbst wieder hinein, sobald etwas laeuft.
+   *
+   * Die Funktion ist absichtlich ohne Gedaechtnis ausser `#footShown`: sie
+   * liest den Zustand aus dem Band, richtet ihn und aendert dabei nichts, was
+   * schon stimmt. Nur so darf der Beobachter unten sie nach jeder Aenderung
+   * im Band erneut aufrufen, ohne dass daraus eine Schleife wird.
+   */
+  #syncFoot(): void {
+    const band = this.#activeFoot();
+
+    /*
+     * Baender anderer Screens bleiben stehen, wie sie stehen.
+     *
+     * Sie beim Wegschalten aufzuraeumen waere der naheliegende Reflex und
+     * genau der falsche: der alte Screen blendet 900 ms lang aus, und in
+     * dieser Zeit saehe man seine Fussleiste noch – mit einem Mal alle
+     * Elemente nebeneinander. Ein angehaltener Durchlauf ist dagegen ein
+     * gueltiges Bild, und wenn der Screen wiederkommt, richtet `#showScreen`
+     * ihn vor dem ersten Bild neu aus.
+     *
+     * Geraeumt wird nur, was gar nicht mehr durchschalten kann – sonst bliebe
+     * ein Band mit einem einzigen Block auf ewig ausgeblendet, weil kein
+     * Timer mehr kommt, der es wieder einblendet.
+     */
+    for (const screen of this.#screenElements.values()) {
+      const other = screen.querySelector<HTMLElement>('.zone--foot');
+      if (!other || other === band) continue;
+      if (other.querySelectorAll(':scope > .module').length < 2) this.#calmFoot(other);
+    }
+
+    this.#watchFoot(band);
+    if (!band) {
+      this.#stopFoot();
+      return;
+    }
+
+    const hosts = [...band.querySelectorAll<HTMLElement>(':scope > .module')];
+    // Ein einzelnes Element hat nichts, wozu es abwechseln koennte – und ein
+    // leeres Band ist ohnehin keines: beide bleiben, wie sie sind.
+    if (hosts.length < 2) {
+      this.#calmFoot(band);
+      this.#stopFoot();
+      return;
+    }
+
+    band.classList.add('zone--cycling');
+
+    /*
+     * Haelt einer der Bloecke im Band den Spiegel fest, gehoert ihm das Band.
+     *
+     * Ohne Punktreihe: sie kuendigt an, dass gleich etwas anderes kommt, und
+     * genau das ist hier nicht der Fall. Ein Zeichen, das etwas ankuendigt,
+     * was nicht passiert, ist schlechter als keines.
+     */
+    const holder = hosts.find(
+      (host) => this.#mounted.get(host.dataset.instance ?? '')?.instance.priority && isHolding(host),
+    );
+    if (holder) {
+      this.#footShown = holder.dataset.instance ?? null;
+      for (const host of hosts) host.classList.toggle('module--current', host === holder);
+      this.#syncFootDots(band, 0, -1);
+      this.#stopFoot();
+      return;
+    }
+
+    const order = hosts.map((host) => host.dataset.instance ?? '');
+    const eligible = hosts
+      .filter((host) => this.#showsSomething(host))
+      .map((host) => host.dataset.instance ?? '');
+
+    const current =
+      this.#footShown !== null && eligible.includes(this.#footShown)
+        ? this.#footShown
+        : nextCarouselId(order, eligible, this.#footShown);
+    this.#footShown = current;
+
+    for (const host of hosts) {
+      host.classList.toggle('module--current', current !== null && host.dataset.instance === current);
+    }
+    this.#syncFootDots(band, eligible.length, current === null ? -1 : eligible.indexOf(current));
+
+    const wanted = eligible.length > 1 ? carouselSlotMs(this.#activeDuration(), eligible.length) : 0;
+    if (wanted <= 0) {
+      this.#stopFoot();
+      return;
+    }
+
+    /*
+     * Der Timer wird nur gestellt, wenn er noch nicht laeuft oder fuer etwas
+     * anderes laeuft.
+     *
+     * Sonst setzte ihn jede Aenderung im Band zurueck – und weil ein Modul
+     * sich haeufiger neu zeichnet, als hier weitergeschaltet wird, stuende die
+     * Durchschaltung fuer immer still.
+     */
+    if (this.#footTimer !== undefined && this.#footTimerFor === current && this.#footSlotMs === wanted) return;
+    window.clearTimeout(this.#footTimer);
+    this.#footTimerFor = current;
+    this.#footSlotMs = wanted;
+    this.#footTimer = window.setTimeout(() => this.#advanceFoot(), wanted);
+  }
+
+  /**
+   * Weiter zum naechsten Element.
+   *
+   * Gezaehlt wird erst hier und nicht schon beim Stellen des Timers: zwischen
+   * beidem liegt die ganze Standzeit, und in der kann ein Block dazugekommen
+   * sein oder aufgehoert haben, etwas zu zeigen. Wer die Reihenfolge vorher
+   * festlegt, schaltet auf einen Platz weiter, den es nicht mehr gibt.
+   */
+  #advanceFoot(): void {
+    this.#footTimer = undefined;
+    const band = this.#activeFoot();
+    if (band) {
+      const hosts = [...band.querySelectorAll<HTMLElement>(':scope > .module')];
+      this.#footShown = nextCarouselId(
+        hosts.map((host) => host.dataset.instance ?? ''),
+        hosts.filter((host) => this.#showsSomething(host)).map((host) => host.dataset.instance ?? ''),
+        this.#footShown,
+      );
+    }
+    this.#syncFoot();
+  }
+
+  /**
+   * Zeigt der Block ueberhaupt etwas?
+   *
+   * Gefragt wird das DOM und nicht das Modul: ein Modul, das nichts anzeigen
+   * will, rendert nichts – das ist der Vertrag, den Spotify mit
+   * "Ausblenden, wenn nichts laeuft" schon erfuellt. Ein zusaetzliches Feld
+   * im Protokoll ("ich bin gerade leer") waere ein zweiter Zustand neben dem
+   * ersten, und der kann falsch stehen.
+   *
+   * Text allein reicht als Antwort nicht: ein Block kann aus einer Grafik
+   * bestehen und trotzdem etwas zeigen. Deshalb zusaetzlich die Frage, ob
+   * irgendetwas darin eine Flaeche belegt.
+   */
+  #showsSomething(host: HTMLElement): boolean {
+    if ((host.textContent ?? '').trim().length > 0) return true;
+    // Erst hier kostet die Frage etwas: `getBoundingClientRect` erzwingt ein
+    // Layout, und das soll nicht bei jedem Zeichnen eines Blocks anfallen,
+    // der ohnehin Text zeigt.
+    if (host.childElementCount === 0) return false;
+    for (const node of host.querySelectorAll<HTMLElement>('*')) {
+      const rect = node.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Die Punktreihe an der rechten Kante des Bandes.
+   *
+   * Dieselbe wie im Wetter, und aus demselben Grund: ohne sie liest man im
+   * Vorbeigehen die eine Zeile und weiss nicht, dass gleich eine andere
+   * dasteht. Gezaehlt wird, was tatsaechlich drankommt – ein Block, der
+   * nichts zeigt, bekommt auch keinen Punkt.
+   *
+   * Aufgebaut wird sie Stueck fuer Stueck und nicht bei jedem Aufruf neu:
+   * jede Aenderung im Band ruft `#syncFoot` erneut auf, und ein Neuaufbau
+   * waere eine Aenderung, die sich selbst ausloest.
+   */
+  #syncFootDots(band: HTMLElement, count: number, active: number): void {
+    const existing = band.querySelector<HTMLElement>(':scope > .dots');
+    if (count < 2) {
+      existing?.remove();
+      return;
+    }
+
+    const dots = existing ?? document.createElement('div');
+    if (!existing) {
+      dots.className = 'dots';
+      band.append(dots);
+    }
+    while (dots.childElementCount > count) dots.lastElementChild?.remove();
+    while (dots.childElementCount < count) dots.append(document.createElement('i'));
+    [...dots.children].forEach((dot, index) => dot.classList.toggle('is-active', index === active));
+  }
+
+  /**
+   * Beobachtet das Band des laufenden Screens.
+   *
+   * Ob ein Block etwas zeigt, aendert sich waehrend des Betriebs: Musik faengt
+   * an zu laufen, eine Verbindung faehrt ab. Das steht in keiner Konfiguration
+   * und in keinem Timer – es steht im DOM, und genau dort wird es abgeholt.
+   *
+   * Nur `childList`, und ausdruecklich kein `characterData`: aus nichts wird
+   * etwas, indem Knoten entstehen, nicht indem sich ein Text aendert. Eine
+   * Uhr im Fussband loeste sonst jede Sekunde eine Runde aus – und die Runde
+   * misst Bloecke aus, was ein Layout erzwingt.
+   */
+  #watchFoot(band: HTMLElement | null): void {
+    if (band === this.#footBand) return;
+    this.#footWatcher?.disconnect();
+    this.#footBand = band;
+    if (!band) return;
+    this.#footWatcher ??= new MutationObserver(() => this.#syncFoot());
+    this.#footWatcher.observe(band, { childList: true, subtree: true });
+  }
+
+  /** Ein Band ohne Durchschaltung: alle Bloecke sichtbar, keine Punktreihe. */
+  #calmFoot(band: HTMLElement): void {
+    band.classList.remove('zone--cycling');
+    band.querySelector<HTMLElement>(':scope > .dots')?.remove();
+    for (const host of band.querySelectorAll<HTMLElement>(':scope > .module')) {
+      host.classList.remove('module--current');
+    }
+  }
+
+  #stopFoot(): void {
+    window.clearTimeout(this.#footTimer);
+    this.#footTimer = undefined;
+    this.#footTimerFor = null;
+    this.#footSlotMs = 0;
+  }
+
+  /** Standzeit des laufenden Screens – der Takt, den sich das Fussband teilt. */
+  #activeDuration(): number {
+    const screen = this.#config?.screens.find((entry) => entry.id === this.#activeScreenId);
+    return screen?.durationSeconds ?? DEFAULT_SCREEN_DURATION;
   }
 
   async #mount(instance: ModuleInstance, moduleVersion: string): Promise<void> {

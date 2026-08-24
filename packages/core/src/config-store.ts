@@ -156,6 +156,9 @@ function normalize(input: Record<string, unknown>): MirrorConfig {
           size,
           enabled: entry.enabled !== false,
           visible,
+          // Wer keinen Block belegt, hat auch nichts, was den Spiegel
+          // anhalten koennte: angehalten wird an einer Flaeche.
+          priority: false,
           config: typeof entry.config === 'object' && entry.config !== null ? entry.config : {},
         };
       }
@@ -182,6 +185,9 @@ function normalize(input: Record<string, unknown>): MirrorConfig {
         size,
         enabled: entry.enabled !== false,
         visible,
+        // Ausdruecklich `=== true`: was nie eingeschaltet wurde, haelt nichts
+        // an. Eine aeltere Konfiguration kennt das Feld gar nicht.
+        priority: entry.priority === true,
         config: typeof entry.config === 'object' && entry.config !== null ? entry.config : {},
       };
     });

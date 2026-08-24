@@ -33,6 +33,8 @@ export interface LayoutPatch {
   enabled?: boolean;
   /** Blendet den Block ein oder aus, ohne die Instanz zu stoppen. */
   visible?: boolean;
+  /** Erlaubt dem Block, den Spiegel anzuhalten, solange bei ihm etwas laeuft. */
+  priority?: boolean;
 }
 
 /** Die PWA ("remote") darf konfigurieren, die Anzeige ("shell") nur lesen. */

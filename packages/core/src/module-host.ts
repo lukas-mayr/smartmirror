@@ -125,6 +125,7 @@ export class ModuleHost extends EventEmitter {
       version: module.manifest.version,
       description: module.manifest.description,
       singleton: module.manifest.singleton === true,
+      holds: module.manifest.holds === true,
       sizes: normalizeWidgetSizes(module.manifest.sizes),
       // Ohne Angabe die kleinste angebotene Groesse: ein Modul, das beim
       // Hinzufuegen zu gross einsteigt, verdeckt fremde Bloecke.

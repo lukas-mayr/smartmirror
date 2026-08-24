@@ -846,6 +846,64 @@ body {
   display: none;
 }
 
+/*
+ * Mehrere Elemente im Fussband stehen nacheinander, nicht nebeneinander.
+ *
+ * Nebeneinander ist die einzige Anordnung, die mit jedem weiteren Element
+ * schlechter wird: zwei Bloecke sind zwei halbe Baender, und ein halbes Band
+ * ist zu schmal fuer die Zeile, fuer die das Fussband da ist ("Laeuft gerade",
+ * die naechste Verbindung). Nacheinander bekommt jedes das ganze Band.
+ *
+ * Bezahlt wird mit Zeit statt mit Breite, und zwar mit der Standzeit des
+ * Screens: ein Durchlauf ist genau so lang wie der Screen, den er begleitet
+ * (die Rechnung steht in carousel.ts). Deshalb liegen alle Bloecke
+ * uebereinander statt in der Reihe – wer ausgeblendet ist, soll auch keine
+ * Breite mehr belegen.
+ */
+.zone--foot.zone--cycling {
+  position: relative;
+}
+
+.zone--foot.zone--cycling > .module {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  /* Der Streifen an der rechten Kante gehoert der Punktreihe allein. */
+  right: 26px;
+  opacity: 0;
+  transition: opacity var(--motion-swap-duration) var(--motion-swap-easing);
+}
+
+.zone--foot.zone--cycling > .module--current {
+  opacity: 1;
+}
+
+/*
+ * Die Punktreihe des Bandes steht, wo die eines Blocks stuende: senkrecht an
+ * der rechten Kante. Dieselbe Form wie im Wetter, damit "hier kommt noch
+ * etwas" auf dem Spiegel ueberall dasselbe Zeichen ist.
+ */
+.zone--foot.zone--cycling > .dots {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/*
+ * Und sie ist die einzige.
+ *
+ * Ein Block, der selbst durchschaltet (das Wetter), braechte seine eigene
+ * Punktreihe an dieselbe Kante – zwei Reihen nebeneinander, die zwei
+ * verschiedene Dinge zaehlen. Aus 3 m ist das eine Reihe mit zufaelligen
+ * Luecken. Solange das Band durchschaltet, gehoert die Kante ihm; die des
+ * Blocks kommt zurueck, sobald er wieder allein im Band steht.
+ */
+.zone--foot.zone--cycling > .module .dots {
+  display: none;
+}
+
 /* ------------------------------ Boxen (1c) -------------------------------- */
 
 /*
