@@ -5,11 +5,13 @@ import {
   createScreen,
   DEFAULT_SCREEN_DURATION,
   formatScreenDuration,
+  gridDecidesPlacement,
   nextScreenId,
   normalizeScreens,
   SCREEN_DURATION_MAX,
   SCREEN_DURATION_MIN,
 } from '../dist/screens.js';
+import { findFreeSpot, rectFor } from '../dist/layout.js';
 
 test('begrenzt die Standzeit und rundet auf die Schrittweite', () => {
   assert.equal(clampScreenDuration(1), SCREEN_DURATION_MIN);
@@ -47,4 +49,33 @@ test('schreibt die Standzeit lesbar', () => {
   assert.equal(formatScreenDuration(60), '1 min');
   assert.equal(formatScreenDuration(90), '1:30 min');
   assert.equal(createScreen('screen-2', 'Abends').durationSeconds, DEFAULT_SCREEN_DURATION);
+});
+
+test('ueber den Platz entscheidet nur im Raster das Raster', () => {
+  assert.equal(gridDecidesPlacement('grid'), true);
+  assert.equal(gridDecidesPlacement('zones'), false);
+});
+
+test('eine Szene laesst XL zu, auch wenn das Raster dahinter voll ist', () => {
+  /*
+   * Der Fall, an dem es scheiterte: eine Szene mit der Uhr im Kopf und einem
+   * XL-Block in der Hauptzone. Im Raster dahinter bleibt kein 4 x 2 grosses
+   * Loch mehr — und deshalb liess sich der Timer im Fussband nicht auf XL
+   * stellen. Auf dem Spiegel ist von dieser Enge nichts zu sehen, und der
+   * einzige Rat dazu ("verschiebe zuerst einen anderen Block") geht in einer
+   * Szene ins Leere: dort wird nichts verschoben.
+   */
+  const grid = { columns: 6, rows: 4 };
+  const occupied = [
+    { x: 2, y: 0, size: 'l' },
+    { x: 0, y: 2, size: 'xl' },
+  ].map((entry) => rectFor(entry, grid));
+
+  const spot = findFreeSpot(occupied, grid, 'xl', { x: 0, y: 0 });
+  assert.equal(spot, null);
+
+  // So entscheidet die Handy-App, ob ein fehlender Rasterplatz eine Absage ist.
+  const refused = (layout) => spot === null && gridDecidesPlacement(layout);
+  assert.equal(refused('grid'), true);
+  assert.equal(refused('zones'), false);
 });

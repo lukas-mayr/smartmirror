@@ -12,6 +12,7 @@ import {
   formatWidgetSizes,
   GRID_MAX,
   GRID_MIN,
+  gridDecidesPlacement,
   gridEqual,
   INSET_MAX,
   INSET_MIN,
@@ -38,6 +39,7 @@ import {
   ZONE_OPTIONS,
   ZONE_SPECS,
   type FontId,
+  type GridRect,
   type GridSize,
   type InsetSide,
   type MirrorConfig,
@@ -1084,14 +1086,43 @@ export class MirrorRemote extends LitElement {
 
   /** Liegt an dieser Stelle schon ein anderer Block? */
   #spotFree(id: string, x: number, y: number, size: WidgetSize, grid: GridSize): boolean {
-    const config = this.snapshot.config;
-    const instance = config?.instances.find((entry) => entry.id === id);
-    if (!config || !instance) return false;
+    const instance = this.snapshot.config?.instances.find((entry) => entry.id === id);
+    if (!instance) return false;
     const cells = sizeCells(size, grid);
     const candidate = { x, y, columns: cells.columns, rows: cells.rows };
-    return !config.instances
-      .filter((entry) => entry.screenId === instance.screenId && entry.id !== id)
-      .some((entry) => rectsOverlap(rectFor(entry, grid), candidate));
+    return !this.#occupied(instance.screenId, id, grid).some((rect) =>
+      rectsOverlap(rect, candidate),
+    );
+  }
+
+  /**
+   * Die Rasterplaetze, die auf einem Screen tatsaechlich belegt sind.
+   *
+   * Nur was einen Platz belegt, belegt einen: ein Block, der bloss meldet,
+   * steht auf dem Spiegel nirgends und darf deshalb auch keinem anderen im Weg
+   * stehen. Auf dem Brett ist er schon nicht zu sehen – bliebe er hier
+   * mitgezaehlt, waere er ein unsichtbares Hindernis, und der Grund dafuer, dass
+   * eine Groesse nicht geht, stuende nirgends.
+   */
+  #occupied(screenId: string, exceptId: string | null, grid: GridSize): GridRect[] {
+    return (this.snapshot.config?.instances ?? [])
+      .filter(
+        (entry) =>
+          entry.screenId === screenId && entry.id !== exceptId && entry.visible !== false,
+      )
+      .map((entry) => rectFor(entry, grid));
+  }
+
+  /**
+   * Entscheidet auf diesem Screen das Raster ueber den Platz?
+   *
+   * In einer Szene nicht – dort liegt ein Block in einem Band. Einen Screen,
+   * den es nicht (mehr) gibt, behandelt die Frage als Raster: das ist die
+   * strengere der beiden Antworten.
+   */
+  #gridDecides(screenId: string): boolean {
+    const screen = this.snapshot.config?.screens.find((entry) => entry.id === screenId);
+    return screen ? gridDecidesPlacement(screen.layout) : true;
   }
 
   /* ------------------------------ Ausgewaehlter Block ------------------------------ */
@@ -1390,44 +1421,65 @@ export class MirrorRemote extends LitElement {
     store.send({ t: 'admin:setLayout', instances: [{ id: instance.id, visible }] });
   }
 
+  /**
+   * Eine andere Groesse – und dazu der Platz, den sie braucht.
+   *
+   * Der Rasterplatz wird auch in einer Szene gesucht und mitgeschrieben: ein
+   * Screen laesst sich zwischen beiden Anordnungen umschalten, und ein Block
+   * ohne passende Koordinaten laege danach unter einem anderen. Findet sich
+   * keiner, ist das in einer Szene aber kein Grund zur Absage – genau so haelt
+   * es der Core schon beim Hinzufuegen. Dort belegt der Block ein Band, und die
+   * Groesse sagt nur noch, welche Form er darin annimmt.
+   */
   #resize(instance: ModuleInstance, size: WidgetSize): void {
     const config = this.snapshot.config;
     if (!config || size === instance.size) return;
     const descriptor = this.snapshot.modules.find((entry) => entry.id === instance.moduleId);
     if (descriptor && !descriptor.sizes.includes(size)) return;
     const grid = config.display.grid;
-    const occupied = config.instances
-      .filter((entry) => entry.screenId === instance.screenId && entry.id !== instance.id)
-      .map((entry) => rectFor(entry, grid));
-    const spot = findFreeSpot(occupied, grid, size, { x: instance.x, y: instance.y });
-    if (!spot) {
+    const spot = findFreeSpot(this.#occupied(instance.screenId, instance.id, grid), grid, size, {
+      x: instance.x,
+      y: instance.y,
+    });
+    if (!spot && this.#gridDecides(instance.screenId)) {
       this.notice = 'Kein Platz fuer diese Groesse. Verschiebe zuerst einen anderen Block.';
       return;
     }
     this.notice = null;
     const before = { size: instance.size, x: instance.x, y: instance.y };
-    store.send({ t: 'admin:setLayout', instances: [{ id: instance.id, size, x: spot.x, y: spot.y }] });
+    store.send({
+      t: 'admin:setLayout',
+      instances: [{ id: instance.id, size, x: spot?.x ?? instance.x, y: spot?.y ?? instance.y }],
+    });
     this.#toast(`Groesse ${WIDGET_SIZE_SPECS[size].label}`, 'ok', {
       label: 'Rueckgaengig',
       run: () => store.send({ t: 'admin:setLayout', instances: [{ id: instance.id, ...before }] }),
     });
   }
 
+  /**
+   * Auf einen anderen Screen legen. Ueber den Platz entscheidet der Screen,
+   * auf den der Block kommt – und eine Szene entscheidet ihn mit ihren Baendern
+   * und nicht mit dem Raster.
+   */
   #moveToScreen(instance: ModuleInstance, screenId: string): void {
     const config = this.snapshot.config;
     if (!config || screenId === instance.screenId) return;
     const grid = config.display.grid;
-    const occupied = config.instances
-      .filter((entry) => entry.screenId === screenId)
-      .map((entry) => rectFor(entry, grid));
-    const spot = findFreeSpot(occupied, grid, instance.size, { x: instance.x, y: instance.y });
-    if (!spot) {
+    const spot = findFreeSpot(this.#occupied(screenId, instance.id, grid), grid, instance.size, {
+      x: instance.x,
+      y: instance.y,
+    });
+    if (!spot && this.#gridDecides(screenId)) {
       this.notice = 'Auf diesem Screen ist kein Platz frei.';
       return;
     }
     this.notice = null;
     const before = { screenId: instance.screenId, x: instance.x, y: instance.y };
-    store.send({ t: 'admin:setLayout', instances: [{ id: instance.id, screenId, x: spot.x, y: spot.y }] });
+    store.send({
+      t: 'admin:setLayout',
+      instances: [{ id: instance.id, screenId, x: spot?.x ?? instance.x, y: spot?.y ?? instance.y }],
+    });
     this.screen = screenId;
     this.#toast('Auf anderen Screen gelegt', 'ok', {
       label: 'Rueckgaengig',

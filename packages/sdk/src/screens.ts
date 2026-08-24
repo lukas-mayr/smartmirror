@@ -53,6 +53,25 @@ export function normalizeScreenLayout(
   return isScreenLayout(value) ? value : fallback;
 }
 
+/**
+ * Entscheidet auf diesem Screen das Raster ueber den Platz eines Blocks?
+ *
+ * Nur im freien Raster. In einer Szene liegt ein Block in einem Band; seine
+ * Rasterkoordinaten werden bloss mitgeschrieben, damit er beim Umschalten
+ * zwischen beiden Anordnungen nicht auf 0,0 landet. Ein Raster, in dem gerade
+ * kein 4 x 2 grosses Loch frei ist, darf dort deshalb nichts verbieten – sonst
+ * scheitert eine Blockgroesse an einer Enge, die auf dem Spiegel niemand sieht,
+ * und der einzige Rat, den man dazu geben kann ("verschiebe zuerst einen
+ * anderen Block"), geht ins Leere: in einer Szene wird nichts verschoben.
+ *
+ * Die Frage steht hier und nicht in der Handy-App, weil der Core dieselbe
+ * schon beim Hinzufuegen beantwortet. Zwei Antworten auf dieselbe Frage sind
+ * genau eine zuviel.
+ */
+export function gridDecidesPlacement(layout: ScreenLayout): boolean {
+  return layout === 'grid';
+}
+
 export interface MirrorScreen {
   /** Stabil ueber die Lebensdauer, z.B. "screen-2". */
   id: string;
