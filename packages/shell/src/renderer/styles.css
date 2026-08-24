@@ -173,7 +173,7 @@
 
   --board-row-h: 112px;
   --board-gap: 16px;
-  --board-text: 40px;
+  --board-text: 56px;
 
   /* ---------------------------------- Aushub -------------------------------- */
 
@@ -2360,8 +2360,16 @@ body {
    * Der Pixelwert deckelt, Hoehe und Breite des Blocks entscheiden darunter —
    * in einem schmalen Block gewinnt die Breite, sonst waere das Ziel
    * abgeschnitten statt kleiner.
+   *
+   * Die Breite gewinnt fast immer: ein grosser Block ist zwei Zellen breit und
+   * zwei hoch, also viel hoeher als breit, und die Hoehe hatte deshalb Luft,
+   * die nie jemand gesehen hat. Darum stehen hier groessere Faktoren — die
+   * Tafel liest sich aus drei Metern wie der Wochentag im Wetterblock.
+   * Bezahlt wird das am Ziel: es hat weniger Zeichen, bevor es abbricht. Wem
+   * der Ortsname wichtiger ist als die Groesse, dreht den Regler in der
+   * Handy-App zurueck.
    */
-  --board-size: calc(var(--board-scale) * min(var(--board-text), 6.5cqh, 4.4cqw));
+  --board-size: calc(var(--board-scale) * min(var(--board-text), 9cqh, 6.2cqw));
   font-size: var(--board-size);
 }
 
@@ -2385,7 +2393,7 @@ body {
 .board__row {
   display: flex;
   align-items: center;
-  gap: 0.5em;
+  gap: 0.4em;
   flex: none;
   min-width: 0;
   min-height: calc(var(--board-scale) * min(var(--board-row-h), 26cqh));
@@ -2402,15 +2410,15 @@ body {
   flex: none;
   display: inline-flex;
   justify-content: center;
-  width: calc(1.5 * var(--board-size));
-  font-size: calc(1.2 * var(--board-size));
+  width: calc(1.6 * var(--board-size));
+  font-size: calc(1.45 * var(--board-size));
   line-height: 0;
   color: var(--mirror-accent);
 }
 
 .board__line {
   flex: none;
-  min-width: 2.8em;
+  min-width: 2.4em;
   font-weight: var(--mirror-weight-value);
   color: var(--mirror-fg);
   white-space: nowrap;
@@ -2444,7 +2452,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 0.2em;
-  font-size: calc(0.68 * var(--board-size));
+  font-size: calc(0.8 * var(--board-size));
   font-variant-numeric: tabular-nums;
   color: var(--mirror-fg-mute);
   white-space: nowrap;
@@ -2461,7 +2469,7 @@ body {
   align-items: baseline;
   justify-content: flex-end;
   gap: 0.25em;
-  min-width: 3.6em;
+  min-width: 3.2em;
   color: var(--mirror-accent);
   white-space: nowrap;
 }
@@ -2511,7 +2519,7 @@ body {
 
 .board__cancelled {
   display: inline-flex;
-  font-size: calc(1.1 * var(--board-size));
+  font-size: calc(1.3 * var(--board-size));
   line-height: 0;
 }
 

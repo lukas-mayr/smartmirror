@@ -437,8 +437,13 @@ export const BOARD = {
    * deutlich darueber und Gleis und Einheit darunter. Ein Mass statt fuenf:
    * eine Zeile, die aus fuenf unabhaengigen Groessen besteht, faellt beim
    * ersten Faktor auseinander.
+   *
+   * Der Wert ist nur der Deckel: in einem Block, der schmaler ist als 1080 px
+   * Bildschirmbreite geteilt durch drei, entscheidet die Blockbreite. Er darf
+   * deshalb grosszuegig stehen — auf einem 4K-Spiegel ist er der Grund, dass
+   * eine Zeile nicht ins Plakathafte waechst.
    */
-  textSize: 40,
+  textSize: 56,
 } as const;
 
 /* --------------------------------- Aushub ---------------------------------- */
