@@ -339,7 +339,15 @@ hängt; in einem 481 px breiten Block landete das Datum unter der Uhr damit bei
 15 px — weit unter den 32 px, ab denen aus 3 m überhaupt noch etwas lesbar ist.
 
 Ein Block behält seinen Rasterplatz, auch während sein Screen eine Szene ist.
-Beim Zurückschalten liegt er wieder dort, wo er lag.
+Beim Zurückschalten liegt er wieder dort, wo er lag. Aber **entscheiden darf
+dieser Platz in einer Szene nichts**: dort liegt ein Block in einem Band, und
+ein Raster, in dem gerade kein Loch der passenden Größe frei ist, ist deshalb
+kein Grund, eine Größe abzulehnen. Sonst scheitert XL an einer Enge, die auf
+dem Spiegel niemand sieht — und der einzige Rat, den man dazu geben kann
+(„verschiebe zuerst einen anderen Block"), geht ins Leere, denn in einer Szene
+wird nichts verschoben. Ein neuer Platz wird trotzdem gesucht und
+mitgeschrieben, wenn sich einer findet; findet sich keiner, bleibt der alte
+stehen.
 
 **Mehrere Screens.** Ein Screen ist eine vollständige Anordnung. Der Spiegel
 schaltet sie im Kreis weiter; die Standzeit steht am Screen und nicht global —
