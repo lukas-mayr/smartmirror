@@ -121,6 +121,53 @@ else
   echo "Kein Startbild fuer Drehung $DREHUNG - die Sekunden vor dem ersten Bild bleiben schwarz." >&2
 fi
 
+# Und was cage beim letzten Mal gelesen hat, jetzt schon einmal holen.
+#
+# Vom Aufruf von cage bis zu seinem ersten Client vergehen auf dem Geraet 5,4
+# Sekunden. Das sind die einzigen, die noch schwarz sind: davor haelt Plymouth
+# das Bild, danach der Startbildschirm. Headless und mit warmem Cache braucht
+# cage 0,02 Sekunden - der Unterschied ist die Grafik-Hardware und eine Karte,
+# die knapp 5 MB/s liefert.
+#
+# Fuer die Anzeige war Vorwaermen ein Irrweg: 40 Sekunden Lesen fuer 5 Sekunden
+# weniger Schwarz, und seit es den Startbildschirm gibt, liegt ihre Wartezeit
+# ohnehin unter dem Wortzeichen. Hier ist es umgekehrt. Es geht um die einzige
+# Luecke, die noch schwarz ist, und gelesen wird nicht auf Verdacht, sondern
+# genau das, was cage beim letzten Start selbst angefasst hat (aufgeschrieben
+# von cage-app.sh). Waehrenddessen steht noch das Bild von Plymouth.
+#
+# Ob es hilft, sagt das Journal: die Zeile hier, die Zeile "cage startet die
+# Anzeige" und "Startbild steht nach ... ms" stehen unmittelbar hintereinander.
+# Bringt es nichts, war die Zeit nicht das Lesen - dann gehoert das hier wieder
+# heraus, wie beim ersten Mal.
+LISTE="${MIRROR_DATA_DIR:-/opt/smartmirror/data}/cage-vorwaermliste"
+CAGE_MB="${MIRROR_CAGE_PREWARM_MB:-160}"
+CAGE_S="${MIRROR_CAGE_PREWARM_S:-15}"
+
+waerme_cage_vor() {
+  [[ "${MIRROR_CAGE_PREWARM:-1}" == '1' ]] || return 0
+  [[ -s "$LISTE" ]] || return 0
+
+  local budget=$(( CAGE_MB * 1024 * 1024 ))
+  local gelesen=0 dateien=0 groesse datei
+  local beginn=$SECONDS
+
+  while IFS= read -r datei; do
+    (( gelesen < budget )) || break
+    (( SECONDS - beginn < CAGE_S )) || break
+    [[ -f "$datei" ]] || continue
+    groesse="$(stat -c %s "$datei" 2>/dev/null || echo 0)"
+    (( groesse > 0 )) || continue
+    cat "$datei" > /dev/null 2>&1 || true
+    gelesen=$(( gelesen + groesse ))
+    dateien=$(( dateien + 1 ))
+  done < "$LISTE"
+
+  echo "cage vorgewaermt: $dateien Dateien, $(( gelesen / 1024 / 1024 )) MB in $(( SECONDS - beginn )) s."
+}
+
+waerme_cage_vor
+
 # Die eine Zeile, an der sich das schwarze Fenster messen laesst.
 #
 # Ab hier hat der Compositor den Bildschirm und die Anzeige noch kein Fenster.

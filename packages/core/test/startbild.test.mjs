@@ -151,8 +151,8 @@ async function nachbau({ drehung, ohnePython = false } = {}) {
   );
   await chmod(join(app, 'smartmirror-shell'), 0o755);
 
+  await mkdir(join(dir, 'data'), { recursive: true });
   if (drehung !== undefined) {
-    await mkdir(join(dir, 'data'), { recursive: true });
     await writeFile(join(dir, 'data/config.json'), JSON.stringify({ display: { rotation: drehung } }));
   }
 
@@ -229,4 +229,56 @@ test('ohne python3 startet die Anzeige trotzdem', async () => {
   const ausgabe = await lauf({ PATH: `${bin}:${werkzeug}` });
   assert.match(ausgabe, /ANZEIGE: --ozone-platform=wayland/, 'ohne Startbildschirm faehrt nichts mehr hoch');
   assert.doesNotMatch(ausgabe, /STARTBILD:/);
+});
+
+/*
+ * Die einzige Luecke, die noch schwarz ist.
+ *
+ * Vom Aufruf von cage bis zu seinem ersten Client vergehen auf dem Geraet 5,4
+ * Sekunden - davor haelt Plymouth das Bild, danach der Startbildschirm.
+ * Headless und mit warmem Cache braucht cage 0,02 Sekunden; der Unterschied
+ * ist die Grafik-Hardware und eine Karte mit knapp 5 MB/s. Deshalb schreibt
+ * cage-app.sh auf, welche Dateien cage dafuer gebraucht hat, und
+ * cage-session.sh liest sie beim naechsten Start vorher ein - waehrend das
+ * Wortzeichen von Plymouth noch steht.
+ *
+ * Gelernt statt geraten: ein fest eingetragener Mesa-Pfad waere mit der
+ * naechsten Version des Systems falsch.
+ */
+
+test('cage merkt sich, was es gelesen hat, und liest es beim naechsten Mal vorher', async () => {
+  const { dir, lauf } = await nachbau();
+  const liste = join(dir, 'data/cage-vorwaermliste');
+
+  // Erster Start: es gibt noch keine Liste - also nichts vorzuwaermen.
+  const erster = await lauf();
+  assert.doesNotMatch(erster, /vorgewaermt/, 'ohne Liste darf nichts gelesen werden');
+  assert.ok(existsSync(liste), 'cage-app.sh hat keine Liste hinterlassen');
+
+  const inhalt = await readFile(liste, 'utf8');
+  const zeilen = inhalt.split('\n').filter(Boolean);
+  assert.ok(zeilen.length > 0, 'die Liste ist leer');
+  assert.ok(zeilen.every((zeile) => zeile.startsWith('/')), 'die Liste enthaelt keine Pfade');
+  assert.ok(
+    zeilen.every((zeile) => !/^\/(dev|proc|sys|run)\//.test(zeile)),
+    'Geraetedateien gehoeren nicht in die Liste - sie lassen sich nicht vorwaermen',
+  );
+
+  // Zweiter Start: jetzt liegt sie da und wird vor cage gelesen.
+  const zweiter = await lauf();
+  assert.match(zweiter, /cage vorgewaermt: \d+ Dateien, \d+ MB/);
+
+  // Und zwar vor dem Start des Compositors - danach waere es zu spaet.
+  assert.ok(
+    zweiter.indexOf('cage vorgewaermt') < zweiter.indexOf('cage startet die Anzeige'),
+    'vorgewaermt wird nach dem Start von cage - dann ist die Luecke schon vorbei',
+  );
+});
+
+test('das Vorwaermen von cage laesst sich abschalten', async () => {
+  const { lauf } = await nachbau();
+  await lauf();
+  const ausgabe = await lauf({ MIRROR_CAGE_PREWARM: '0' });
+  assert.doesNotMatch(ausgabe, /vorgewaermt/);
+  assert.match(ausgabe, /ANZEIGE: --ozone-platform=wayland/, 'die Anzeige muss trotzdem starten');
 });

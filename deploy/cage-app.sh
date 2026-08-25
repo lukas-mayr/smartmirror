@@ -29,6 +29,42 @@ starte_startbild() {
   export MIRROR_SPLASH_PID=$!
 }
 
+merke_was_cage_gelesen_hat() {
+  # Was `cage` beim Start von der Karte liest, weiss nur `cage` selbst.
+  #
+  # Auf dem Geraet vergehen zwischen dem Aufruf von cage und diesem Skript
+  # 5,4 Sekunden - die einzigen, die noch schwarz sind, denn vorher kann sich
+  # kein Client anmelden. Headless und mit warmem Cache sind es 0,02: der
+  # Unterschied ist die Grafik-Hardware und eine Karte, die knapp 5 MB/s
+  # liefert. Also wlroots, Mesa, libEGL, seitenweise von der Karte.
+  #
+  # Vorwaermen kann das nur, wer die Liste kennt - und die steht hier: dieses
+  # Skript ist das erste, was cage aufruft, sein Elternprozess *ist* cage, und
+  # dessen Speicherabbild nennt jede Datei, die er dafuer gebraucht hat.
+  # Aufgeschrieben fuer den naechsten Start; cage-session.sh liest sie dann,
+  # bevor es cage aufruft - und bis dahin steht noch das Wortzeichen von
+  # Plymouth.
+  #
+  # Gelernt statt geraten: kein fest eingetragener Mesa-Pfad, der sich mit der
+  # naechsten Version des Systems verschiebt, und nichts, was cage gar nicht
+  # anfasst.
+  local verzeichnis="${MIRROR_DATA_DIR:-/opt/smartmirror/data}"
+  local liste="$verzeichnis/cage-vorwaermliste"
+  [[ -d "$verzeichnis" && -w "$verzeichnis" ]] || return 0
+
+  awk '$6 ~ /^\// && $6 !~ /^\/(dev|proc|sys|run)\// && $0 !~ /deleted/ { print $6 }' \
+    "/proc/$PPID/maps" 2>/dev/null | sort -u > "$liste.neu" 2>/dev/null || return 0
+
+  # Nur ersetzen, wenn wirklich etwas drinsteht: eine leere Liste waere
+  # schlechter als die alte.
+  if [[ -s "$liste.neu" ]]; then
+    mv -f "$liste.neu" "$liste" 2>/dev/null || rm -f "$liste.neu"
+  else
+    rm -f "$liste.neu"
+  fi
+}
+
 starte_startbild
+merke_was_cage_gelesen_hat
 
 exec "$@"
