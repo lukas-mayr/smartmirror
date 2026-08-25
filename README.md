@@ -985,7 +985,38 @@ sondern wie ein Bild aussehen, das durchgehend steht.
 
 Gegengeprüft wurde er gegen ein echtes `cage` (headless, Screenshots über
 `zwlr_screencopy`): das Bild steht nach gut 100 ms, die Punkte atmen, und das
-Fenster der Anzeige deckt ihn vollständig zu, sobald es kommt. Die Tests im
+Fenster der Anzeige deckt ihn vollständig zu, sobald es kommt.
+
+**Was danach noch schwarz war, gehört `cage` selbst.** Auf dem Gerät gemessen:
+
+```
+22:37:36.680  cage startet die Anzeige.      ← ab hier schwarz
+22:37:42.445  Startbild steht nach 406 ms.   ← ab hier das Wortzeichen
+22:38:18.752  [shell] erstes Bild nach 9.1 s ← ab hier der Spiegel
+```
+
+5,8 Sekunden, davon 5,4 zwischen dem Aufruf von `cage` und dem Augenblick, in
+dem es sein erstes Programm startet — vorher kann sich kein Client anmelden.
+Headless und mit warmem Cache braucht `cage` dafür 0,02 Sekunden; der
+Unterschied ist die Grafik-Hardware und wieder die Karte mit knapp 5 MB/s:
+wlroots, Mesa und libEGL wandern seitenweise in den Speicher.
+
+Dagegen hilft hier, was für die Anzeige ein Irrweg war — aber gelernt statt
+geraten. `cage-app.sh` ist das erste Programm, das `cage` startet, sein
+Elternprozess *ist* `cage`, und dessen Speicherabbild (`/proc/<pid>/maps`)
+nennt jede Datei, die dafür gebraucht wurde. Die Liste wird aufgeschrieben, und
+`cage-session.sh` liest sie beim nächsten Start ein, **bevor** es `cage`
+aufruft — währenddessen steht noch das Bild von Plymouth. Kein fest
+eingetragener Mesa-Pfad, der mit der nächsten Version des Systems falsch wäre,
+und nichts, was `cage` gar nicht anfasst. Grenzen: `MIRROR_CAGE_PREWARM_MB`
+(160) und `MIRROR_CAGE_PREWARM_S` (15), abschaltbar mit `MIRROR_CAGE_PREWARM=0`.
+
+Der Unterschied zum Vorwärmen der Anzeige, das oben herausgeflogen ist: dort
+ging es um 40 Sekunden Lesen für 5 Sekunden weniger Schwarz — und seit es den
+Startbildschirm gibt, liegt die Wartezeit der Anzeige ohnehin unter dem
+Wortzeichen. Hier geht es um die einzige Lücke, die überhaupt noch schwarz ist.
+Ob es hilft, sagt dieselbe Zeitleiste im Journal; wenn nicht, war die Zeit nicht
+das Lesen, und dann gehört auch das wieder heraus. Die Tests im
 Repository prüfen, was ohne Compositor prüfbar ist — Bilder vorhanden und lesbar,
 Atemkurve identisch, Drehung kommt an, und die Anzeige startet auch dann, wenn
 der Startbildschirm ausfällt.
