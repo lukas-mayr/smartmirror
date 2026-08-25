@@ -1,6 +1,6 @@
 {
   "name": "@mirror/module-weather",
-  "version": "0.25.2",
+  "version": "0.25.3",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,8 +8,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@mirror/sdk": "0.25.2",
+    "@mirror/sdk": "0.25.3",
     "lit": "^3.2.1",
-    "@mirror/icons": "0.25.2"
+    "@mirror/icons": "0.25.3"
   }
 }

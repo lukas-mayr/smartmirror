@@ -1,6 +1,6 @@
 {
   "name": "@mirror/shell",
-  "version": "0.25.2",
+  "version": "0.25.3",
   "private": true,
   "description": "Anzeige-Anwendung des Spiegels",
   "main": "dist/main/index.cjs",
@@ -12,7 +12,7 @@
     "clean": "rm -rf dist release"
   },
   "dependencies": {
-    "@mirror/sdk": "0.25.2",
+    "@mirror/sdk": "0.25.3",
     "lit": "^3.2.1"
   },
   "devDependencies": {
