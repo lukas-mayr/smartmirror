@@ -64,6 +64,18 @@ function createWindow(): void {
   mainWindow.once('ready-to-show', () => {
     mainWindow?.show();
     mainWindow?.focus();
+    /*
+     * Die einzige Zahl, die den Startbildschirm betrifft und sich messen laesst.
+     *
+     * Zwischen dem Start von `cage` und diesem Augenblick ist der Bildschirm
+     * schwarz: der Compositor hat die Grafikausgabe, aber noch kein Fenster zu
+     * zeichnen. Wie lang das dauert, haengt am Geraet und daran, ob die
+     * Anwendung schon im Speicher lag - deshalb steht es im Journal und nicht
+     * in einer Schaetzung. Zusammen mit der Zeile "Vorgewaermt: ..." aus
+     * cage-session.sh laesst sich `journalctl -u mirror-shell` lesen wie eine
+     * Zeitleiste des Starts.
+     */
+    console.log(`[shell] erstes Bild nach ${process.uptime().toFixed(1)} s`);
   });
 
   // Die Anzeige navigiert nie irgendwohin. Alles andere waere ein Weg, ueber

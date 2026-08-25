@@ -949,7 +949,34 @@ sich, Plymouth muss sie also freigeben, bevor Electron sein erstes Bild hat.
 Diese Sekunden bleiben schwarz — aber wenigstens nur schwarz, ohne Zeiger und
 ohne Textzeilen.
 
-Nötig sind dafür sieben Dinge, und vier davon liegen außerhalb des Releases:
+**Bemalen lässt sich dieses Fenster nicht, kürzen schon.** Sobald `cage` läuft,
+kann dort nur noch ein Wayland-Client zeichnen — und der einzige, den der
+Spiegel hat, ist die Anzeige selbst, also genau das, worauf gewartet wird. Der
+größte Teil der Wartezeit ist aber kein Rechnen, sondern Lesen: die
+Electron-Anwendung ist ein knapp 200 MB großes Programm, das sich der Start
+seitenweise von der SD-Karte holt, in der Reihenfolge, in der die Seiten
+gebraucht werden — für eine Karte der ungünstigste Fall.
+
+Deshalb liest `cage-session.sh` die Anwendung **vor** dem Start des Compositors
+am Stück in den Dateisystem-Cache des Kernels (Programm, Bibliotheken,
+V8-Schnappschuss, Ressourcenpakete, `app.asar`; höchstens 320 MB, höchstens
+25 Sekunden). Am Stück gelesen geht dieselbe Datenmenge um ein Vielfaches
+schneller, und Electron findet sie danach im Speicher statt auf der Karte. Die
+Wartezeit verschwindet dadurch nicht, sie wandert: aus dem schwarzen Fenster
+hinter `cage` in die Zeit davor — und dort steht noch das Wortzeichen von
+Plymouth. Auf dem Bildschirm sieht das aus, als stünde das Logo länger und das
+Schwarz kürzer.
+
+Ist der Cache schon warm — Neustart der Anzeige im laufenden Betrieb,
+Wiederanlauf nach einem Absturz —, kostet das unter einer Sekunde.
+`MIRROR_PREWARM=0` schaltet es ab.
+
+Wie lang das schwarze Fenster auf einem bestimmten Gerät wirklich ist, steht im
+Journal statt in einer Schätzung: `journalctl -u mirror-shell` zeigt die Zeile
+`Vorgewaermt: … MB in … s` und danach `[shell] erstes Bild nach … s` — dazwischen
+liegt genau die Zeit, in der der Bildschirm schwarz war.
+
+Nötig sind dafür acht Dinge, und vier davon liegen außerhalb des Releases:
 
 - **`disable_splash=1`** in der `config.txt`. Das Regenbogenquadrat ist die
   einzige große helle Fläche im ganzen Startvorgang.
@@ -985,6 +1012,9 @@ Nötig sind dafür sieben Dinge, und vier davon liegen außerhalb des Releases:
   `XCURSOR_PATH` ein eigenes Thema untergeschoben, in dem jeder Zeiger aus
   lauter durchsichtigen Bildpunkten besteht (`deploy/cursor/`, erzeugt von
   `scripts/generate-cursor.mjs`).
+- **Die Anwendung liegt im Speicher, bevor `cage` startet** (siehe oben). Das
+  Lesen von der Karte passiert damit unter dem Wortzeichen und nicht unter dem
+  schwarzen Bildschirm.
 - **Die Anzeige startet sofort**, ohne auf den Core zu warten. Vorher wartete sie
   bis zu 30 Sekunden auf dessen `/healthz`, damit der Spiegel nicht kurz „keine
   Verbindung" zeigt — und genau diese halbe Minute war das Fenster, in dem
