@@ -1,6 +1,6 @@
 {
   "name": "smartmirror",
-  "version": "0.25.1",
+  "version": "0.25.2",
   "private": true,
   "description": "Smartmirror – modulare Anzeige-Software fuer Raspberry Pi hinter einem Zwei-Wege-Spiegel",
   "license": "MIT",
