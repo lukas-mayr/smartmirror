@@ -143,16 +143,29 @@ test('die Anwendung wird gelesen, bevor cage den Bildschirm nimmt', async () => 
   assert.match(stdout, /Vorgewaermt: 4 Dateien/);
 });
 
-test('das Vorwaermen laesst sich abschalten und haelt sein Budget ein', async () => {
+test('die kleinen Dateien kommen vor dem grossen Programm', async () => {
+  // Gemessen auf dem Geraet: das 169 MB grosse Programm allein braucht auf der
+  // Karte 35 Sekunden. Stuende es vorn, waere die Frist um, bevor die kleinen
+  // Dateien an der Reihe sind - und genau die braucht Electron vollstaendig.
+  const { lauf } = await nachbau({ 'libffmpeg.so': 1024 * 1024 });
+
+  // Budget so knapp wie die erste kleine Datei: was danach kaeme, faellt weg.
+  // Stuende das 2 MB grosse Programm vorn, meldete die Zeile 2 MB.
+  const knapp = await lauf({ MIRROR_PREWARM_BUDGET_MB: '1' });
+  assert.match(knapp, /Vorgewaermt: 1 Dateien, 1 MB/);
+  assert.match(knapp, /cage gestartet/);
+});
+
+test('das Vorwaermen laesst sich abschalten und haelt seine Frist ein', async () => {
   const { lauf } = await nachbau({ 'libffmpeg.so': 1024 * 1024 });
 
   const aus = await lauf({ MIRROR_PREWARM: '0' });
   assert.doesNotMatch(aus, /Vorgewaermt:/);
   assert.match(aus, /cage gestartet/, 'ohne Vorwaermen muss cage trotzdem starten');
 
-  // Ein Budget unterhalb der ersten Datei: gelesen wird sie trotzdem - sie ist
-  // die wichtigste -, danach ist Schluss.
-  const knapp = await lauf({ MIRROR_PREWARM_BUDGET_MB: '1' });
-  assert.match(knapp, /Vorgewaermt: 1 Dateien/);
-  assert.match(knapp, /cage gestartet/);
+  // Keine Frist heisst: gar nichts lesen - und trotzdem starten. Der
+  // Startbildschirm ist eine Verschoenerung; die Anzeige ist der Zweck.
+  const eilig = await lauf({ MIRROR_PREWARM_SECONDS: '0' });
+  assert.match(eilig, /Vorgewaermt: 0 Dateien/);
+  assert.match(eilig, /cage gestartet/);
 });

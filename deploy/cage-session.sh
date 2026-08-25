@@ -82,6 +82,24 @@ fi
 # Ist der Cache schon warm - Neustart der Anzeige im laufenden Betrieb,
 # Wiederanlauf nach einem Absturz -, liest der Kernel aus dem Speicher und ist
 # in unter einer Sekunde durch. Wer es abschalten will: MIRROR_PREWARM=0.
+# Die Reihenfolge kommt vom Geraet, nicht aus der Vermutung.
+#
+# Gemessen auf dem Spiegel (journalctl -u mirror-shell): die Karte liefert am
+# Stueck knapp 5 MB/s. Das grosse Programm allein - 169 MB - dauert damit
+# 35 Sekunden, und danach war die Frist um, bevor auch nur eine der kleinen
+# Dateien an der Reihe war. Electron holte sie sich anschliessend selbst von der
+# Karte: die zehn Sekunden Schwarz, die uebrig blieben, waren zum grossen Teil
+# genau das.
+#
+# Deshalb jetzt umgekehrt: erst die kleinen Dateien, die Electron beim Start
+# vollstaendig braucht (Bibliotheken, V8-Schnappschuss, Ressourcenpakete,
+# Zeichensatztabellen, App-Archiv - zusammen ein paar Dutzend MB), und das grosse
+# Programm ganz zuletzt. Von dem liest Electron beim Start ohnehin nur einen
+# Bruchteil; es vollstaendig zu lesen kostete mehr Zeit, als es sparte.
+#
+# Nicht dabei: locales/ (Electron laedt daraus genau eine Datei) und alles
+# Uebrige im Verzeichnis. Der Cache ist kein Selbstzweck - jede Seite, die hier
+# hineingelesen wird, verdraengt auf einem Pi mit wenig Speicher eine andere.
 BUDGET_MB="${MIRROR_PREWARM_BUDGET_MB:-320}"
 FRIST_S="${MIRROR_PREWARM_SECONDS:-25}"
 
@@ -94,39 +112,51 @@ vorwaermen() {
   local verzeichnis
   verzeichnis="$(dirname "$APP")"
 
-  # Nur, was Electron beim Start wirklich anfasst, und die grosse Datei zuerst:
-  # das Programm selbst, die mitgelieferten Bibliotheken, der V8-Schnappschuss,
-  # die Ressourcenpakete, die Zeichensatztabellen und das App-Archiv.
-  #
-  # Nicht dabei: locales/ (Electron laedt daraus genau eine Datei) und alles
-  # Uebrige im Verzeichnis. Der Cache ist kein Selbstzweck - jede Seite, die
-  # hier hineingelesen wird, verdraengt auf einem Pi mit wenig Speicher eine
-  # andere.
-  local -a kandidaten=("$APP")
+  local -a kandidaten=()
   local muster
-  for muster in "$verzeichnis"/*.so "$verzeichnis"/*.bin "$verzeichnis"/*.pak \
-    "$verzeichnis"/*.dat "$verzeichnis"/resources/*.asar; do
+  for muster in "$verzeichnis"/*.so "$verzeichnis"/*.so.* "$verzeichnis"/*.bin \
+    "$verzeichnis"/*.pak "$verzeichnis"/*.dat "$verzeichnis"/resources/*.asar; do
     # Ein Glob ohne Treffer bleibt als Text stehen - deshalb jede Datei pruefen.
     [[ -f "$muster" ]] && kandidaten+=("$muster")
   done
+  # Zuletzt das Programm selbst: das groesste Stueck und das einzige, von dem
+  # sich auch ein Teil lohnt.
+  kandidaten+=("$APP")
 
   local budget=$(( BUDGET_MB * 1024 * 1024 ))
-  local gelesen=0 dateien=0 groesse datei
+  local gelesen=0 dateien=0 groesse datei verstrichen rate
   local beginn=$SECONDS
 
   for datei in "${kandidaten[@]}"; do
-    # Abbrechen statt ueberspringen: die Liste steht nach Wichtigkeit, und was
-    # nach dem Budget kaeme, ist genau das, was am wenigsten fehlt.
+    verstrichen=$(( SECONDS - beginn ))
     (( gelesen < budget )) || { echo "Vorwaermen: ${BUDGET_MB} MB gelesen, das reicht."; break; }
-    (( SECONDS - beginn < FRIST_S )) || { echo "Vorwaermen: Zeit ist um."; break; }
+    (( verstrichen < FRIST_S )) || { echo "Vorwaermen: Zeit ist um."; break; }
     groesse="$(stat -c %s "$datei" 2>/dev/null || echo 0)"
     (( groesse > 0 )) || continue
 
+    # Vorher rechnen, statt hinterher abzubrechen.
+    #
+    # Wie schnell die Karte liest, weiss vorher niemand: zwischen einer alten
+    # SD-Karte und einer SSD am USB-Anschluss liegt der Faktor zwanzig. Also
+    # wird an den schon gelesenen Dateien gemessen, was diese Karte kann, und
+    # daran entschieden, ob die naechste in die verbleibende Frist passt. Was
+    # nicht passt, holt sich Electron eben selbst - das kostet dann genau die
+    # Zeit, die es hier auch gekostet haette, nur ohne den Umweg.
+    if (( gelesen > 0 && verstrichen > 0 )); then
+      rate=$(( gelesen / verstrichen ))
+      if (( rate > 0 && groesse / rate > FRIST_S - verstrichen )); then
+        echo "Vorwaermen: $(basename "$datei") uebersprungen - $(( groesse / rate )) s bei $(( rate / 1024 / 1024 )) MB/s."
+        continue
+      fi
+    fi
+
     # Lesen und wegwerfen: es geht nur darum, dass der Kernel die Seiten haelt.
-    # Mit Frist, weil eine sterbende SD-Karte einen Lesevorgang minutenlang
-    # haengen lassen kann - und der Spiegel dann gar nicht erst hochkaeme.
+    # Die Frist ist ein Notnagel und keine Zusicherung - ein Lesevorgang, der in
+    # der Karte steckt, laesst sich nicht abbrechen (der Prozess haengt im
+    # Kernel und nimmt kein Signal an). Die eigentliche Bremse ist die Rechnung
+    # oben.
     if command -v timeout >/dev/null 2>&1; then
-      timeout 15 cat "$datei" > /dev/null 2>&1 || true
+      timeout "$(( FRIST_S > verstrichen ? FRIST_S - verstrichen : 5 ))" cat "$datei" > /dev/null 2>&1 || true
     else
       cat "$datei" > /dev/null 2>&1 || true
     fi
@@ -134,7 +164,8 @@ vorwaermen() {
     dateien=$(( dateien + 1 ))
   done
 
-  echo "Vorgewaermt: $dateien Dateien, $(( gelesen / 1024 / 1024 )) MB in $(( SECONDS - beginn )) s."
+  verstrichen=$(( SECONDS - beginn ))
+  echo "Vorgewaermt: $dateien Dateien, $(( gelesen / 1024 / 1024 )) MB in ${verstrichen} s."
 }
 
 vorwaermen

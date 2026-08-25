@@ -958,14 +958,27 @@ seitenweise von der SD-Karte holt, in der Reihenfolge, in der die Seiten
 gebraucht werden — für eine Karte der ungünstigste Fall.
 
 Deshalb liest `cage-session.sh` die Anwendung **vor** dem Start des Compositors
-am Stück in den Dateisystem-Cache des Kernels (Programm, Bibliotheken,
-V8-Schnappschuss, Ressourcenpakete, `app.asar`; höchstens 320 MB, höchstens
-25 Sekunden). Am Stück gelesen geht dieselbe Datenmenge um ein Vielfaches
-schneller, und Electron findet sie danach im Speicher statt auf der Karte. Die
-Wartezeit verschwindet dadurch nicht, sie wandert: aus dem schwarzen Fenster
-hinter `cage` in die Zeit davor — und dort steht noch das Wortzeichen von
-Plymouth. Auf dem Bildschirm sieht das aus, als stünde das Logo länger und das
-Schwarz kürzer.
+in den Dateisystem-Cache des Kernels. Electron findet sie danach im Speicher
+statt auf der Karte, und die Wartezeit verschwindet nicht, sondern wandert: aus
+dem schwarzen Fenster hinter `cage` in die Zeit davor — und dort steht noch das
+Wortzeichen von Plymouth.
+
+**Die Reihenfolge kommt vom Gerät, nicht aus der Vermutung.** Gemessen auf dem
+Spiegel: die Karte liefert am Stück knapp 5 MB/s. Das Programm allein — 169 MB —
+dauert damit 35 Sekunden, und danach war die Frist um, bevor auch nur eine der
+kleinen Dateien an der Reihe war; Electron holte sie sich anschließend selbst.
+Also erst die kleinen Dateien, die es beim Start vollständig braucht
+(Bibliotheken, V8-Schnappschuss, Ressourcenpakete, Zeichensatztabellen,
+`app.asar` — zusammen ein paar Dutzend MB), und das große Programm zuletzt: davon
+liest Electron beim Start ohnehin nur einen Bruchteil.
+
+Und vorher gerechnet statt hinterher abgebrochen: wie schnell die Karte liest,
+weiß vorher niemand — zwischen einer alten SD-Karte und einer SSD am USB-Anschluss
+liegt der Faktor zwanzig. Das Skript misst es an den schon gelesenen Dateien und
+entscheidet daran, ob die nächste noch in die verbleibende Frist passt (Grenzen:
+`MIRROR_PREWARM_BUDGET_MB`, Vorgabe 320, und `MIRROR_PREWARM_SECONDS`, Vorgabe
+25). Was nicht passt, holt sich Electron selbst — das kostet dann genau die Zeit,
+die es hier auch gekostet hätte, nur ohne den Umweg.
 
 Ist der Cache schon warm — Neustart der Anzeige im laufenden Betrieb,
 Wiederanlauf nach einem Absturz —, kostet das unter einer Sekunde.
