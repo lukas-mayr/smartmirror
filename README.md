@@ -51,7 +51,8 @@ modules/
   notifications/ Die Fläche für Mitteilungen; den Inhalt melden die Module
   timer/         Ein Bagger trägt einen Berg ab; ist er weg, ist die Zeit um
 deploy/      systemd-Units, Compositor-Start, Installer, Drehung, Neustart,
-             Plymouth-Thema fuer den Start, unsichtbarer Mauszeiger
+             Plymouth-Thema fuer den Start, Startbildschirm unter cage,
+             unsichtbarer Mauszeiger
 scripts/     Build-, Bundle- und Generator-Skripte
 ```
 
@@ -949,10 +950,45 @@ sich, Plymouth muss sie also freigeben, bevor Electron sein erstes Bild hat.
 Diese Sekunden bleiben schwarz — aber wenigstens nur schwarz, ohne Zeiger und
 ohne Textzeilen.
 
-**Bemalen lässt sich dieses Fenster nicht.** Sobald `cage` läuft, kann dort nur
-noch ein Wayland-Client zeichnen — und der einzige, den der Spiegel hat, ist die
-Anzeige selbst, also genau das, worauf gewartet wird. Plymouth kommt nicht mehr
-dran: es muss die Grafikausgabe freigeben, damit `cage` sie bekommt.
+**Bemalen kann dieses Fenster nur ein Wayland-Client.** Plymouth kommt nicht mehr
+dran — es muss die Grafikausgabe freigeben, damit `cage` sie bekommt —, und die
+Anzeige ist genau das, worauf gewartet wird. Also läuft unter `cage` ein zweites,
+kleines Programm, das dieselben Sekunden bemalt: **`deploy/cage-splash.py`**.
+
+Es zeigt dasselbe Bild wie Plymouth davor und die Anzeige danach — aus denselben
+Dateien (`deploy/plymouth/<ebene>-<grad>.png`) und mit derselben Atemkurve wie
+`smartmirror.script`: 1400 ms hin und zurück, die drei Punkte um je 180 ms
+versetzt, zwischen 30 % und voll. Der Wechsel soll nicht als Wechsel auffallen,
+sondern wie ein Bild aussehen, das durchgehend steht.
+
+- **Warum kein fertiges Programm.** Ein Bildbetrachter wie `imv` zeigt ein
+  Standbild. Zwischen zwei atmenden Logos wäre genau dort die Naht, die der ganze
+  Startbildschirm vermeiden soll. Und jedes zusätzliche Paket betrifft ein Gerät
+  an der Wand, an das niemand kurzfristig herankommt; Python liegt auf Raspberry
+  Pi OS ohnehin.
+- **Warum das Wayland-Protokoll von Hand.** Bindings dafür sind nicht Teil der
+  Standardbibliothek. Gebraucht wird ein Bruchteil — eine Fläche, ein
+  Speicherpuffer, ein Bild pro Takt — und der steht im Skript ausgeschrieben.
+  Denselben Weg geht der PNG-Leser: 8-Bit-RGBA ohne Interlace, genau das, was
+  `scripts/generate-splash.mjs` erzeugt.
+- **Wer ihn startet.** `deploy/cage-app.sh`, das `cage` anstelle der Anzeige
+  aufruft: ein Client kann sich erst anmelden, wenn der Compositor steht, und das
+  ist genau dieser Augenblick. Danach `exec`t es die Anzeige mit ihren Schaltern.
+  Ohne Bedingung — geht am Startbildschirm etwas schief (kein `python3`, kein
+  Bild, ein Fehler im Skript), startet die Anzeige trotzdem.
+- **Wer ihn beendet.** Die Anzeige, eine Sekunde nachdem ihr erstes Bild steht
+  (`MIRROR_SPLASH_PID`). Bis dahin liegt sie längst darüber, `cage` legt das
+  jüngste Fenster nach oben. Fällt das aus, beendet er sich selbst nach 90
+  Sekunden (`MIRROR_SPLASH_MAX_S`) und ebenso, wenn der Compositor endet: ein
+  Standbild, das über dem Spiegel hängen bleibt, wäre schlimmer als die
+  Sekunden, gegen die es geht.
+
+Gegengeprüft wurde er gegen ein echtes `cage` (headless, Screenshots über
+`zwlr_screencopy`): das Bild steht nach gut 100 ms, die Punkte atmen, und das
+Fenster der Anzeige deckt ihn vollständig zu, sobald es kommt. Die Tests im
+Repository prüfen, was ohne Compositor prüfbar ist — Bilder vorhanden und lesbar,
+Atemkurve identisch, Drehung kommt an, und die Anzeige startet auch dann, wenn
+der Startbildschirm ausfällt.
 
 **Kürzen ließ es sich auch nicht — gemessen, nicht vermutet.** Hier stand ein
 Versuch, die Electron-Anwendung (knapp 200 MB) am Stück von der Karte zu lesen,
@@ -980,7 +1016,7 @@ Bild nach … s". Der Abstand dazwischen in `journalctl -u mirror-shell` ist gen
 die Zeit, in der der Bildschirm schwarz war — auf diesem Gerät, nicht in einer
 Schätzung.
 
-Nötig sind dafür sieben Dinge, und vier davon liegen außerhalb des Releases:
+Nötig sind dafür acht Dinge, und vier davon liegen außerhalb des Releases:
 
 - **`disable_splash=1`** in der `config.txt`. Das Regenbogenquadrat ist die
   einzige große helle Fläche im ganzen Startvorgang.
@@ -1016,6 +1052,8 @@ Nötig sind dafür sieben Dinge, und vier davon liegen außerhalb des Releases:
   `XCURSOR_PATH` ein eigenes Thema untergeschoben, in dem jeder Zeiger aus
   lauter durchsichtigen Bildpunkten besteht (`deploy/cursor/`, erzeugt von
   `scripts/generate-cursor.mjs`).
+- **Ein Startbildschirm unter `cage`** (siehe oben) für die Sekunden, in denen
+  der Compositor den Bildschirm hat und die Anzeige noch kein Fenster.
 - **Die Anzeige startet sofort**, ohne auf den Core zu warten. Vorher wartete sie
   bis zu 30 Sekunden auf dessen `/healthz`, damit der Spiegel nicht kurz „keine
   Verbindung" zeigt — und genau diese halbe Minute war das Fenster, in dem

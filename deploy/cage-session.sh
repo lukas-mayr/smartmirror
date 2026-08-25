@@ -86,6 +86,41 @@ fi
 # Tastatur heisst das: schwarzer Bildschirm ohne Hinweis. Gebraucht wird hier
 # ohnehin keine: VT-Umschaltung braucht ein Geraet ohne Tastatur nicht, und den
 # Mauszeiger nimmt das Thema oben weg.
+# Der Startbildschirm fuer die Sekunden, die cage allein auf dem Bildschirm ist.
+#
+# Bemalen kann dieses Fenster nur ein Wayland-Client - Plymouth hat die
+# Grafikausgabe da schon abgegeben, und die Anzeige ist das, worauf gewartet
+# wird. Also laeuft unter cage zuerst ein kleines Programm, das dasselbe Bild
+# zeichnet wie Plymouth davor und die Anzeige danach (deploy/cage-splash.py).
+#
+# Gestartet wird es nicht hier, sondern in cage-app.sh: ein Client kann sich
+# erst anmelden, wenn der Compositor steht, und das ist genau der Augenblick,
+# in dem cage dieses Skript aufruft.
+#
+# Welche Drehung, entscheidet dieselbe Einstellung wie beim Rest der Anzeige.
+# Faellt das Lesen aus - keine Datei, kein node, kaputtes JSON -, ist 0 die
+# richtige Annahme: ein quer haengender Spiegel ist der Normalfall.
+lies_drehung() {
+  local config="${MIRROR_DATA_DIR:-/opt/smartmirror/data}/config.json"
+  [[ -f "$config" ]] || { printf '0'; return; }
+  node -e '
+    try {
+      const config = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
+      const rotation = Number(config.display?.rotation ?? 0);
+      process.stdout.write([0, 90, 180, 270].includes(rotation) ? String(rotation) : "0");
+    } catch { process.stdout.write("0"); }
+  ' "$config" 2>/dev/null || printf '0'
+}
+
+DREHUNG="$(lies_drehung)"
+if [[ -f "$HIER/cage-splash.py" && -f "$HIER/plymouth/mark-$DREHUNG.png" ]]; then
+  export MIRROR_SPLASH_SKRIPT="$HIER/cage-splash.py"
+  export MIRROR_SPLASH_DIR="$HIER/plymouth"
+  export MIRROR_SPLASH_ROTATION="$DREHUNG"
+else
+  echo "Kein Startbild fuer Drehung $DREHUNG - die Sekunden vor dem ersten Bild bleiben schwarz." >&2
+fi
+
 # Die eine Zeile, an der sich das schwarze Fenster messen laesst.
 #
 # Ab hier hat der Compositor den Bildschirm und die Anzeige noch kein Fenster.
@@ -94,7 +129,11 @@ fi
 # dauert - und nicht, wie lange es dauern sollte.
 echo "cage startet die Anzeige."
 
-exec cage -- "$APP" \
+# Ueber cage-app.sh und nicht direkt: dort wird der Startbildschirm gestartet,
+# bevor die Anzeige uebernimmt. Ueber /bin/bash aufgerufen und nicht direkt, weil
+# das Ausfuehrungsrecht am Skript daran haengt, wie das Archiv entpackt wurde -
+# dieselbe Ueberlegung wie bei mirror-guard.service.
+exec cage -- /bin/bash "$HIER/cage-app.sh" "$APP" \
   --ozone-platform=wayland \
   --enable-features=UseOzonePlatform \
   --disable-features=Translate,MediaRouter \

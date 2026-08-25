@@ -34,6 +34,36 @@ if (!app.requestSingleInstanceLock()) {
 let mainWindow: BrowserWindow | null = null;
 let saveBlocker: number | null = null;
 
+/**
+ * Beendet den Startbildschirm, der unter cage lief, bis dieses Fenster stand.
+ *
+ * Er ist ein eigener Wayland-Client (deploy/cage-splash.py) und hat den
+ * Bildschirm in den Sekunden bemalt, in denen der Compositor zwar die
+ * Grafikausgabe hatte, diese Anwendung aber noch kein Bild. Er kennt diesen
+ * Augenblick nicht - also sagt ihn ihm der einzige Prozess, der ihn kennt.
+ *
+ * Mit einer Sekunde Abstand: `ready-to-show` heisst, dass gezeichnet wurde,
+ * nicht, dass das Fenster schon auf dem Bildschirm liegt. cage legt es ueber
+ * den Startbildschirm, der so lange unsichtbar darunter liegt - eine Sekunde
+ * zu frueh waere ein schwarzes Aufblitzen, eine Sekunde zu spaet sieht
+ * niemand.
+ *
+ * Wenn das hier ausfaellt - kein Fenster, Absturz vorher -, beendet sich der
+ * Startbildschirm nach eigener Frist von selbst. Ein Standbild, das ueber dem
+ * Spiegel haengen bleibt, waere schlimmer als die Sekunden, gegen die es geht.
+ */
+function endeStartbild(): void {
+  const pid = Number(process.env.MIRROR_SPLASH_PID);
+  if (!Number.isInteger(pid) || pid <= 0) return;
+  setTimeout(() => {
+    try {
+      process.kill(pid, 'SIGTERM');
+    } catch {
+      // Schon beendet – dann ist genau das erreicht, worum es ging.
+    }
+  }, 1_000);
+}
+
 function createWindow(): void {
   const display = screen.getPrimaryDisplay();
   mainWindow = new BrowserWindow({
@@ -76,6 +106,7 @@ function createWindow(): void {
      * Zeitleiste des Starts.
      */
     console.log(`[shell] erstes Bild nach ${process.uptime().toFixed(1)} s`);
+    endeStartbild();
   });
 
   // Die Anzeige navigiert nie irgendwohin. Alles andere waere ein Weg, ueber
