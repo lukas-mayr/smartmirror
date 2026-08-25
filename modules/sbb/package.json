@@ -1,6 +1,6 @@
 {
   "name": "@mirror/module-sbb",
-  "version": "0.25.3",
+  "version": "0.26.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,8 +8,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@mirror/sdk": "0.25.3",
-    "@mirror/icons": "0.25.3",
+    "@mirror/sdk": "0.26.0",
+    "@mirror/icons": "0.26.0",
     "lit": "^3.2.1"
   }
 }
