@@ -949,47 +949,38 @@ sich, Plymouth muss sie also freigeben, bevor Electron sein erstes Bild hat.
 Diese Sekunden bleiben schwarz — aber wenigstens nur schwarz, ohne Zeiger und
 ohne Textzeilen.
 
-**Bemalen lässt sich dieses Fenster nicht, kürzen schon.** Sobald `cage` läuft,
-kann dort nur noch ein Wayland-Client zeichnen — und der einzige, den der
-Spiegel hat, ist die Anzeige selbst, also genau das, worauf gewartet wird. Der
-größte Teil der Wartezeit ist aber kein Rechnen, sondern Lesen: die
-Electron-Anwendung ist ein knapp 200 MB großes Programm, das sich der Start
-seitenweise von der SD-Karte holt, in der Reihenfolge, in der die Seiten
-gebraucht werden — für eine Karte der ungünstigste Fall.
+**Bemalen lässt sich dieses Fenster nicht.** Sobald `cage` läuft, kann dort nur
+noch ein Wayland-Client zeichnen — und der einzige, den der Spiegel hat, ist die
+Anzeige selbst, also genau das, worauf gewartet wird. Plymouth kommt nicht mehr
+dran: es muss die Grafikausgabe freigeben, damit `cage` sie bekommt.
 
-Deshalb liest `cage-session.sh` die Anwendung **vor** dem Start des Compositors
-in den Dateisystem-Cache des Kernels. Electron findet sie danach im Speicher
-statt auf der Karte, und die Wartezeit verschwindet nicht, sondern wandert: aus
-dem schwarzen Fenster hinter `cage` in die Zeit davor — und dort steht noch das
-Wortzeichen von Plymouth.
+**Kürzen ließ es sich auch nicht — gemessen, nicht vermutet.** Hier stand ein
+Versuch, die Electron-Anwendung (knapp 200 MB) am Stück von der Karte zu lesen,
+solange das Wortzeichen noch steht, damit der Start sie danach im Speicher findet
+statt seitenweise auf der Karte. Drei Starts aus dem Journal:
 
-**Die Reihenfolge kommt vom Gerät, nicht aus der Vermutung.** Gemessen auf dem
-Spiegel: die Karte liefert am Stück knapp 5 MB/s. Das Programm allein — 169 MB —
-dauert damit 35 Sekunden, und danach war die Frist um, bevor auch nur eine der
-kleinen Dateien an der Reihe war; Electron holte sie sich anschließend selbst.
-Also erst die kleinen Dateien, die es beim Start vollständig braucht
-(Bibliotheken, V8-Schnappschuss, Ressourcenpakete, Zeichensatztabellen,
-`app.asar` — zusammen ein paar Dutzend MB), und das große Programm zuletzt: davon
-liest Electron beim Start ohnehin nur einen Bruchteil.
+| vorgewärmt | Kosten | schwarzes Fenster |
+| --- | --- | --- |
+| nichts | – | ~15 s |
+| das Programm (169 MB) | 35 s | 10,0 s |
+| dazu die kleinen Dateien (218 MB) | 40 s | 10,5 s |
 
-Und vorher gerechnet statt hinterher abgebrochen: wie schnell die Karte liest,
-weiß vorher niemand — zwischen einer alten SD-Karte und einer SSD am USB-Anschluss
-liegt der Faktor zwanzig. Das Skript misst es an den schon gelesenen Dateien und
-entscheidet daran, ob die nächste noch in die verbleibende Frist passt (Grenzen:
-`MIRROR_PREWARM_BUDGET_MB`, Vorgabe 320, und `MIRROR_PREWARM_SECONDS`, Vorgabe
-25). Was nicht passt, holt sich Electron selbst — das kostet dann genau die Zeit,
-die es hier auch gekostet hätte, nur ohne den Umweg.
+Die Annahme dahinter — am Stück gelesen gehe dieselbe Datenmenge um ein
+Vielfaches schneller — stimmt auf der Karte dieses Geräts nicht: sie liefert
+knapp 5 MB/s, ob am Stück oder nicht. Und von den 10,5 Sekunden gehen nur **2,0**
+auf Electron; so lange braucht es vom Start des Prozesses bis zum ersten Bild.
+Die übrigen achteinhalb liegen davor, zwischen dem Start von `cage` und dem
+Moment, in dem Electron überhaupt läuft: der Compositor und Chromiums eigener
+Start. Daran ändert ein voller Dateisystem-Cache nichts, also ist das Vorwärmen
+wieder draußen — vierzig Sekunden längerer Start für nichts.
 
-Ist der Cache schon warm — Neustart der Anzeige im laufenden Betrieb,
-Wiederanlauf nach einem Absturz —, kostet das unter einer Sekunde.
-`MIRROR_PREWARM=0` schaltet es ab.
+Was bleibt, ist die Messung selbst: `cage-session.sh` schreibt „cage startet die
+Anzeige", der Hauptprozess der Anzeige schreibt beim ersten Bild „[shell] erstes
+Bild nach … s". Der Abstand dazwischen in `journalctl -u mirror-shell` ist genau
+die Zeit, in der der Bildschirm schwarz war — auf diesem Gerät, nicht in einer
+Schätzung.
 
-Wie lang das schwarze Fenster auf einem bestimmten Gerät wirklich ist, steht im
-Journal statt in einer Schätzung: `journalctl -u mirror-shell` zeigt die Zeile
-`Vorgewaermt: … MB in … s` und danach `[shell] erstes Bild nach … s` — dazwischen
-liegt genau die Zeit, in der der Bildschirm schwarz war.
-
-Nötig sind dafür acht Dinge, und vier davon liegen außerhalb des Releases:
+Nötig sind dafür sieben Dinge, und vier davon liegen außerhalb des Releases:
 
 - **`disable_splash=1`** in der `config.txt`. Das Regenbogenquadrat ist die
   einzige große helle Fläche im ganzen Startvorgang.
@@ -1025,9 +1016,6 @@ Nötig sind dafür acht Dinge, und vier davon liegen außerhalb des Releases:
   `XCURSOR_PATH` ein eigenes Thema untergeschoben, in dem jeder Zeiger aus
   lauter durchsichtigen Bildpunkten besteht (`deploy/cursor/`, erzeugt von
   `scripts/generate-cursor.mjs`).
-- **Die Anwendung liegt im Speicher, bevor `cage` startet** (siehe oben). Das
-  Lesen von der Karte passiert damit unter dem Wortzeichen und nicht unter dem
-  schwarzen Bildschirm.
 - **Die Anzeige startet sofort**, ohne auf den Core zu warten. Vorher wartete sie
   bis zu 30 Sekunden auf dessen `/healthz`, damit der Spiegel nicht kurz „keine
   Verbindung" zeigt — und genau diese halbe Minute war das Fenster, in dem
