@@ -161,6 +161,17 @@ DAUER_S = 1.4
 VERSATZ_S = 0.18
 STUFEN = 32  # So viele Deckkraft-Stufen werden vorberechnet.
 
+# Hoechstens zwanzig Bilder je Sekunde.
+#
+# Der Compositor bietet sechzig an, und drei pulsierende Punkte brauchen keine
+# sechzig: bei 1400 ms je Atemzug liegen zwischen zwei Bildern dann drei
+# Prozent Helligkeit, das sieht niemand. Wohl aber sieht man, was daneben
+# passiert - waehrend dieser Startbildschirm liegt, startet Chromium, und jedes
+# Bild kostet den Compositor eine Runde. Gemessen auf dem Geraet: von den
+# 36 Sekunden, die das Logo steht, gehen 27 fuer das Lesen der Anwendung von
+# der Karte drauf. Genau dabei soll hier niemand im Weg stehen.
+TAKT_S = 1 / 20
+
 
 def deckkraft(zeit):
     anteil = (zeit % DAUER_S) / DAUER_S
@@ -277,6 +288,7 @@ class Startbild:
         self.karte = None
         self.beginn = time.monotonic()
         self.gemeldet = False
+        self.letztes_bild = 0.0
 
         self.lade_bilder(verzeichnis, drehung)
         self.melde_an()
@@ -495,6 +507,14 @@ class Startbild:
         if self.karte is None or self.puffer_masse != (self.breite, self.hoehe):
             self.lege_puffer_an()
 
+        jetzt = time.monotonic()
+        if not erstes and jetzt - self.letztes_bild < TAKT_S:
+            # Zu frueh fuer ein neues Bild: nur das naechste anfragen. Ohne
+            # commit bliebe die Anfrage liegen und es kaeme nie wieder eines.
+            self.frage_naechstes_bild()
+            self.wl.sende(self.flaeche, 6)
+            return
+
         index = 0 if self.puffer_frei[0] else (1 if self.puffer_frei[1] else -1)
         if index < 0:
             # Beide Puffer noch beim Compositor: dieses Bild auslassen und
@@ -508,6 +528,7 @@ class Startbild:
             stufe = min(STUFEN - 1, max(0, int(wert * STUFEN) - 1))
             self.male_ebene(index, ausschnitt, stufen[stufe])
 
+        self.letztes_bild = jetzt
         self.puffer_frei[index] = False
         self.wl.sende(self.flaeche, 1, struct.pack('<Iii', self.puffer_ids[index], 0, 0))  # attach
         if erstes:
