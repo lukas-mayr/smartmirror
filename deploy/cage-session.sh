@@ -52,6 +52,93 @@ else
   echo "Kein Zeiger-Thema unter $HIER/cursor – vor dem ersten Bild kann kurz ein Pfeil stehen." >&2
 fi
 
+# Vor dem Compositor: die Anzeige von der Karte in den Speicher holen.
+#
+# Was beim Start zu sehen ist, haengt an einer Reihenfolge. Plymouth zeichnet
+# das Wortzeichen; `plymouth quit --retain-splash` laesst das letzte Bild
+# stehen, und es bleibt stehen, bis `cage` die Grafikausgabe uebernimmt und
+# seine schwarze Flaeche darueberlegt. Danach dauert es, bis Electron sein
+# erstes Bild hat - das ist der Zeitraum, in dem hier frueher der Mauszeiger
+# stand und der jetzt schwarz ist.
+#
+# Bemalen laesst er sich nicht: innerhalb von `cage` kann nur ein
+# Wayland-Client zeichnen, und der einzige, den der Spiegel hat, ist die
+# Anzeige selbst - also genau das, worauf gewartet wird. Was sich aendern
+# laesst, ist seine Laenge.
+#
+# Der groesste Teil davon ist kein Rechnen, sondern Lesen. Die Anwendung ist
+# ein knapp 200 MB grosses Programm, und Electron holt es sich beim Start
+# seitenweise von der SD-Karte, in der Reihenfolge, in der die Seiten gebraucht
+# werden - fuer eine Karte der unguenstigste Fall. Am Stueck gelesen geht
+# dieselbe Datenmenge um ein Vielfaches schneller.
+#
+# Also wird sie hier am Stueck gelesen, bevor `cage` startet. Der Inhalt landet
+# im Dateisystem-Cache des Kernels, und Electron findet ihn spaeter im Speicher
+# statt auf der Karte. Die Wartezeit verschwindet dadurch nicht, sie wandert:
+# aus dem schwarzen Fenster hinter `cage` in die Zeit davor, in der noch das
+# Wortzeichen steht. Auf dem Bildschirm sieht das aus, als stuende das Logo
+# laenger und das Schwarz kuerzer - und darum geht es.
+#
+# Ist der Cache schon warm - Neustart der Anzeige im laufenden Betrieb,
+# Wiederanlauf nach einem Absturz -, liest der Kernel aus dem Speicher und ist
+# in unter einer Sekunde durch. Wer es abschalten will: MIRROR_PREWARM=0.
+BUDGET_MB="${MIRROR_PREWARM_BUDGET_MB:-320}"
+FRIST_S="${MIRROR_PREWARM_SECONDS:-25}"
+
+vorwaermen() {
+  if [[ "${MIRROR_PREWARM:-1}" != '1' ]]; then
+    echo "Vorwaermen abgeschaltet (MIRROR_PREWARM=$MIRROR_PREWARM)."
+    return 0
+  fi
+
+  local verzeichnis
+  verzeichnis="$(dirname "$APP")"
+
+  # Nur, was Electron beim Start wirklich anfasst, und die grosse Datei zuerst:
+  # das Programm selbst, die mitgelieferten Bibliotheken, der V8-Schnappschuss,
+  # die Ressourcenpakete, die Zeichensatztabellen und das App-Archiv.
+  #
+  # Nicht dabei: locales/ (Electron laedt daraus genau eine Datei) und alles
+  # Uebrige im Verzeichnis. Der Cache ist kein Selbstzweck - jede Seite, die
+  # hier hineingelesen wird, verdraengt auf einem Pi mit wenig Speicher eine
+  # andere.
+  local -a kandidaten=("$APP")
+  local muster
+  for muster in "$verzeichnis"/*.so "$verzeichnis"/*.bin "$verzeichnis"/*.pak \
+    "$verzeichnis"/*.dat "$verzeichnis"/resources/*.asar; do
+    # Ein Glob ohne Treffer bleibt als Text stehen - deshalb jede Datei pruefen.
+    [[ -f "$muster" ]] && kandidaten+=("$muster")
+  done
+
+  local budget=$(( BUDGET_MB * 1024 * 1024 ))
+  local gelesen=0 dateien=0 groesse datei
+  local beginn=$SECONDS
+
+  for datei in "${kandidaten[@]}"; do
+    # Abbrechen statt ueberspringen: die Liste steht nach Wichtigkeit, und was
+    # nach dem Budget kaeme, ist genau das, was am wenigsten fehlt.
+    (( gelesen < budget )) || { echo "Vorwaermen: ${BUDGET_MB} MB gelesen, das reicht."; break; }
+    (( SECONDS - beginn < FRIST_S )) || { echo "Vorwaermen: Zeit ist um."; break; }
+    groesse="$(stat -c %s "$datei" 2>/dev/null || echo 0)"
+    (( groesse > 0 )) || continue
+
+    # Lesen und wegwerfen: es geht nur darum, dass der Kernel die Seiten haelt.
+    # Mit Frist, weil eine sterbende SD-Karte einen Lesevorgang minutenlang
+    # haengen lassen kann - und der Spiegel dann gar nicht erst hochkaeme.
+    if command -v timeout >/dev/null 2>&1; then
+      timeout 15 cat "$datei" > /dev/null 2>&1 || true
+    else
+      cat "$datei" > /dev/null 2>&1 || true
+    fi
+    gelesen=$(( gelesen + groesse ))
+    dateien=$(( dateien + 1 ))
+  done
+
+  echo "Vorgewaermt: $dateien Dateien, $(( gelesen / 1024 / 1024 )) MB in $(( SECONDS - beginn )) s."
+}
+
+vorwaermen
+
 # Bewusst ohne zusaetzliche cage-Optionen.
 #
 # Die Optionsnamen haben sich zwischen cage-Versionen geaendert, und eine
