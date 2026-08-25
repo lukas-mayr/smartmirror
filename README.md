@@ -51,7 +51,8 @@ modules/
   notifications/ Die Fläche für Mitteilungen; den Inhalt melden die Module
   timer/         Ein Bagger trägt einen Berg ab; ist er weg, ist die Zeit um
 deploy/      systemd-Units, Compositor-Start, Installer, Drehung, Neustart,
-             Plymouth-Thema fuer den Start, unsichtbarer Mauszeiger
+             Plymouth-Thema fuer den Start, Startbildschirm unter cage,
+             unsichtbarer Mauszeiger
 scripts/     Build-, Bundle- und Generator-Skripte
 ```
 
@@ -949,45 +950,71 @@ sich, Plymouth muss sie also freigeben, bevor Electron sein erstes Bild hat.
 Diese Sekunden bleiben schwarz — aber wenigstens nur schwarz, ohne Zeiger und
 ohne Textzeilen.
 
-**Bemalen lässt sich dieses Fenster nicht, kürzen schon.** Sobald `cage` läuft,
-kann dort nur noch ein Wayland-Client zeichnen — und der einzige, den der
-Spiegel hat, ist die Anzeige selbst, also genau das, worauf gewartet wird. Der
-größte Teil der Wartezeit ist aber kein Rechnen, sondern Lesen: die
-Electron-Anwendung ist ein knapp 200 MB großes Programm, das sich der Start
-seitenweise von der SD-Karte holt, in der Reihenfolge, in der die Seiten
-gebraucht werden — für eine Karte der ungünstigste Fall.
+**Bemalen kann dieses Fenster nur ein Wayland-Client.** Plymouth kommt nicht mehr
+dran — es muss die Grafikausgabe freigeben, damit `cage` sie bekommt —, und die
+Anzeige ist genau das, worauf gewartet wird. Also läuft unter `cage` ein zweites,
+kleines Programm, das dieselben Sekunden bemalt: **`deploy/cage-splash.py`**.
 
-Deshalb liest `cage-session.sh` die Anwendung **vor** dem Start des Compositors
-in den Dateisystem-Cache des Kernels. Electron findet sie danach im Speicher
-statt auf der Karte, und die Wartezeit verschwindet nicht, sondern wandert: aus
-dem schwarzen Fenster hinter `cage` in die Zeit davor — und dort steht noch das
-Wortzeichen von Plymouth.
+Es zeigt dasselbe Bild wie Plymouth davor und die Anzeige danach — aus denselben
+Dateien (`deploy/plymouth/<ebene>-<grad>.png`) und mit derselben Atemkurve wie
+`smartmirror.script`: 1400 ms hin und zurück, die drei Punkte um je 180 ms
+versetzt, zwischen 30 % und voll. Der Wechsel soll nicht als Wechsel auffallen,
+sondern wie ein Bild aussehen, das durchgehend steht.
 
-**Die Reihenfolge kommt vom Gerät, nicht aus der Vermutung.** Gemessen auf dem
-Spiegel: die Karte liefert am Stück knapp 5 MB/s. Das Programm allein — 169 MB —
-dauert damit 35 Sekunden, und danach war die Frist um, bevor auch nur eine der
-kleinen Dateien an der Reihe war; Electron holte sie sich anschließend selbst.
-Also erst die kleinen Dateien, die es beim Start vollständig braucht
-(Bibliotheken, V8-Schnappschuss, Ressourcenpakete, Zeichensatztabellen,
-`app.asar` — zusammen ein paar Dutzend MB), und das große Programm zuletzt: davon
-liest Electron beim Start ohnehin nur einen Bruchteil.
+- **Warum kein fertiges Programm.** Ein Bildbetrachter wie `imv` zeigt ein
+  Standbild. Zwischen zwei atmenden Logos wäre genau dort die Naht, die der ganze
+  Startbildschirm vermeiden soll. Und jedes zusätzliche Paket betrifft ein Gerät
+  an der Wand, an das niemand kurzfristig herankommt; Python liegt auf Raspberry
+  Pi OS ohnehin.
+- **Warum das Wayland-Protokoll von Hand.** Bindings dafür sind nicht Teil der
+  Standardbibliothek. Gebraucht wird ein Bruchteil — eine Fläche, ein
+  Speicherpuffer, ein Bild pro Takt — und der steht im Skript ausgeschrieben.
+  Denselben Weg geht der PNG-Leser: 8-Bit-RGBA ohne Interlace, genau das, was
+  `scripts/generate-splash.mjs` erzeugt.
+- **Wer ihn startet.** `deploy/cage-app.sh`, das `cage` anstelle der Anzeige
+  aufruft: ein Client kann sich erst anmelden, wenn der Compositor steht, und das
+  ist genau dieser Augenblick. Danach `exec`t es die Anzeige mit ihren Schaltern.
+  Ohne Bedingung — geht am Startbildschirm etwas schief (kein `python3`, kein
+  Bild, ein Fehler im Skript), startet die Anzeige trotzdem.
+- **Wer ihn beendet.** Die Anzeige, eine Sekunde nachdem ihr erstes Bild steht
+  (`MIRROR_SPLASH_PID`). Bis dahin liegt sie längst darüber, `cage` legt das
+  jüngste Fenster nach oben. Fällt das aus, beendet er sich selbst nach 90
+  Sekunden (`MIRROR_SPLASH_MAX_S`) und ebenso, wenn der Compositor endet: ein
+  Standbild, das über dem Spiegel hängen bleibt, wäre schlimmer als die
+  Sekunden, gegen die es geht.
 
-Und vorher gerechnet statt hinterher abgebrochen: wie schnell die Karte liest,
-weiß vorher niemand — zwischen einer alten SD-Karte und einer SSD am USB-Anschluss
-liegt der Faktor zwanzig. Das Skript misst es an den schon gelesenen Dateien und
-entscheidet daran, ob die nächste noch in die verbleibende Frist passt (Grenzen:
-`MIRROR_PREWARM_BUDGET_MB`, Vorgabe 320, und `MIRROR_PREWARM_SECONDS`, Vorgabe
-25). Was nicht passt, holt sich Electron selbst — das kostet dann genau die Zeit,
-die es hier auch gekostet hätte, nur ohne den Umweg.
+Gegengeprüft wurde er gegen ein echtes `cage` (headless, Screenshots über
+`zwlr_screencopy`): das Bild steht nach gut 100 ms, die Punkte atmen, und das
+Fenster der Anzeige deckt ihn vollständig zu, sobald es kommt. Die Tests im
+Repository prüfen, was ohne Compositor prüfbar ist — Bilder vorhanden und lesbar,
+Atemkurve identisch, Drehung kommt an, und die Anzeige startet auch dann, wenn
+der Startbildschirm ausfällt.
 
-Ist der Cache schon warm — Neustart der Anzeige im laufenden Betrieb,
-Wiederanlauf nach einem Absturz —, kostet das unter einer Sekunde.
-`MIRROR_PREWARM=0` schaltet es ab.
+**Kürzen ließ es sich auch nicht — gemessen, nicht vermutet.** Hier stand ein
+Versuch, die Electron-Anwendung (knapp 200 MB) am Stück von der Karte zu lesen,
+solange das Wortzeichen noch steht, damit der Start sie danach im Speicher findet
+statt seitenweise auf der Karte. Drei Starts aus dem Journal:
 
-Wie lang das schwarze Fenster auf einem bestimmten Gerät wirklich ist, steht im
-Journal statt in einer Schätzung: `journalctl -u mirror-shell` zeigt die Zeile
-`Vorgewaermt: … MB in … s` und danach `[shell] erstes Bild nach … s` — dazwischen
-liegt genau die Zeit, in der der Bildschirm schwarz war.
+| vorgewärmt | Kosten | schwarzes Fenster |
+| --- | --- | --- |
+| nichts | – | ~15 s |
+| das Programm (169 MB) | 35 s | 10,0 s |
+| dazu die kleinen Dateien (218 MB) | 40 s | 10,5 s |
+
+Die Annahme dahinter — am Stück gelesen gehe dieselbe Datenmenge um ein
+Vielfaches schneller — stimmt auf der Karte dieses Geräts nicht: sie liefert
+knapp 5 MB/s, ob am Stück oder nicht. Und von den 10,5 Sekunden gehen nur **2,0**
+auf Electron; so lange braucht es vom Start des Prozesses bis zum ersten Bild.
+Die übrigen achteinhalb liegen davor, zwischen dem Start von `cage` und dem
+Moment, in dem Electron überhaupt läuft: der Compositor und Chromiums eigener
+Start. Daran ändert ein voller Dateisystem-Cache nichts, also ist das Vorwärmen
+wieder draußen — vierzig Sekunden längerer Start für nichts.
+
+Was bleibt, ist die Messung selbst: `cage-session.sh` schreibt „cage startet die
+Anzeige", der Hauptprozess der Anzeige schreibt beim ersten Bild „[shell] erstes
+Bild nach … s". Der Abstand dazwischen in `journalctl -u mirror-shell` ist genau
+die Zeit, in der der Bildschirm schwarz war — auf diesem Gerät, nicht in einer
+Schätzung.
 
 Nötig sind dafür acht Dinge, und vier davon liegen außerhalb des Releases:
 
@@ -1025,9 +1052,8 @@ Nötig sind dafür acht Dinge, und vier davon liegen außerhalb des Releases:
   `XCURSOR_PATH` ein eigenes Thema untergeschoben, in dem jeder Zeiger aus
   lauter durchsichtigen Bildpunkten besteht (`deploy/cursor/`, erzeugt von
   `scripts/generate-cursor.mjs`).
-- **Die Anwendung liegt im Speicher, bevor `cage` startet** (siehe oben). Das
-  Lesen von der Karte passiert damit unter dem Wortzeichen und nicht unter dem
-  schwarzen Bildschirm.
+- **Ein Startbildschirm unter `cage`** (siehe oben) für die Sekunden, in denen
+  der Compositor den Bildschirm hat und die Anzeige noch kein Fenster.
 - **Die Anzeige startet sofort**, ohne auf den Core zu warten. Vorher wartete sie
   bis zu 30 Sekunden auf dessen `/healthz`, damit der Spiegel nicht kurz „keine
   Verbindung" zeigt — und genau diese halbe Minute war das Fenster, in dem

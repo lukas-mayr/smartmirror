@@ -47,6 +47,15 @@ brauchbar() {
     echo "  shell/smartmirror-shell ist leer"
     return 1
   fi
+  # Dasselbe fuer das Skript, das unter cage die Anzeige startet: gibt es das
+  # als leere Datei, startet cage ein Programm ohne Inhalt und der Bildschirm
+  # bleibt schwarz. Geprueft wird es nur, wenn es da ist - aeltere Releases
+  # kannten es nicht, und auf die faellt dieses Skript im Zweifel zurueck.
+  local starter="$dir/deploy/cage-app.sh"
+  if [[ -e "$starter" && ! -s "$starter" ]]; then
+    echo "  deploy/cage-app.sh ist leer"
+    return 1
+  fi
   return 0
 }
 

@@ -147,10 +147,16 @@ apt-get update -qq
 # Pflicht: ohne diese startet nichts. cage zieht den kompletten
 # wlroots-/Mesa-Unterbau nach, das dauert auf einer SD-Karte einige Minuten.
 log "Compositor und Grundpakete (das dauert ein paar Minuten) ..."
+# python3 steht dabei fuer den Startbildschirm unter cage
+# (deploy/cage-splash.py): auf Raspberry Pi OS ist es ohnehin vorhanden, und
+# wo nicht, faellt der Startbildschirm sonst still aus. Nicht python3-minimal -
+# welche Module Debian dort hineinlegt, ist eine Wette; das vollstaendige
+# Paket ist es nicht.
 apt-get install -y --no-install-recommends \
   ca-certificates curl tar \
   cage wlr-randr seatd \
   avahi-daemon \
+  python3 \
   || die "Grundpakete liessen sich nicht installieren. Bitte zuerst:
   sudo apt --fix-broken install && sudo apt update && sudo apt full-upgrade -y"
 

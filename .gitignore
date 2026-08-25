@@ -21,3 +21,6 @@ packages/shell/src/renderer/fonts.css
 minisign.key
 *.key
 !device.key
+
+# Python legt Bytecode neben die Skripte in deploy/
+__pycache__/

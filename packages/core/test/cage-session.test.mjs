@@ -76,36 +76,27 @@ test('cage bekommt das Thema untergeschoben', async () => {
 });
 
 /*
- * Das Vorwaermen.
+ * Die Meldung, an der sich das schwarze Fenster messen laesst.
  *
- * Der Bildschirm ist von dem Augenblick an schwarz, in dem cage die
- * Grafikausgabe uebernimmt, bis Electron sein erstes Bild hat. Damit dieses
- * Fenster kurz bleibt, liest cage-session.sh die Anwendung vorher am Stueck in
- * den Dateisystem-Cache - und zwar *vor* dem Start von cage, weil bis dahin
- * noch das Wortzeichen von Plymouth steht.
- *
- * Genau diese Reihenfolge wird hier geprueft: passierte es
- * nachher, waere die Wartezeit dort, wo sie jetzt weg ist.
+ * Zwischen dem Start von cage und dem ersten Bild von Electron ist der
+ * Bildschirm schwarz. Wie lange, sagt nur das Geraet selbst - und zwar aus dem
+ * Abstand dieser Zeile zu "[shell] erstes Bild nach ... s". Faellt sie bei
+ * einem Umbau weg, faellt die einzige Messung mit, die es dazu gibt.
  */
 
-/** Baut ein Verzeichnis nach, wie es der Updater auf dem Pi hinterlaesst. */
-async function nachbau(dateien) {
+test('vor cage steht eine Zeile im Journal', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'mirror-cage-'));
   await cp(join(repoRoot, 'deploy'), join(dir, 'deploy'), { recursive: true });
 
   const bin = join(dir, 'bin');
   await mkdir(bin, { recursive: true });
-  // Die Attrappe von cage meldet sich, damit sich die Reihenfolge ablesen laesst.
   await writeFile(join(bin, 'cage'), '#!/usr/bin/env bash\nprintf "cage gestartet\\n"\n');
   await chmod(join(bin, 'cage'), 0o755);
 
   const app = join(dir, 'shell');
-  await mkdir(join(app, 'resources'), { recursive: true });
-  await writeFile(join(app, 'smartmirror-shell'), Buffer.alloc(2 * 1024 * 1024, 7));
+  await mkdir(app, { recursive: true });
+  await writeFile(join(app, 'smartmirror-shell'), '#!/usr/bin/env bash\nexit 0\n');
   await chmod(join(app, 'smartmirror-shell'), 0o755);
-  for (const [name, groesse] of Object.entries(dateien)) {
-    await writeFile(join(app, name), Buffer.alloc(groesse, 7));
-  }
 
   const skript = join(dir, 'deploy/cage-session.sh');
   const quelle = await readFile(skript, 'utf8');
@@ -114,58 +105,10 @@ async function nachbau(dateien) {
     quelle.replace('APP="/opt/smartmirror/current/shell/smartmirror-shell"', `APP="${join(app, 'smartmirror-shell')}"`),
   );
 
-  return {
-    async lauf(env = {}) {
-      const { stdout } = await run('bash', [skript], {
-        env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, ...env },
-      });
-      return stdout;
-    },
-  };
-}
+  const { stdout } = await run('bash', [skript], { env: { ...process.env, PATH: `${bin}:${process.env.PATH}` } });
 
-test('die Anwendung wird gelesen, bevor cage den Bildschirm nimmt', async () => {
-  const { lauf } = await nachbau({
-    'libffmpeg.so': 1024 * 1024,
-    'icudtl.dat': 512 * 1024,
-    'resources/app.asar': 256 * 1024,
-  });
-
-  const stdout = await lauf();
-
-  const vorgewaermt = stdout.indexOf('Vorgewaermt:');
+  const gemeldet = stdout.indexOf('cage startet die Anzeige.');
   const gestartet = stdout.indexOf('cage gestartet');
-  assert.ok(vorgewaermt >= 0, 'keine Meldung ueber das Vorwaermen');
-  assert.ok(gestartet >= 0, 'cage wurde nicht gestartet');
-  assert.ok(vorgewaermt < gestartet, 'erst cage, dann vorgewaermt - genau falsch herum');
-
-  // Alle vier Dateien: das Programm, die Bibliothek, die Tabelle, das Archiv.
-  assert.match(stdout, /Vorgewaermt: 4 Dateien/);
-});
-
-test('die kleinen Dateien kommen vor dem grossen Programm', async () => {
-  // Gemessen auf dem Geraet: das 169 MB grosse Programm allein braucht auf der
-  // Karte 35 Sekunden. Stuende es vorn, waere die Frist um, bevor die kleinen
-  // Dateien an der Reihe sind - und genau die braucht Electron vollstaendig.
-  const { lauf } = await nachbau({ 'libffmpeg.so': 1024 * 1024 });
-
-  // Budget so knapp wie die erste kleine Datei: was danach kaeme, faellt weg.
-  // Stuende das 2 MB grosse Programm vorn, meldete die Zeile 2 MB.
-  const knapp = await lauf({ MIRROR_PREWARM_BUDGET_MB: '1' });
-  assert.match(knapp, /Vorgewaermt: 1 Dateien, 1 MB/);
-  assert.match(knapp, /cage gestartet/);
-});
-
-test('das Vorwaermen laesst sich abschalten und haelt seine Frist ein', async () => {
-  const { lauf } = await nachbau({ 'libffmpeg.so': 1024 * 1024 });
-
-  const aus = await lauf({ MIRROR_PREWARM: '0' });
-  assert.doesNotMatch(aus, /Vorgewaermt:/);
-  assert.match(aus, /cage gestartet/, 'ohne Vorwaermen muss cage trotzdem starten');
-
-  // Keine Frist heisst: gar nichts lesen - und trotzdem starten. Der
-  // Startbildschirm ist eine Verschoenerung; die Anzeige ist der Zweck.
-  const eilig = await lauf({ MIRROR_PREWARM_SECONDS: '0' });
-  assert.match(eilig, /Vorgewaermt: 0 Dateien/);
-  assert.match(eilig, /cage gestartet/);
+  assert.ok(gemeldet >= 0, 'keine Meldung vor dem Start des Compositors');
+  assert.ok(gemeldet < gestartet, 'die Meldung kommt nach cage - dann misst sie nichts mehr');
 });
