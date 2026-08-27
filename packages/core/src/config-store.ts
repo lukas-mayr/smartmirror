@@ -8,6 +8,7 @@ import {
   normalizeGrid,
   normalizeInsets,
   normalizeNightMode,
+  normalizeOutlet,
   normalizeRotation,
   normalizeScreens,
   normalizeSetup,
@@ -195,6 +196,9 @@ function normalize(input: Record<string, unknown>): MirrorConfig {
   power.rules = (Array.isArray(power.rules) ? power.rules : []).filter(
     (rule) => typeof rule?.on === 'string' && typeof rule?.off === 'string' && Array.isArray(rule?.days),
   );
+  // Eine Adresse, die keine ist, wuerde eingerichtet aussehen und nie
+  // schalten – dann lieber ein leeres Feld und ein Schalter, der zurueckfaellt.
+  power.outlet = normalizeOutlet(power.outlet);
 
   const update = { ...defaults.update, ...(source.update ?? {}) };
   update.checkIntervalMinutes = clamp(update.checkIntervalMinutes, 5, 1440);

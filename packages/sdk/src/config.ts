@@ -69,6 +69,79 @@ export interface PowerRule {
   off: string;
 }
 
+/**
+ * Was an der Steckdose haengt.
+ *
+ * Der Unterschied ist keine Geschmacksfrage, sondern entscheidet, in welche
+ * Richtungen ueberhaupt geschaltet werden kann:
+ *
+ * - `display`: An der Dose haengt der Bildschirm (oder was sonst leuchtet),
+ *   der Rechner nicht. Der Spiegel laeuft durch und schaltet die Dose in
+ *   beide Richtungen – der Zeitplan gilt vollstaendig.
+ * - `mirror`: An der Dose haengt der Spiegel selbst. Dann kann er sich
+ *   abschalten, aber nicht wieder einschalten: waehrend die Dose aus ist,
+ *   laeuft nichts, was sie einschalten koennte. Das Einschalten muss die Dose
+ *   selbst uebernehmen – ueber den Zeitplan in der myStrom-App.
+ */
+export type OutletScope = 'display' | 'mirror';
+
+/**
+ * Eine myStrom-Steckdose im eigenen Netz.
+ *
+ * Angesprochen wird ausschliesslich lokal ueber die REST-Schnittstelle des
+ * Geraets (`/relay`, `/report`) – kein Konto, keine Cloud, kein Weg nach
+ * draussen. Das passt zum Rest des Spiegels und ueberlebt einen Ausfall des
+ * Herstellers.
+ */
+export interface OutletSettings {
+  enabled: boolean;
+  /**
+   * IP oder Hostname im eigenen Netz, z.B. "192.168.1.60".
+   *
+   * Ohne Schema und ohne Pfad: die Adresse wird hier nur benannt, gebaut wird
+   * sie im Core. Eine feste IP (oder eine DHCP-Reservierung) ist Pflicht –
+   * eine Dose, die nach dem Router-Neustart woanders sitzt, wird nicht mehr
+   * gefunden.
+   */
+  host: string;
+  scope: OutletScope;
+}
+
+export const DEFAULT_OUTLET: OutletSettings = { enabled: false, host: '', scope: 'display' };
+
+/**
+ * Macht aus dem, was jemand eingetippt hat, eine Adresse – oder nichts.
+ *
+ * Erlaubt sind Hostname oder IP, wahlweise mit Port. Ein mitkopiertes
+ * "http://" und ein angehaengter Pfad werden weggeschnitten, weil genau das
+ * passiert, wenn man die Adresse aus der Adresszeile holt. Alles andere wird
+ * zu einem leeren Feld: eine halb verstandene Adresse ist schlimmer als
+ * keine, denn sie sieht eingerichtet aus und schaltet nie.
+ */
+export function normalizeOutletHost(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  let host = value.trim().replace(/^https?:\/\//i, '');
+  host = host.split('/')[0]!.split('?')[0]!;
+  if (!host) return '';
+  const match = /^([A-Za-z0-9][A-Za-z0-9.-]*)(?::(\d{1,5}))?$/.exec(host);
+  if (!match) return '';
+  const port = match[2] === undefined ? null : Number(match[2]);
+  if (port !== null && (port === 0 || port > 65535)) return '';
+  return port === null ? match[1]! : `${match[1]}:${port}`;
+}
+
+export function normalizeOutlet(value: unknown): OutletSettings {
+  const source = (typeof value === 'object' && value !== null ? value : {}) as Partial<OutletSettings>;
+  const host = normalizeOutletHost(source.host);
+  return {
+    // Ohne Adresse gibt es nichts einzuschalten. Der Schalter faellt dann von
+    // selbst zurueck, statt eine Steckdose zu versprechen, die es nicht gibt.
+    enabled: source.enabled === true && host !== '',
+    host,
+    scope: source.scope === 'mirror' ? 'mirror' : 'display',
+  };
+}
+
 export interface PowerSettings {
   /** Zeitplan aktiv? Wenn false, bleibt das Display dauerhaft an. */
   scheduleEnabled: boolean;
@@ -78,6 +151,12 @@ export interface PowerSettings {
    * Zeitplan-Wechsel – sonst muesste man sie von Hand zuruecknehmen.
    */
   manualOverride: { active: boolean; on: boolean } | null;
+  /**
+   * Eine Steckdose, die mit demselben Zeitplan geschaltet wird wie das
+   * Display. Bewusst keine eigene Zeitschaltuhr: zwei Zeitplaene, die
+   * dasselbe meinen, laufen frueher oder spaeter auseinander.
+   */
+  outlet: OutletSettings;
 }
 
 /**
@@ -304,6 +383,7 @@ export function createDefaultConfig(): MirrorConfig {
         { id: 'wochenende', days: [0, 6], on: '08:00', off: '23:30' },
       ],
       manualOverride: null,
+      outlet: { ...DEFAULT_OUTLET },
     },
     update: {
       repository: '',

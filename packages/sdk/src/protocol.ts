@@ -151,6 +151,29 @@ export interface BootLookStatus {
  */
 export type RestartScope = 'services' | 'device';
 
+/**
+ * Was die Steckdose zuletzt gesagt hat.
+ *
+ * Kein Teil der Konfiguration: das ist ein Zustand von jetzt, und er darf
+ * einen Neustart nicht ueberleben. In der Handy-App steht er unter dem
+ * Zeitplan – dort ist er die einzige Antwort auf die Frage, ob die Adresse
+ * stimmt.
+ */
+export interface OutletStatus {
+  /** Ist ueberhaupt eine Steckdose eingerichtet und eingeschaltet? */
+  configured: boolean;
+  /** Hat sie beim letzten Versuch geantwortet? */
+  reachable: boolean;
+  /** Relais laut letzter Antwort, `null` wenn noch keine kam. */
+  relay: boolean | null;
+  /** Leistung in Watt laut letzter Antwort. */
+  watts: number | null;
+  /** Letzter Fehler im Klartext – das, was in der App steht. */
+  error: string | null;
+  /** Zeitpunkt der letzten Antwort oder des letzten Versuchs, ISO. */
+  checkedAt: string | null;
+}
+
 export type ClientMessage =
   | { t: 'hello'; clientType: ClientType; token?: string; appVersion: string }
   | { t: 'pair:request'; code: string; clientName: string }
@@ -202,6 +225,12 @@ export type ClientMessage =
   | { t: 'admin:setSettings'; patch: Partial<Pick<MirrorConfig, 'deviceName' | 'locale' | 'timezone' | 'display' | 'power' | 'update' | 'setup'>> }
   | { t: 'admin:setSecret'; moduleId: string; key: string; value: string }
   | { t: 'admin:power'; on: boolean }
+  /**
+   * Die Steckdose jetzt fragen, statt auf den naechsten Schaltvorgang zu
+   * warten. Der Knopf hinter der Adresse: ohne ihn wuesste niemand, ob eine
+   * frisch eingetippte IP stimmt, bis abends der Zeitplan zuschlaegt.
+   */
+  | { t: 'admin:testOutlet' }
   | { t: 'admin:renameDevice'; deviceId: string; name: string }
   | { t: 'admin:revokeDevice'; deviceId: string }
   | { t: 'admin:checkUpdate' }
@@ -233,11 +262,12 @@ export type ServerMessage
       /** Nur fuer ungekoppelte Clients: laeuft gerade eine Kopplung? */
       pairing?: PairingState;
     }
-  | { t: 'snapshot'; config: MirrorConfig; modules: ModuleDescriptor[]; state: Record<string, ModuleStateEnvelope>; power: { on: boolean }; update: UpdateStatus; bootLook: BootLookStatus | null; viewport: Viewport | null; previewScreenId: string | null }
+  | { t: 'snapshot'; config: MirrorConfig; modules: ModuleDescriptor[]; state: Record<string, ModuleStateEnvelope>; power: { on: boolean }; outlet: OutletStatus; update: UpdateStatus; bootLook: BootLookStatus | null; viewport: Viewport | null; previewScreenId: string | null }
   | { t: 'state:patch'; envelope: ModuleStateEnvelope }
   | { t: 'config:update'; config: MirrorConfig }
   | { t: 'modules:update'; modules: ModuleDescriptor[] }
   | { t: 'display:power'; on: boolean }
+  | { t: 'outlet:status'; status: OutletStatus }
   | { t: 'display:viewport'; viewport: Viewport | null }
   | { t: 'display:previewScreen'; screenId: string | null }
   | { t: 'update:status'; status: UpdateStatus }

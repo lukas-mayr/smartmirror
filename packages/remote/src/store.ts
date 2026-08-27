@@ -3,6 +3,7 @@ import type {
   MirrorConfig,
   ModuleDescriptor,
   ModuleStateEnvelope,
+  OutletStatus,
   PairedDevice,
   PairingState,
   ServerMessage,
@@ -68,6 +69,8 @@ export interface StoreSnapshot {
   modules: ModuleDescriptor[];
   state: Record<string, ModuleStateEnvelope>;
   powerOn: boolean;
+  /** Was die Steckdose zuletzt gesagt hat – die einzige Rueckmeldung auf eine eingetippte Adresse. */
+  outlet: OutletStatus;
   update: UpdateStatus | null;
   /**
    * Wie der Spiegel beim Booten aussieht – und ob dafuer noch ein Neustart
@@ -117,6 +120,7 @@ export class Store extends EventTarget {
     modules: [],
     state: {},
     powerOn: true,
+    outlet: { configured: false, reachable: false, relay: null, watts: null, error: null, checkedAt: null },
     update: null,
     bootLook: null,
     viewport: null,
@@ -315,6 +319,7 @@ export class Store extends EventTarget {
           modules: message.modules,
           state: message.state,
           powerOn: message.power.on,
+          outlet: message.outlet,
           update: message.update,
           bootLook: message.bootLook,
           viewport: message.viewport,
@@ -340,6 +345,10 @@ export class Store extends EventTarget {
         });
         return;
       }
+      case 'outlet:status':
+        this.#patch({ outlet: message.status });
+        return;
+
       case 'display:power':
         this.#patch({ powerOn: message.on });
         return;

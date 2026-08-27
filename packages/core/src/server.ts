@@ -22,6 +22,7 @@ import {
   type ClientType,
   type ErrorCode,
   type MirrorConfig,
+  type OutletStatus,
   type PairedDevice,
   type PairingState,
   type RestartScope,
@@ -138,6 +139,7 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
     modules: deps.modules.descriptors(),
     state: deps.modules.snapshot(),
     power: { on: deps.power.isOn },
+    outlet: deps.power.outletStatus,
     update: deps.updates.status,
     bootLook: deps.bootLook.status,
     viewport,
@@ -254,6 +256,11 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
   // welche schon da sind, und wuerde sonst weiter nach einem fragen.
   deps.modules.on('modules', () => broadcast({ t: 'modules:update', modules: deps.modules.descriptors() }));
   deps.power.on('change', (on: boolean) => broadcast({ t: 'display:power', on }));
+  // Nur an die Fernbedienung: an der Wand steht niemand, der eine Steckdose
+  // einrichten koennte.
+  deps.power.on('outlet', (status: OutletStatus) =>
+    broadcast({ t: 'outlet:status', status }, (client) => client.type === 'remote'),
+  );
   deps.updates.on('status', (status) => broadcast({ t: 'update:status', status }));
   // Nur an die Fernbedienung: die Anzeige hat mit ihrem eigenen Startbildschirm
   // nichts zu entscheiden, und ein Hinweis darauf gehoert nicht an die Wand.
@@ -785,6 +792,15 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
       case 'admin:power':
         await deps.power.setManual(message.on);
         return;
+
+      case 'admin:testOutlet': {
+        const status = await deps.power.checkOutlet();
+        // Gezielt an den, der gefragt hat: der Broadcast kommt ohnehin, aber
+        // nur wenn sich etwas geaendert hat – und "immer noch nicht
+        // erreichbar" ist die Antwort, auf die jemand gerade wartet.
+        send(client, { t: 'outlet:status', status });
+        return;
+      }
 
       case 'admin:renameDevice': {
         const name = message.name.trim();

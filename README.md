@@ -1347,6 +1347,61 @@ Der Spiegel bleibt bei Verbindungsverlust bewusst ruhig: kleiner Hinweis unten
 rechts statt Fehlerseite. Während eines Updates ist der Core einige Sekunden
 weg — das ist kein Zustand, der Aufmerksamkeit verdient.
 
+### Eine Steckdose mitschalten
+
+Der Zeitplan unter *Anzeige* schaltet den Bildschirm. Er kann zusätzlich eine
+**myStrom-Steckdose** im eigenen Netz mitschalten — über deren lokale
+REST-Schnittstelle, ohne Konto, ohne Cloud, ohne einen Weg nach draußen. Der
+Spiegel spricht mit einem Gerät im selben WLAN:
+
+```bash
+curl "http://192.168.1.60/report"          # {"power":8.2,"relay":true, ...}
+curl "http://192.168.1.60/relay?state=0"   # antwortet ohne Inhalt
+```
+
+Weil `/relay` nichts zurückgibt, ist ein Schaltbefehl allein nur eine
+Behauptung: der Core liest nach jedem Schalten `/report` und meldet erst dann
+„geschaltet". Was die Dose zuletzt gesagt hat — erreichbar, Relais, Watt —
+steht in der Handy-App unter dem Zeitplan. Eine falsch eingetippte Adresse
+fällt damit sofort auf und nicht erst abends.
+
+**Eingestellt wird, was daran hängt**, und das ist keine Geschmacksfrage:
+
+| Einstellung | Was der Zeitplan kann |
+|---|---|
+| **Der Bildschirm** | Beides. Der Rechner hängt an eigenem Strom und läuft durch, die Dose geht mit dem Zeitplan an und aus. |
+| **Der ganze Spiegel** | Nur ausschalten. Während die Dose aus ist, läuft nichts, was sie wieder einschalten könnte — das muss ihr eigener Zeitplan in der myStrom-App übernehmen. |
+
+Wer den Spiegel morgens automatisch starten lassen will, hängt also den
+**Bildschirm** an die Dose und lässt den Pi durchlaufen. Das kostet die paar
+Watt des Rechners und bringt dafür einen Spiegel, der wirklich aus ist statt
+nur dunkel — und einen Zeitplan, der an einer Stelle steht.
+
+Drei Vorkehrungen gegen das, was hier schiefgehen kann:
+
+- **Ausgeschaltet wird nur nach einem Wechsel**, den der laufende Prozess
+  selbst gesehen hat. Sonst entstünde genau die Schleife, gegen die auch der
+  Neustart-Auftrag einen Zeitstempel trägt: wer abends während eines
+  Aus-Fensters einschaltet, bekäme beim ersten Tick sofort wieder den Strom
+  abgedreht und den Spiegel nie zu sehen.
+- **Ein Griff ans Handy nimmt den Spiegel nie vom Strom.** Der Schalter *An/Aus*
+  oben in der App dunkelt ab; die Dose bleibt an. Eingeschaltet bekäme dieselbe
+  App den Spiegel danach nicht mehr — ein Knopf, der sich selbst unerreichbar
+  macht, gehört nicht in eine Fernbedienung.
+- **Geschaltet wird nur bei Änderung.** Wer den Knopf an der Dose drückt, soll
+  nicht zwanzig Sekunden später dagegen anschalten müssen.
+
+Die Adresse gehört fest vergeben — im Router als DHCP-Reservierung. Eine Dose,
+die nach einem Neustart woanders sitzt, wird nicht mehr gefunden; in der App
+steht dann „Die Steckdose ist nicht erreichbar", und der Bildschirm schaltet
+weiter wie bisher. Die Dose ist eine Zugabe und keine Bedingung.
+
+Die Schnittstelle kennt keine Anmeldung: wer im WLAN ist, kann schalten. Das
+ist die Vorgabe des Geräts und nichts, was der Spiegel entschieden hätte —
+neuere Firmware kann sie mit einem Token schützen, dann muss der Schutz für den
+Spiegel aus bleiben. Die App sagt das im Klartext, wenn die Dose mit 403
+antwortet.
+
 ### Neustart aus der Handy-App
 
 Ein Spiegel hängt an der Wand, oft im Bad, und hat weder Tastatur noch Knopf.

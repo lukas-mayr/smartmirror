@@ -60,6 +60,24 @@ type Tab = 'module' | 'anzeige' | 'system';
 
 const WEEKDAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 
+/**
+ * Was an der Steckdose haengt, entscheidet, in welche Richtungen geschaltet
+ * werden kann. Das gehoert neben das Feld und nicht in die Anleitung: wer hier
+ * "Der ganze Spiegel" waehlt, soll vorher lesen, dass das Einschalten damit
+ * woanders hingehoert.
+ */
+const OUTLET_SCOPE_HINTS: Record<'display' | 'mirror', string> = {
+  display:
+    'Der Rechner haengt an eigenem Strom und laeuft durch. Der Zeitplan schaltet die Dose in beide Richtungen.',
+  mirror:
+    'Der Spiegel selbst haengt daran. Der Zeitplan kann die Dose dann nur ausschalten – einschalten muss sie sich selbst, ueber ihren Zeitplan in der myStrom-App.',
+};
+
+/** Leistung so, wie man sie liest: unter zehn Watt mit einer Nachkommastelle. */
+function formatWatts(watts: number): string {
+  return `${watts < 10 ? watts.toFixed(1) : Math.round(watts)} W`;
+}
+
 /** Seitenverhaeltnis der Vorschau, solange die Anzeige noch nichts gemeldet hat. */
 const FALLBACK_ASPECT = 16 / 9;
 
@@ -1713,6 +1731,7 @@ export class MirrorRemote extends LitElement {
     if (!config) return html``;
     const display = config.display;
     const power = config.power;
+    const outlet = power.outlet;
     const night = display.nightMode;
 
     const patchDisplay = (patch: Partial<typeof display>): void =>
@@ -1929,6 +1948,90 @@ export class MirrorRemote extends LitElement {
           Ein Schalten von Hand gilt bis zum naechsten Wechsel im Zeitplan und hebt sich danach von selbst auf.
         </p>
       </section>
+
+      <h2>Steckdose</h2>
+      <section class="panel">
+        <label class="field field--switch">
+          <span class="field__label">
+            Steckdose mitschalten
+            <span class="field__hint">
+              Eine myStrom-Steckdose im eigenen Netz, ueber ihre lokale Schnittstelle. Sie folgt demselben
+              Zeitplan wie der Bildschirm – ein zweiter waere einer zu viel.
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            .checked=${outlet.enabled}
+            @change=${(event: Event) =>
+              patchPower({ outlet: { ...outlet, enabled: (event.target as HTMLInputElement).checked } })}
+          />
+        </label>
+
+        <label class="field">
+          <span class="field__label">
+            Adresse im Netz
+            <span class="field__hint">
+              IP oder Name, etwa 192.168.1.60. Am Router eine feste Adresse vergeben: eine Dose, die nach
+              einem Neustart woanders sitzt, wird nicht mehr gefunden.
+            </span>
+          </span>
+          <input
+            type="text"
+            inputmode="url"
+            autocomplete="off"
+            placeholder="192.168.1.60"
+            .value=${outlet.host}
+            @change=${(event: Event) =>
+              patchPower({ outlet: { ...outlet, host: (event.target as HTMLInputElement).value } })}
+          />
+        </label>
+
+        <label class="field">
+          <span class="field__label">
+            Daran haengt
+            <span class="field__hint">${OUTLET_SCOPE_HINTS[outlet.scope]}</span>
+          </span>
+          <select
+            @change=${(event: Event) =>
+              patchPower({
+                outlet: {
+                  ...outlet,
+                  scope: (event.target as HTMLSelectElement).value === 'mirror' ? 'mirror' : 'display',
+                },
+              })}
+          >
+            <option value="display" ?selected=${outlet.scope === 'display'}>Der Bildschirm</option>
+            <option value="mirror" ?selected=${outlet.scope === 'mirror'}>Der ganze Spiegel</option>
+          </select>
+        </label>
+
+        ${outlet.enabled ? this.#renderOutletStatus() : nothing}
+      </section>
+    `;
+  }
+
+  /**
+   * Was die Steckdose zuletzt gesagt hat.
+   *
+   * Ohne diese Zeile bliebe eine falsch eingetippte Adresse bis zum Abend
+   * unbemerkt – und dann faellt sie als Spiegel auf, der nicht angeht.
+   */
+  #renderOutletStatus(): TemplateResult {
+    const outlet = this.snapshot.outlet;
+    return html`
+      ${outlet.error ? html`<p class="banner banner--error">${outlet.error}</p>` : nothing}
+      <p class="muted small">
+        ${outlet.reachable
+          ? `Antwortet. Steckdose ${outlet.relay ? 'ein' : 'aus'}geschaltet${
+              outlet.watts === null ? '' : `, ${formatWatts(outlet.watts)}`
+            }.`
+          : outlet.error
+            ? 'Zuletzt keine Antwort.'
+            : 'Noch keine Antwort.'}
+      </p>
+      <div class="card__actions">
+        <button @click=${() => store.send({ t: 'admin:testOutlet' })}>Verbindung pruefen</button>
+      </div>
     `;
   }
 
