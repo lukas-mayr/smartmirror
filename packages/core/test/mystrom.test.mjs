@@ -92,18 +92,43 @@ test('hinter der Adresse sitzt etwas anderes', async () => {
   }
 });
 
-test('eine geschuetzte Schnittstelle sagt, wo der Schalter dafuer sitzt', async () => {
-  const dose = await fakeSwitch((_req, res) => {
-    res.writeHead(403);
-    res.end();
+test('ohne Adresse wird gar nicht erst gefragt', async () => {
+  await assert.rejects(() => readReport(''), /keine Adresse/);
+});
+
+test('nach draussen geht ueber diesen Weg nichts', async () => {
+  // Auch wenn eine oeffentliche Adresse in der Konfiguration steht: die Grenze
+  // liegt im Client und nicht im Einstellungsformular.
+  await assert.rejects(() => readReport('example.com'), /eigenen Netz/);
+  await assert.rejects(() => setRelay('93.184.216.34', true), /eigenen Netz/);
+});
+
+test('der Token geht als Kopfzeile mit', async () => {
+  let gesehen = null;
+  const dose = await fakeSwitch((req, res) => {
+    gesehen = req.headers.token ?? null;
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ power: 0, relay: true }));
   });
   try {
-    await assert.rejects(() => readReport(dose.host), /myStrom-App/);
+    await readReport(dose.host, 'geheim');
+    assert.equal(gesehen, 'geheim');
+    await readReport(dose.host);
+    assert.equal(gesehen, null);
   } finally {
     await dose.close();
   }
 });
 
-test('ohne Adresse wird gar nicht erst gefragt', async () => {
-  await assert.rejects(() => readReport(''), /keine Adresse/);
+test('eine geschuetzte Dose fragt nach dem Token, statt zum Abschalten zu raten', async () => {
+  const dose = await fakeSwitch((_req, res) => {
+    res.writeHead(403);
+    res.end();
+  });
+  try {
+    await assert.rejects(() => readReport(dose.host), /verlangt einen Token/);
+    await assert.rejects(() => readReport(dose.host, 'falsch'), /weist den hinterlegten Token zurueck/);
+  } finally {
+    await dose.close();
+  }
 });

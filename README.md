@@ -1396,11 +1396,25 @@ die nach einem Neustart woanders sitzt, wird nicht mehr gefunden; in der App
 steht dann „Die Steckdose ist nicht erreichbar", und der Bildschirm schaltet
 weiter wie bisher. Die Dose ist eine Zugabe und keine Bedingung.
 
-Die Schnittstelle kennt keine Anmeldung: wer im WLAN ist, kann schalten. Das
-ist die Vorgabe des Geräts und nichts, was der Spiegel entschieden hätte —
-neuere Firmware kann sie mit einem Token schützen, dann muss der Schutz für den
-Spiegel aus bleiben. Die App sagt das im Klartext, wenn die Dose mit 403
-antwortet.
+**Der Weg führt nur nach außen und nur ins eigene Netz.** Die Steckdose ist die
+einzige Adresse, die jemand von Hand einträgt — jede andere, die der Spiegel
+aufruft, steht im Quelltext. Deshalb prüft der Core vor jedem Aufruf, ob sie in
+einem privaten Netz liegt (10/8, 172.16/12, 192.168/16, 127/8, 169.254/16), ein
+Name ohne Punkt ist oder auf eine übliche Heimnetz-Endung geht (`.local`,
+`.lan`, `.home`, `.home.arpa`, `.internal`, `.box`). Alles andere wird nicht
+aufgerufen, egal was in der Konfiguration steht. Die Grenze sitzt im Client und
+nicht im Formular: eine von Hand editierte Datei kommt an ihr genauso wenig
+vorbei.
+
+Die Schnittstelle der Dose kennt ab Werk keine Anmeldung: wer im WLAN ist, kann
+schalten. Neuere Firmware kann sie mit einem **Token** schützen — den trägt man
+in der Handy-App unter der Adresse ein, und der Spiegel schickt ihn als
+`Token`-Kopfzeile mit. Er liegt verschlüsselt in `data/secrets.json`, unter dem
+Bezeichner `core:power`: denselben Speicher benutzen die Module, aber einen
+Doppelpunkt kann keine Modul-Id enthalten (der Manifest-Validator lässt nur
+kebab-case zu), also erreicht ihn keines. Zur Anzeige und in die Handy-App geht
+nur die Auskunft, *dass* einer hinterlegt ist — nie der Token selbst. Den
+Schutz abzuschalten, wäre der bequeme Rat und der falsche.
 
 ### Neustart aus der Handy-App
 

@@ -168,6 +168,11 @@ export interface OutletStatus {
   relay: boolean | null;
   /** Leistung in Watt laut letzter Antwort. */
   watts: number | null;
+  /**
+   * Liegt ein Token fuer die Dose bereit? Nur das – der Token selbst verlaesst
+   * den Core nie, so wie kein Modul-Geheimnis ihn verlaesst.
+   */
+  hasToken: boolean;
   /** Letzter Fehler im Klartext – das, was in der App steht. */
   error: string | null;
   /** Zeitpunkt der letzten Antwort oder des letzten Versuchs, ISO. */
@@ -231,6 +236,12 @@ export type ClientMessage =
    * frisch eingetippte IP stimmt, bis abends der Zeitplan zuschlaegt.
    */
   | { t: 'admin:testOutlet' }
+  /**
+   * Token fuer die geschuetzte Schnittstelle der Steckdose hinterlegen. Ein
+   * leerer Wert loescht ihn. Er wandert verschluesselt neben die
+   * Modul-Geheimnisse und kommt nie wieder heraus.
+   */
+  | { t: 'admin:setOutletToken'; value: string }
   | { t: 'admin:renameDevice'; deviceId: string; name: string }
   | { t: 'admin:revokeDevice'; deviceId: string }
   | { t: 'admin:checkUpdate' }

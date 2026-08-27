@@ -20,6 +20,7 @@ import {
   INSET_STEP,
   insetsEqual,
   insetToPixels,
+  isLocalOutletHost,
   normalizeRotation,
   rectFor,
   rectsOverlap,
@@ -1732,6 +1733,9 @@ export class MirrorRemote extends LitElement {
     const display = config.display;
     const power = config.power;
     const outlet = power.outlet;
+    // Einstellung und Rueckmeldung sind zweierlei: die eine steht in der
+    // Konfiguration, die andere ist ein Zustand von jetzt.
+    const outletState = this.snapshot.outlet;
     const night = display.nightMode;
 
     const patchDisplay = (patch: Partial<typeof display>): void =>
@@ -1986,6 +1990,14 @@ export class MirrorRemote extends LitElement {
           />
         </label>
 
+        ${outlet.host && !isLocalOutletHost(outlet.host)
+          ? html`
+              <p class="banner banner--error">
+                Diese Adresse liegt ausserhalb des eigenen Netzes. Der Spiegel ruft sie nicht auf.
+              </p>
+            `
+          : nothing}
+
         <label class="field">
           <span class="field__label">
             Daran haengt
@@ -2003,6 +2015,27 @@ export class MirrorRemote extends LitElement {
             <option value="display" ?selected=${outlet.scope === 'display'}>Der Bildschirm</option>
             <option value="mirror" ?selected=${outlet.scope === 'mirror'}>Der ganze Spiegel</option>
           </select>
+        </label>
+
+        <label class="field">
+          <span class="field__label">
+            Token
+            <span class="field__hint">
+              Nur noetig, wenn in der myStrom-App der Schutz der REST-Schnittstelle eingeschaltet ist.
+              ${outletState.hasToken ? 'Einer ist hinterlegt – ein leeres Feld loescht ihn.' : ''}
+            </span>
+          </span>
+          <input
+            type="password"
+            autocomplete="off"
+            placeholder=${outletState.hasToken ? '••••••••' : 'ohne'}
+            @change=${(event: Event) => {
+              const input = event.target as HTMLInputElement;
+              store.send({ t: 'admin:setOutletToken', value: input.value });
+              // Nicht stehen lassen: das Feld zeigt nie, was hinterlegt ist.
+              input.value = '';
+            }}
+          />
         </label>
 
         ${outlet.enabled ? this.#renderOutletStatus() : nothing}

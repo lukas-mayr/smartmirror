@@ -30,7 +30,12 @@ export class PowerController extends EventEmitter {
   /** Zeitplan-Zustand, als die manuelle Uebersteuerung gesetzt wurde. */
   #overrideBaseline: boolean | null = null;
   #hardwareAvailable = true;
-  #outlet: OutletStatus = idleOutlet(false);
+  #outlet: OutletStatus = idleOutlet(false, false);
+  /**
+   * Der Token der Steckdose wird bei jedem Aufruf frisch geholt und nirgends
+   * hier gehalten: der Geheimnisspeicher ist die einzige Ablage dafuer.
+   */
+  #readToken: () => string;
   /**
    * Anfragen an die Steckdose laufen nacheinander.
    *
@@ -58,10 +63,11 @@ export class PowerController extends EventEmitter {
    */
   #selfCutPending = false;
 
-  constructor(config: MirrorConfig) {
+  constructor(config: MirrorConfig, readToken: () => string = () => '') {
     super();
     this.#config = config;
-    this.#outlet = idleOutlet(outletActive(config));
+    this.#readToken = readToken;
+    this.#outlet = idleOutlet(outletActive(config), readToken() !== '');
   }
 
   get isOn(): boolean {
@@ -98,7 +104,7 @@ export class PowerController extends EventEmitter {
       // Eine frisch eingetippte Adresse soll sofort etwas sagen und nicht bis
       // zum Abend schweigen. Geschaltet wird dabei nicht: eine Aenderung an
       // den Einstellungen ist kein Wechsel im Zeitplan.
-      this.#outlet = idleOutlet(outletActive(config));
+      this.#outlet = idleOutlet(outletActive(config), this.#readToken() !== '');
       this.#outletDesired = null;
       this.emit('outlet', this.#outlet);
       void this.#refreshOutlet();
@@ -213,7 +219,7 @@ export class PowerController extends EventEmitter {
     }
 
     this.#outletDesired = on;
-    await this.#talkToOutlet(() => setRelay(outlet.host, on));
+    await this.#talkToOutlet(() => setRelay(outlet.host, on, this.#readToken()));
     // Hat es nicht geklappt, bleibt es zu tun: eine Dose, die gerade nicht
     // antwortet, soll beim naechsten Tick wieder gefragt werden.
     if (!this.#outlet.reachable) this.#outletDesired = null;
@@ -227,14 +233,14 @@ export class PowerController extends EventEmitter {
     this.#outletCountdown = OUTLET_TICKS;
     if (!outlet.enabled || !outlet.host) {
       if (this.#outlet.configured) {
-        this.#outlet = idleOutlet(false);
+        this.#outlet = idleOutlet(false, this.#readToken() !== '');
         this.emit('outlet', this.#outlet);
       }
       return;
     }
     // Eine Abfrage darf ausfallen, solange ohnehin schon jemand mit der Dose
     // spricht – ein Schaltbefehl nie.
-    await this.#talkToOutlet(() => readReport(outlet.host), !force);
+    await this.#talkToOutlet(() => readReport(outlet.host, this.#readToken()), !force);
   }
 
   async #talkToOutlet(
@@ -261,6 +267,7 @@ export class PowerController extends EventEmitter {
         reachable: true,
         relay: report.relay,
         watts: report.watts,
+        hasToken: this.#readToken() !== '',
         error: null,
         checkedAt: new Date().toISOString(),
       });
@@ -274,6 +281,7 @@ export class PowerController extends EventEmitter {
         reachable: false,
         relay: null,
         watts: null,
+        hasToken: this.#readToken() !== '',
         error: message,
         checkedAt: new Date().toISOString(),
       });
@@ -290,6 +298,7 @@ export class PowerController extends EventEmitter {
       previous.reachable === next.reachable &&
       previous.relay === next.relay &&
       previous.watts === next.watts &&
+      previous.hasToken === next.hasToken &&
       previous.error === next.error
     ) {
       return;
@@ -298,8 +307,8 @@ export class PowerController extends EventEmitter {
   }
 }
 
-function idleOutlet(configured: boolean): OutletStatus {
-  return { configured, reachable: false, relay: null, watts: null, error: null, checkedAt: null };
+function idleOutlet(configured: boolean, hasToken: boolean): OutletStatus {
+  return { configured, reachable: false, relay: null, watts: null, hasToken, error: null, checkedAt: null };
 }
 
 function outletActive(config: MirrorConfig): boolean {

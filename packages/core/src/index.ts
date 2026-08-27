@@ -2,6 +2,7 @@ import { AuthStore } from './auth.js';
 import { ConfigStore } from './config-store.js';
 import { ModuleHost } from './module-host.js';
 import { PowerController } from './power.js';
+import { OUTLET_SECRET_KEY, OUTLET_SECRET_SCOPE } from './mystrom.js';
 import { SecretStore } from './secrets.js';
 import { UpdateBridge } from './update-bridge.js';
 import { BootLookBridge } from './boot-look.js';
@@ -43,7 +44,12 @@ async function main(): Promise<void> {
   const modules = new ModuleHost(config.current, secrets);
   await modules.discover();
 
-  const power = new PowerController(config.current);
+  // Der Controller bekommt keinen Token, sondern den Weg zu ihm: so liegt das
+  // Geheimnis weiter nur im verschluesselten Speicher und nicht zusaetzlich in
+  // einem langlebigen Objekt.
+  const power = new PowerController(config.current, () =>
+    secrets.get(OUTLET_SECRET_SCOPE, OUTLET_SECRET_KEY) ?? '',
+  );
   const updates = new UpdateBridge();
   const bootLook = new BootLookBridge();
 

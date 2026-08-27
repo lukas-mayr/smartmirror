@@ -1,3 +1,4 @@
+import { isLocalOutletHost } from '@mirror/sdk';
 import { createLogger } from './logger.js';
 
 const log = createLogger('outlet');
@@ -8,6 +9,17 @@ const log = createLogger('outlet');
  * Schaltvorgang nicht in den naechsten laeuft (der Zeitplan tickt alle 20s).
  */
 const REQUEST_TIMEOUT_MS = 4_000;
+
+/**
+ * Wo der Token der Steckdose liegt.
+ *
+ * Derselbe verschluesselte Speicher wie fuer Modul-Geheimnisse, aber unter
+ * einem Bezeichner, den kein Modul tragen kann: Modul-Ids sind kebab-case und
+ * enthalten keinen Doppelpunkt. Damit ist der Token vor den Modulen ebenso
+ * sicher wie vor der Anzeige.
+ */
+export const OUTLET_SECRET_SCOPE = 'core:power';
+export const OUTLET_SECRET_KEY = 'outletToken';
 
 /** Was `/report` liefert – so viel davon, wie hier gebraucht wird. */
 export interface OutletReport {
@@ -42,8 +54,8 @@ export class OutletError extends Error {
  * Netz ist, kann schalten. Das ist die Vorgabe des Geraets und nichts, was
  * der Spiegel entschieden haette.
  */
-export async function readReport(host: string): Promise<OutletReport> {
-  const raw = await request(host, '/report');
+export async function readReport(host: string, token = ''): Promise<OutletReport> {
+  const raw = await request(host, '/report', token);
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -72,9 +84,9 @@ export async function readReport(host: string): Promise<OutletReport> {
  * umgelegt hat; genau daran haengt in der App die Anzeige, ob die Steckdose
  * tut, was der Zeitplan sagt.
  */
-export async function setRelay(host: string, on: boolean): Promise<OutletReport> {
-  await request(host, `/relay?state=${on ? 1 : 0}`);
-  const report = await readReport(host);
+export async function setRelay(host: string, on: boolean, token = ''): Promise<OutletReport> {
+  await request(host, `/relay?state=${on ? 1 : 0}`, token);
+  const report = await readReport(host, token);
   if (report.relay !== on) {
     throw new OutletError(`Die Steckdose liess sich nicht ${on ? 'ein' : 'aus'}schalten.`);
   }
@@ -82,8 +94,15 @@ export async function setRelay(host: string, on: boolean): Promise<OutletReport>
   return report;
 }
 
-async function request(host: string, path: string): Promise<string> {
+async function request(host: string, path: string, token: string): Promise<string> {
   if (!host) throw new OutletError('Fuer die Steckdose ist keine Adresse hinterlegt.');
+  // Die Grenze steht hier und nicht erst in den Einstellungen: was auch immer
+  // in der Konfiguration steht, hinaus geht ueber diesen Weg nichts. Die
+  // Steckdose ist die einzige Adresse, die jemand von Hand eintippt – jede
+  // andere Adresse, die der Spiegel aufruft, steht im Quelltext.
+  if (!isLocalOutletHost(host)) {
+    throw new OutletError('Nur Steckdosen im eigenen Netz. Diese Adresse liegt ausserhalb.');
+  }
   // Die Adresse wird hier gebaut und nicht uebernommen: `host` ist beim
   // Speichern auf Hostname und Port zusammengestrichen worden, damit aus einem
   // eingefuegten Link kein Aufruf irgendwohin wird.
@@ -92,17 +111,23 @@ async function request(host: string, path: string): Promise<string> {
   try {
     response = await fetch(url, {
       redirect: 'error',
+      // Der Token schuetzt die Schnittstelle der Dose, wenn er in der
+      // myStrom-App eingeschaltet wurde. Er liegt verschluesselt neben den
+      // Modul-Geheimnissen und erreicht weder die Anzeige noch die Handy-App.
+      headers: token ? { Token: token } : undefined,
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
   } catch (error) {
     throw new OutletError(reasonFor(error), { cause: error });
   }
   if (response.status === 401 || response.status === 403) {
-    // Neuere Firmware kann die Schnittstelle mit einem Token schuetzen. Der
-    // Spiegel kennt keinen – lieber sagen, wo der Schalter dafuer sitzt, als
-    // stumm nicht zu schalten.
+    // Neuere Firmware kann die Schnittstelle mit einem Token schuetzen. Den
+    // Schutz abzuschalten waere der bequeme Rat und der falsche – also nach
+    // dem Token fragen.
     throw new OutletError(
-      'Die Steckdose verlangt einen Token. In der myStrom-App den Schutz der REST-Schnittstelle ausschalten.',
+      token
+        ? 'Die Steckdose weist den hinterlegten Token zurueck.'
+        : 'Die Steckdose verlangt einen Token. Er steht in der myStrom-App unter den Einstellungen der Dose.',
     );
   }
   if (!response.ok) throw new OutletError(`Die Steckdose antwortet mit Fehler ${response.status}.`);

@@ -40,6 +40,7 @@ import type { UpdateBridge } from './update-bridge.js';
 import type { BootLookBridge } from './boot-look.js';
 import { createLogger } from './logger.js';
 import { appVersion, remoteDistDir } from './paths.js';
+import { OUTLET_SECRET_KEY, OUTLET_SECRET_SCOPE } from './mystrom.js';
 import { requestRestart } from './system-bridge.js';
 
 const log = createLogger('server');
@@ -792,6 +793,19 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
       case 'admin:power':
         await deps.power.setManual(message.on);
         return;
+
+      case 'admin:setOutletToken': {
+        const value = message.value.trim();
+        // Der Namensraum ist absichtlich kein Modul-Bezeichner: Modul-Ids sind
+        // kebab-case (siehe ID_PATTERN im Manifest-Validator), ein Doppelpunkt
+        // kommt dort nicht vor. Kein Modul kann diesen Eimer also lesen.
+        if (value) await deps.secrets.set(OUTLET_SECRET_SCOPE, OUTLET_SECRET_KEY, value);
+        else await deps.secrets.remove(OUTLET_SECRET_SCOPE, OUTLET_SECRET_KEY);
+        // Sofort ausprobieren: ein Token, der nicht passt, soll nicht bis zum
+        // naechsten Schaltvorgang unbemerkt bleiben.
+        send(client, { t: 'outlet:status', status: await deps.power.checkOutlet() });
+        return;
+      }
 
       case 'admin:testOutlet': {
         const status = await deps.power.checkOutlet();

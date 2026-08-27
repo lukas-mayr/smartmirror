@@ -18,9 +18,14 @@ packages/shell/src/renderer/fonts.css
 
 # Signierschluessel. Der geheime Schluessel gehoert NIE ins Repository – wer ihn
 # hat, kann Updates signieren, die jeder Spiegel bereitwillig installiert.
+#
+# Keine Ausnahme fuer device.key: der entschluesselt secrets.json und liegt im
+# Datenverzeichnis (.data/ in der Entwicklung, /opt/smartmirror/data auf dem
+# Geraet), also ohnehin ausserhalb des Repositories. Eine Ausnahme schuetzte
+# nichts und machte aus einer versehentlich hierher kopierten Datei einen
+# Commit.
 minisign.key
 *.key
-!device.key
 
 # Python legt Bytecode neben die Skripte in deploy/
 __pycache__/

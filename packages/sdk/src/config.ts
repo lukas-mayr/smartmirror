@@ -130,6 +130,45 @@ export function normalizeOutletHost(value: unknown): string {
   return port === null ? match[1]! : `${match[1]}:${port}`;
 }
 
+/**
+ * Adressen, die im eigenen Netz liegen koennen.
+ *
+ * Namen ohne Punkt sind LAN-Namen; alles andere braucht eine dieser Endungen.
+ */
+const LOCAL_SUFFIXES = ['.local', '.lan', '.home', '.home.arpa', '.internal', '.box'];
+
+const IPV4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+
+/**
+ * Liegt diese Adresse im eigenen Netz?
+ *
+ * Die Steckdose ist das einzige Geraet, dessen Adresse jemand von Hand
+ * eintippt — und damit die einzige Stelle, an der aus einer Einstellung eine
+ * Verbindung irgendwohin werden koennte. Der Spiegel darf nach draussen
+ * sprechen (Wetter, Fahrplan, Updates), aber jede dieser Adressen steht im
+ * Quelltext. Diese hier nicht, also wird sie eingegrenzt: private IPv4-Netze,
+ * Namen ohne Punkt, oder eine der ueblichen Heimnetz-Endungen.
+ */
+export function isLocalOutletHost(host: string): boolean {
+  const name = host.split(':')[0]!.trim().toLowerCase();
+  if (!name) return false;
+
+  const match = IPV4.exec(name);
+  if (match) {
+    const [a, b] = [Number(match[1]), Number(match[2])];
+    if (match.slice(1).some((part) => Number(part) > 255)) return false;
+    if (a === 10 || a === 127) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    // 169.254/16 ist die Adresse, die sich ein Geraet ohne DHCP selbst gibt.
+    if (a === 169 && b === 254) return true;
+    return false;
+  }
+
+  if (!name.includes('.')) return true;
+  return LOCAL_SUFFIXES.some((suffix) => name.endsWith(suffix));
+}
+
 export function normalizeOutlet(value: unknown): OutletSettings {
   const source = (typeof value === 'object' && value !== null ? value : {}) as Partial<OutletSettings>;
   const host = normalizeOutletHost(source.host);
