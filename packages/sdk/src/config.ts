@@ -5,9 +5,10 @@ import { defaultGridForRotation, type GridSize, type WidgetSize } from './layout
 import { DEFAULT_ROTATION, type Rotation } from './rotation.js';
 import { createScreen, type MirrorScreen } from './screens.js';
 import { createDefaultSetup, type SetupState } from './setup.js';
+import { DEFAULT_NETWORK, type NetworkSettings } from './wifi.js';
 
 /** Aktuelle Version des Config-Formats. Erhoehen = Migration schreiben. */
-export const CONFIG_SCHEMA_VERSION = 6;
+export const CONFIG_SCHEMA_VERSION = 7;
 
 export interface ModuleInstance {
   /** Stabil ueber die Lebensdauer der Instanz, z.B. "weather-1". */
@@ -247,6 +248,15 @@ export interface MirrorConfig {
   power: PowerSettings;
   update: UpdateSettings;
   /**
+   * Netzwerk. Bisher genau eine Frage: ob der Spiegel ein Einrichtungs-WLAN
+   * aufmachen darf, wenn er sonst nirgends hinkommt.
+   *
+   * Das WLAN selbst steht nicht hier, sondern in den Profilen des
+   * NetworkManagers – dort, wo auch das Passwort liegt, und dort allein. Der
+   * Core sieht es nie wieder, nachdem er es weitergereicht hat.
+   */
+  network: NetworkSettings;
+  /**
    * Wie weit die Einrichtung ist. Steht hier und nicht in einer der beiden
    * Oberflaechen, weil Spiegel und Handy denselben Schritt zeigen muessen.
    */
@@ -311,6 +321,7 @@ export function createDefaultConfig(): MirrorConfig {
       autoUpdate: true,
       checkIntervalMinutes: 15,
     },
+    network: { ...DEFAULT_NETWORK },
     setup: createDefaultSetup(),
   };
 }

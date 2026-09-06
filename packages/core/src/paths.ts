@@ -76,6 +76,17 @@ export const systemRequestFile = join(dataDir, 'system-request.json');
  * und ob dafuer noch ein Neustart aussteht. Der Core liest nur.
  */
 export const bootLookStatusFile = join(dataDir, 'bootlook-status.json');
+/**
+ * Auftrag an den Root-Dienst, der das WLAN schaltet. Der Core schreibt nur;
+ * gelesen und – noch vor dem Ausfuehren – geloescht wird die Datei von
+ * deploy/mirror-wifi.sh.
+ *
+ * Sie enthaelt zeitweise ein WLAN-Passwort. Deshalb wird sie wie alles hier
+ * mit 0600 geschrieben, und deshalb loescht der Root-Dienst sie als Erstes.
+ */
+export const wifiRequestFile = join(dataDir, 'wifi-request.json');
+/** Bericht desselben Dienstes: Netz, Signal, Nachbarn, Einrichtungs-WLAN. */
+export const wifiStatusFile = join(dataDir, 'wifi-status.json');
 
 export function appVersion(): string {
   for (const file of [join(appRoot, 'VERSION'), join(appRoot, 'package.json')]) {

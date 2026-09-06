@@ -1,0 +1,20 @@
+[Unit]
+Description=Sieht regelmaessig nach, ob der Spiegel noch am Netz haengt
+
+[Timer]
+# Anders als bei mirror-system.timer ist das hier nicht nur die Rueckfallebene
+# fuer eine Path-Unit, die vielleicht nicht feuert. Der Dienst hat eine eigene
+# Aufgabe, die niemand anstoesst: nachsehen, ob der Spiegel ueberhaupt noch
+# irgendwo hinkommt, und sonst nach ein paar Minuten sein eigenes WLAN
+# aufmachen. Ohne diesen Takt gaebe es genau in dem Fall, fuer den das Ganze
+# gebaut ist, niemanden mehr, der danach fragt.
+#
+# Erst nach einer Minute: vorher ist der Spiegel noch beim Verbinden, und ein
+# Lauf, der ihn dabei fuer "ohne Netz" haelt, waere nur eine Zeile im Journal.
+OnBootSec=60s
+OnUnitActiveSec=30s
+AccuracySec=5s
+Unit=mirror-wifi.service
+
+[Install]
+WantedBy=timers.target

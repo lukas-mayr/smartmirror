@@ -20,13 +20,14 @@ Drei Prozesse, bewusst getrennt:
 | **Anzeige** | `mirror-shell.service` | Electron unter [`cage`](https://github.com/cage-kiosk/cage), einem Wayland-Compositor für genau ein Fenster. Kein Desktop, keine Browser-Bedienelemente. |
 | **Updater** | `mirror-updater.service` + `.timer` + `.path` | Prüft GitHub Releases, verifiziert Signaturen, tauscht Symlinks, rollt bei fehlgeschlagenem Healthcheck zurück. Der Timer prüft regelmäßig, die Path-Unit startet ihn sofort, wenn die App darum bittet. |
 | **Neustart** | `mirror-system.service` + `.path` + `.timer` | Führt aus, worum die App bittet: Dienste neu starten, Gerät booten, Updater anstoßen. Kennt genau diese drei Aufträge. |
+| **WLAN** | `mirror-wifi.service` + `.path` + `.timer` | Sucht Netze, verbindet, vergisst – und sieht alle 30 Sekunden nach, ob der Spiegel überhaupt noch irgendwo hinkommt. Kommt er nirgendwo hin, macht er sein eigenes WLAN auf, damit die Handy-App erreichbar bleibt. |
 | **Startbild** | `mirror-bootlook.service` | Sorgt bei jedem Start dafür, dass beim Booten der Spiegel zu sehen ist und nicht der Pi: Firmware-Splash aus, kein Moduswechsel, Textkonsole auf ein unsichtbares Terminal, Plymouth mit dem Wortzeichen — bis ins Startabbild hinein. Ändert nur, was fehlt. |
 
 Der Updater ist ein eigener Dienst, weil er genau die Dateien ersetzt, aus
 denen der Core läuft, und ihn danach neu startet — im selben Prozess würde er
 sich selbst unter den Füßen wegziehen.
 
-Die drei letzten sind die einzigen Teile mit Root-Rechten. Der Core läuft
+Die vier letzten sind die einzigen Teile mit Root-Rechten. Der Core läuft
 unprivilegiert und soll das bleiben: was er anstoßen können muss, stößt er über
 eine Datei an und nicht über einen Aufruf (siehe
 [Neustart aus der Handy-App](#neustart-aus-der-handy-app)). `mirror-bootlook`
@@ -51,7 +52,7 @@ modules/
   notifications/ Die Fläche für Mitteilungen; den Inhalt melden die Module
   timer/         Ein Bagger trägt einen Berg ab; ist er weg, ist die Zeit um
 deploy/      systemd-Units, Compositor-Start, Installer, Drehung, Neustart,
-             Plymouth-Thema fuer den Start, Startbildschirm unter cage,
+             WLAN, Plymouth-Thema fuer den Start, Startbildschirm unter cage,
              unsichtbarer Mauszeiger
 scripts/     Build-, Bundle- und Generator-Skripte
 ```
@@ -902,6 +903,73 @@ Dieselbe Liste zeigt zu jedem Gerät den Namen, wann es zuletzt am Spiegel war
 und ob es gerade hängt. **Entkoppeln** trifft genau eines: sein Token gilt
 sofort nicht mehr, die Verbindung wird getrennt, alle anderen bleiben.
 
+### WLAN
+
+Ein Spiegel hängt an der Wand, oft im Bad, und hat weder Tastatur noch
+Netzwerkdose. Das WLAN steht damit an einer Stelle, an die im Zweifel niemand
+mehr herankommt: fällt es aus der Konfiguration – ein zurückgesetzter Router,
+ein neues Passwort, ein frisch aufgesetztes Image –, ist auch die App weg, in
+der man es wieder eintragen würde.
+
+Deshalb zwei Wege hinein.
+
+**In der App: System → WLAN.** Netze suchen, eines antippen, Passwort eingeben.
+Dieselbe Liste zeigt, was der Spiegel schon kennt; **Entfernen** wirft ein
+gespeichertes Netz weg. Ein gespeichertes Netz braucht kein Passwort mehr – wer
+das Feld leer lässt, verbindet mit dem, was der Spiegel hat.
+
+**Wenn nichts mehr geht: der Spiegel macht sein eigenes WLAN auf.** Kommt er
+weder über WLAN noch über Kabel irgendwohin, öffnet er nach zwei Minuten
+einen Zugangspunkt. Name und Passwort stehen dann auf dem Spiegel – dieselbe
+Hürde wie beim Kopplungscode: wer einrichten will, steht davor. Das Handy
+verbindet sich damit und findet dieselbe App unter
+**`http://10.42.0.1:8080`**. Dort steht die Netzliste vom letzten Suchlauf, aus
+der sich das Heimnetz auswählen lässt; der Spiegel wechselt hinüber und macht
+den Zugangspunkt wieder zu. Klappt es nicht – falsches Passwort, Netz zu weit
+weg –, kommt er von selbst zurück, mit der Fehlermeldung darin.
+
+Beides steht auch dann in der App, wenn gerade alles läuft: Name und Passwort
+des Einrichtungs-WLANs sind genau dann nicht mehr nachzulesen, wenn man sie
+braucht. **Einrichtungs-WLAN anbieten** schaltet das Ganze ab, wenn es nicht
+gewünscht ist.
+
+**Warum das nicht `nmcli` aufruft.** Aus demselben Grund wie beim Neustart: der
+Core läuft unprivilegiert und darf kein Netz schalten. Er schreibt eine
+Auftragsdatei, `mirror-wifi.service` führt sie als root aus
+(`deploy/mirror-wifi.sh`) und kennt dabei genau vier Aufträge – suchen,
+verbinden, vergessen, Zugangspunkt. Alles andere lehnt es ab, und ein Auftrag,
+der älter als zwei Minuten ist, gilt nicht mehr.
+
+Der Timer daneben ist hier keine bloße Rückfallebene für eine Path-Unit, die
+vielleicht nicht feuert. Er ist der Einzige, der überhaupt nachsieht, ob der
+Spiegel noch am Netz hängt – und ohne ihn gäbe es genau in dem Fall, für den
+das Ganze gebaut ist, niemanden mehr, der danach fragt.
+
+**Wo das Passwort liegt.** Beim NetworkManager, in
+`/etc/NetworkManager/system-connections/`, mit 0600 und root. Sonst nirgends:
+die Auftragsdatei wird gelesen und gelöscht, bevor irgendetwas geschieht, der
+Core behält nichts, und der Bericht zurück kennt Netznamen und
+Signalstärken, keine Geheimnisse. Das Profil schreibt das Skript selbst,
+statt `nmcli … password …` aufzurufen: Kommandozeilenargumente stehen in
+`/proc` und sind für jeden Prozess auf dem Gerät lesbar, und sei es nur für
+die Sekunde, die der Aufruf dauert.
+
+Ohne Landeskennung lässt der Funkchip keinen Zugangspunkt zu – das ist der
+häufigste Grund, aus dem auf einem frischen Pi kein WLAN erscheint. Der
+Installer weist darauf hin; setzen lässt sie sich mit:
+
+```bash
+sudo raspi-config nonint do_wifi_country CH
+```
+
+Von Hand geht ohnehin alles weiterhin:
+
+```bash
+nmcli device wifi list
+sudo nmcli device wifi connect "<SSID>" password "<Passwort>"
+journalctl -u mirror-wifi -f
+```
+
 ### Drehen
 
 Genau deshalb ist die Drehung keine reine App-Einstellung: Sie steht in der
@@ -1338,7 +1406,7 @@ Tastatur ein schlechter Tausch.
 ## Betrieb
 
 ```bash
-journalctl -u mirror-core -u mirror-shell -u mirror-updater -f
+journalctl -u mirror-core -u mirror-shell -u mirror-updater -u mirror-wifi -f
 curl -s localhost:8080/healthz
 systemctl restart mirror-shell        # nur die Anzeige neu starten
 ```

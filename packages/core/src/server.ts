@@ -9,6 +9,8 @@ import {
   defaultScreenName,
   findFreeSpot,
   isClientMessage,
+  isValidPassphrase,
+  isValidSsid,
   nearestWidgetSize,
   nextScreenId,
   normalizeScreenLayout,
@@ -37,6 +39,7 @@ import type { PowerController } from './power.js';
 import type { SecretStore } from './secrets.js';
 import type { UpdateBridge } from './update-bridge.js';
 import type { BootLookBridge } from './boot-look.js';
+import type { WifiBridge } from './wifi-bridge.js';
 import { createLogger } from './logger.js';
 import { appVersion, remoteDistDir } from './paths.js';
 import { requestRestart } from './system-bridge.js';
@@ -71,6 +74,7 @@ export interface ServerDeps {
   power: PowerController;
   updates: UpdateBridge;
   bootLook: BootLookBridge;
+  wifi: WifiBridge;
 }
 
 export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
@@ -140,6 +144,7 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
     power: { on: deps.power.isOn },
     update: deps.updates.status,
     bootLook: deps.bootLook.status,
+    wifi: deps.wifi.status,
     viewport,
     previewScreenId: preview?.screenId ?? null,
   });
@@ -260,6 +265,11 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
   deps.bootLook.on('status', (status) =>
     broadcast({ t: 'bootlook:status', status }, (client) => client.type === 'remote'),
   );
+  // Der WLAN-Zustand geht auch an die Anzeige, anders als der Startbildschirm:
+  // laeuft das Einrichtungs-WLAN, gehoeren Name und Passwort auf den Spiegel.
+  // Es ist der eine Fall, in dem die Handy-App sie nicht zeigen kann – wer sie
+  // braucht, kommt ja gerade nicht an sie heran.
+  deps.wifi.on('status', (status) => broadcast({ t: 'wifi:status', status }));
 
   deps.power.on('override', (override: { active: boolean; on: boolean } | null) => {
     void deps.config.update((draft) => {
@@ -813,6 +823,46 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
 
       case 'admin:applyUpdate':
         await deps.updates.requestApply(message.version);
+        return;
+
+      /*
+       * WLAN.
+       *
+       * Enger Wertebereich, obwohl der Absender angemeldet ist – wie beim
+       * Neustart und aus demselben Grund: was hier durchkommt, landet in einer
+       * Datei, die ein Root-Dienst liest und zu einer Netzwerkkonfiguration
+       * macht.
+       */
+      case 'admin:wifiScan':
+        await deps.wifi.requestScan();
+        return;
+
+      case 'admin:wifiConnect': {
+        if (!isValidSsid(message.ssid)) {
+          return fail(client, 'bad-request', 'Das ist kein brauchbarer Netzname.');
+        }
+        const passphrase = message.passphrase ?? '';
+        if (!isValidPassphrase(passphrase)) {
+          return fail(
+            client,
+            'bad-request',
+            'Ein WLAN-Passwort hat zwischen 8 und 63 Zeichen.',
+          );
+        }
+        await deps.wifi.requestConnect(message.ssid, passphrase);
+        return;
+      }
+
+      case 'admin:wifiForget': {
+        if (!isValidSsid(message.ssid)) {
+          return fail(client, 'bad-request', 'Das ist kein brauchbarer Netzname.');
+        }
+        await deps.wifi.requestForget(message.ssid);
+        return;
+      }
+
+      case 'admin:wifiHotspot':
+        await deps.wifi.requestHotspot(message.on === true);
         return;
 
       case 'admin:restart': {

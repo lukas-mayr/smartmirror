@@ -5,6 +5,7 @@ import { PowerController } from './power.js';
 import { SecretStore } from './secrets.js';
 import { UpdateBridge } from './update-bridge.js';
 import { BootLookBridge } from './boot-look.js';
+import { WifiBridge } from './wifi-bridge.js';
 import { createServer } from './server.js';
 import { createLogger } from './logger.js';
 import { appVersion, dataDir, modulesDir } from './paths.js';
@@ -46,8 +47,9 @@ async function main(): Promise<void> {
   const power = new PowerController(config.current);
   const updates = new UpdateBridge();
   const bootLook = new BootLookBridge();
+  const wifi = new WifiBridge();
 
-  const app = await createServer({ config, modules, secrets, auth, power, updates, bootLook });
+  const app = await createServer({ config, modules, secrets, auth, power, updates, bootLook, wifi });
 
   // Erst zuhoeren, dann Module starten: ein Modul, das beim Start haengt, darf
   // nicht verhindern, dass der Healthcheck des Updaters antwortet.
@@ -57,6 +59,7 @@ async function main(): Promise<void> {
   await power.start();
   updates.start();
   bootLook.start();
+  wifi.start();
   await modules.sync(config.current);
 
   const shutdown = async (signal: string): Promise<void> => {
@@ -64,6 +67,7 @@ async function main(): Promise<void> {
     power.stop();
     updates.stop();
     bootLook.stop();
+    wifi.stop();
     await modules.stopAll();
     await app.close();
     process.exit(0);

@@ -1,0 +1,21 @@
+[Unit]
+Description=Fuehrt WLAN-Auftraege aus, die die Handy-App stellt
+After=mirror-core.service
+
+[Path]
+# Der Core schreibt diese Datei, wenn in der App ein Netz gesucht, verbunden
+# oder vergessen wird. Er laeuft unprivilegiert und kann selbst kein Netz
+# schalten – dieselbe Bruecke wie beim Neustart und beim Updater.
+#
+# PathExists und nicht PathChanged: die Datei entsteht durch Umbenennen einer
+# Temporaerdatei (atomares Schreiben), und mirror-wifi.sh loescht sie zu
+# Beginn wieder. Damit ist ihre blosse Existenz das Signal, und das Loeschen
+# schaerft den Ausloeser fuer das naechste Mal.
+#
+# In dieser Datei steht ein WLAN-Passwort. Dass sie so kurz wie moeglich liegen
+# bleibt, ist deshalb kein Aufraeumen, sondern der Punkt.
+PathExists=/opt/smartmirror/data/wifi-request.json
+Unit=mirror-wifi.service
+
+[Install]
+WantedBy=paths.target
