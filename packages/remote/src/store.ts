@@ -9,6 +9,7 @@ import type {
   BootLookStatus,
   UpdateStatus,
   Viewport,
+  WifiStatus,
 } from '@mirror/sdk';
 
 const TOKEN_KEY = 'mirror.token';
@@ -75,6 +76,12 @@ export interface StoreSnapshot {
    */
   bootLook: BootLookStatus | null;
   /**
+   * WLAN des Spiegels: woran er haengt, was in Reichweite ist, ob sein
+   * Einrichtungs-WLAN offen steht. `null` heisst, dass es hier nichts zu
+   * steuern gibt – kein NetworkManager, kein Funkgeraet.
+   */
+  wifi: WifiStatus | null;
+  /**
    * Kantenlaengen der Anzeige in Pixeln, sofern sie gerade haengt. Nur zur
    * Erlaeuterung beim Ausrichten: neben "2,5 %" steht dann auch "27 px".
    */
@@ -119,6 +126,7 @@ export class Store extends EventTarget {
     powerOn: true,
     update: null,
     bootLook: null,
+    wifi: null,
     viewport: null,
     previewScreenId: null,
     mirrorPaired: false,
@@ -317,6 +325,7 @@ export class Store extends EventTarget {
           powerOn: message.power.on,
           update: message.update,
           bootLook: message.bootLook,
+          wifi: message.wifi,
           viewport: message.viewport,
           previewScreenId: message.previewScreenId,
         });
@@ -354,6 +363,9 @@ export class Store extends EventTarget {
         return;
       case 'bootlook:status':
         this.#patch({ bootLook: message.status });
+        return;
+      case 'wifi:status':
+        this.#patch({ wifi: message.status });
         return;
       case 'error':
         // Ein abgelaufenes Token muss zur Kopplung fuehren, nicht zu einer

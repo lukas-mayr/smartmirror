@@ -4,6 +4,7 @@ import {
   DEFAULT_GRID,
   findFreeSpot,
   normalizeInsets,
+  normalizeNetwork,
   normalizeNightMode,
   normalizeRotation,
   normalizeScreenLayout,
@@ -171,6 +172,21 @@ export const migrations: readonly Migration[] = [
           return { ...instance, visible: instance.visible !== false };
         }),
       };
+    },
+  },
+  {
+    from: 6,
+    describe: 'network.setupHotspot ergaenzt',
+    migrate: (config) => {
+      // Der Spiegel darf ab jetzt ein Einrichtungs-WLAN aufmachen, wenn er
+      // sonst nirgends hinkommt. Fuer einen laufenden Spiegel aendert das
+      // nichts: solange WLAN oder Kabel traegt, passiert gar nichts.
+      //
+      // Einen vorhandenen Wert nicht ueberschreiben: nach einem
+      // zurueckgerollten Update steht die Versionsnummer wieder auf 6, die
+      // Entscheidung aber schon in der Datei.
+      const network = (config.network ?? {}) as Record<string, unknown>;
+      return { ...config, network: normalizeNetwork(network) };
     },
   },
 ];

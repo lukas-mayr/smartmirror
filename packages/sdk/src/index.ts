@@ -16,3 +16,4 @@ export * from './schema.js';
 export * from './screens.js';
 export * from './setup.js';
 export * from './time.js';
+export * from './wifi.js';

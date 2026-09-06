@@ -3,6 +3,7 @@ import type { Zone } from './design.js';
 import type { WidgetSize } from './layout.js';
 import type { ModuleDescriptor } from './manifest.js';
 import type { MirrorScreen } from './screens.js';
+import type { WifiStatus } from './wifi.js';
 
 /**
  * Kantenlaengen der bespielbaren Buehne in Pixeln, wie die Anzeige sie sieht.
@@ -199,7 +200,7 @@ export type ClientMessage =
    * ein Zustand von jetzt und darf einen Neustart nicht ueberleben.
    */
   | { t: 'admin:previewScreen'; screenId: string | null }
-  | { t: 'admin:setSettings'; patch: Partial<Pick<MirrorConfig, 'deviceName' | 'locale' | 'timezone' | 'display' | 'power' | 'update' | 'setup'>> }
+  | { t: 'admin:setSettings'; patch: Partial<Pick<MirrorConfig, 'deviceName' | 'locale' | 'timezone' | 'display' | 'power' | 'update' | 'network' | 'setup'>> }
   | { t: 'admin:setSecret'; moduleId: string; key: string; value: string }
   | { t: 'admin:power'; on: boolean }
   | { t: 'admin:renameDevice'; deviceId: string; name: string }
@@ -216,6 +217,30 @@ export type ClientMessage =
    * immer.
    */
   | { t: 'admin:restart'; scope: RestartScope }
+  /**
+   * WLAN des Spiegels.
+   *
+   * Vier Nachrichten und kein "setWifi": ein Netz zu suchen, sich zu verbinden
+   * und ein Profil wieder wegzuwerfen sind drei verschiedene Vorgaenge mit drei
+   * verschiedenen Ausgaengen. Was davon gelingt, steht danach in `wifi:status`
+   * — nicht in einer Antwort auf genau diese Nachricht: die Verbindung reisst
+   * beim Wechsel des Netzes gerade ab.
+   *
+   * Das Passwort geht hier durch und wird nirgends behalten. Der Core reicht es
+   * an den Root-Dienst weiter, der daraus ein Profil des NetworkManagers macht;
+   * danach kennt es nur noch der. Der Spiegel gibt es nie wieder heraus.
+   */
+  | { t: 'admin:wifiScan' }
+  | { t: 'admin:wifiConnect'; ssid: string; passphrase?: string }
+  | { t: 'admin:wifiForget'; ssid: string }
+  /**
+   * Das Einrichtungs-WLAN von Hand oeffnen oder schliessen.
+   *
+   * Von selbst kommt es nur hoch, wenn der Spiegel sonst nirgends hinkommt.
+   * Wer es trotzdem sehen will – zum Ausprobieren, oder um ein zweites Handy
+   * heranzuholen –, schaltet es hier ein.
+   */
+  | { t: 'admin:wifiHotspot'; on: boolean }
   | { t: 'ping' };
 
 /* ------------------------------- Server → Client ------------------------------- */
@@ -233,7 +258,7 @@ export type ServerMessage
       /** Nur fuer ungekoppelte Clients: laeuft gerade eine Kopplung? */
       pairing?: PairingState;
     }
-  | { t: 'snapshot'; config: MirrorConfig; modules: ModuleDescriptor[]; state: Record<string, ModuleStateEnvelope>; power: { on: boolean }; update: UpdateStatus; bootLook: BootLookStatus | null; viewport: Viewport | null; previewScreenId: string | null }
+  | { t: 'snapshot'; config: MirrorConfig; modules: ModuleDescriptor[]; state: Record<string, ModuleStateEnvelope>; power: { on: boolean }; update: UpdateStatus; bootLook: BootLookStatus | null; wifi: WifiStatus | null; viewport: Viewport | null; previewScreenId: string | null }
   | { t: 'state:patch'; envelope: ModuleStateEnvelope }
   | { t: 'config:update'; config: MirrorConfig }
   | { t: 'modules:update'; modules: ModuleDescriptor[] }
@@ -242,6 +267,7 @@ export type ServerMessage
   | { t: 'display:previewScreen'; screenId: string | null }
   | { t: 'update:status'; status: UpdateStatus }
   | { t: 'bootlook:status'; status: BootLookStatus | null }
+  | { t: 'wifi:status'; status: WifiStatus | null }
   | { t: 'pair:result'; ok: true; token: string; deviceId: string }
   /** Nur an die Anzeige: der Code zum Abschreiben. Leer heisst "wieder wegnehmen". */
   | { t: 'pair:code'; code: string; expiresAt: string }

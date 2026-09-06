@@ -20,6 +20,7 @@ import {
   type ModuleView,
   type NightModeSettings,
   type ServerMessage,
+  type WifiStatus,
   type Zone,
 } from '@mirror/sdk';
 import type { CoreConnection, ConnectionState } from './connection.js';
@@ -116,8 +117,28 @@ export class MirrorApp {
   #powerOn = true;
   #burnInIndex = 0;
   #ready = false;
-  /** Was gerade ueber der Buehne liegt, damit nur das Passende wieder weggeht. */
-  #overlayVariant: 'full' | 'badge' | null = null;
+  /**
+   * Was gerade ueber der Buehne liegt.
+   *
+   * Als Zeichenkette und nicht als blosses "ja/nein": #updateOverlay laeuft bei
+   * jeder Konfigurationsaenderung mit, also auch dann, wenn am Handy gerade ein
+   * Block verschoben wird. Ohne diesen Vergleich baute die Anzeige die Karte
+   * dabei jedes Mal neu – und ein Kopplungscode, der im Sekundentakt
+   * aufblitzt, ist auf einer Wand das Auffaelligste im Raum.
+   */
+  #overlaySignature: string | null = null;
+  /**
+   * Was gerade ueber der Buehne stehen soll.
+   *
+   * Drei Dinge streiten sich um dieselbe Flaeche: der Kopplungscode, der
+   * Hinweis "warte auf ein Handy" und das Einrichtungs-WLAN. Frueher schrieb
+   * jeder Fall direkt in die Einblendung, und wer zuletzt kam, gewann – auch
+   * wenn er das Unwichtigere zu sagen hatte. Jetzt merkt sich die Anzeige die
+   * drei Zustaende und entscheidet an einer Stelle, was davon zu sehen ist.
+   */
+  #pairCode: string | null = null;
+  #pairWaiting = false;
+  #wifi: WifiStatus | null = null;
   /** Liegt der Startbildschirm noch? Solange: kein Verbindungshinweis. */
   #booting = true;
 
@@ -149,13 +170,8 @@ export class MirrorApp {
   handle(message: ServerMessage): void {
     switch (message.t) {
       case 'welcome':
-        if (message.needsPairing) {
-          this.#showOverlay(
-            'Spiegel koppeln',
-            null,
-            'Oeffne die Spiegel-App auf dem Handy und gib den Code ein, sobald er hier erscheint.',
-          );
-        }
+        this.#pairWaiting = message.needsPairing;
+        this.#updateOverlay();
         return;
 
       case 'snapshot':
@@ -163,9 +179,12 @@ export class MirrorApp {
         this.#states = new Map(Object.entries(message.state));
         this.#powerOn = message.power.on;
         this.#previewScreenId = message.previewScreenId;
+        this.#wifi = message.wifi;
         this.#applyConfig(message.config);
         this.#applyPower();
-        this.#hideOverlay();
+        this.#pairWaiting = false;
+        this.#pairCode = null;
+        this.#updateOverlay();
         this.#hideBoot();
         if (!this.#ready) {
           this.#ready = true;
@@ -214,24 +233,18 @@ export class MirrorApp {
         this.#scheduleCycle();
         return;
 
-      case 'pair:code': {
-        if (!message.code) {
-          this.#hideOverlay();
-          return;
-        }
-        // Beim ersten Koppeln gehoert der Code ueber den ganzen Spiegel – es
-        // gibt ohnehin nichts anderes zu sehen. Danach ist er ein Zettel am
-        // unteren Rand: ein zweites Handy zu koppeln darf weder die Wand
-        // leerraeumen noch den Ausricht-Rahmen verdecken.
-        const initial = (this.#config?.setup.step ?? 'pair') === 'pair';
-        this.#showOverlay(
-          initial ? 'Spiegel koppeln' : 'Neues Geraet koppeln',
-          message.code,
-          'Diesen Code in der Spiegel-App eingeben.',
-          initial ? 'full' : 'badge',
-        );
+      case 'pair:code':
+        this.#pairCode = message.code || null;
+        this.#updateOverlay();
         return;
-      }
+
+      case 'wifi:status':
+        // Auch die Anzeige bekommt den WLAN-Zustand, anders als den des
+        // Startbildschirms: laeuft das Einrichtungs-WLAN, ist der Spiegel der
+        // einzige Ort, an dem Name und Passwort noch zu lesen sind.
+        this.#wifi = message.status;
+        this.#updateOverlay();
+        return;
 
       case 'error':
         console.error(`[shell] ${message.code}: ${message.message}`);
@@ -1009,7 +1022,8 @@ export class MirrorApp {
     // Beim Ausrichten zaehlt der Rahmen, und zwar ganz – eine deckende
     // Einblendung muss weg. Der kleine Kopplungszettel darf bleiben: sonst
     // haette ein zweites Handy, das waehrenddessen dazukommt, keinen Code.
-    if (aligning && this.#overlayVariant === 'full') this.#hideOverlay();
+    // Genau das entscheidet #updateOverlay anhand des Einrichtungsschritts.
+    this.#updateOverlay();
   }
 
   /**
@@ -1043,12 +1057,69 @@ export class MirrorApp {
   }
 
   /**
+   * Entscheidet, was ueber der Buehne steht.
+   *
+   * Die Reihenfolge ist die Reihenfolge der Dringlichkeit, und die zweite
+   * Zeile ist der Grund, warum es diese Funktion gibt: Wer koppeln will,
+   * braucht den Code – aber wer den Code sehen will, muss die App erst
+   * erreichen, und genau daran fehlt es, wenn das Einrichtungs-WLAN laeuft.
+   * Der Hinweis "warte auf ein Handy" steht deshalb hinter beidem: er sagt
+   * nichts, was weiterhilft.
+   *
+   * Beim ersten Einrichten gehoert das Ganze ueber den ganzen Spiegel – es
+   * gibt ohnehin nichts anderes zu sehen. Danach ist es ein Zettel am unteren
+   * Rand: weder ein zweites Handy noch ein ausgefallenes WLAN darf die Wand
+   * leerraeumen oder den Ausricht-Rahmen verdecken.
+   */
+  #updateOverlay(): void {
+    const initial = (this.#config?.setup.step ?? 'pair') === 'pair';
+    const variant = initial ? 'full' : 'badge';
+
+    if (this.#pairCode) {
+      this.#showOverlay(
+        initial ? 'Spiegel koppeln' : 'Neues Geraet koppeln',
+        this.#pairCode,
+        'Diesen Code in der Spiegel-App eingeben.',
+        variant,
+      );
+      return;
+    }
+
+    const hotspot = this.#wifi?.hotspot;
+    if (this.#wifi?.state === 'hotspot' && hotspot) {
+      this.#showOverlay(
+        `WLAN ${hotspot.ssid}`,
+        hotspot.passphrase || null,
+        `Der Spiegel kommt gerade nirgendwo hin. Verbinde das Handy mit diesem WLAN und oeffne http://${hotspot.address}:8080`,
+        variant,
+      );
+      return;
+    }
+
+    if (this.#pairWaiting) {
+      this.#showOverlay(
+        'Spiegel koppeln',
+        null,
+        'Oeffne die Spiegel-App auf dem Handy und gib den Code ein, sobald er hier erscheint.',
+        variant,
+      );
+      return;
+    }
+
+    this.#hideOverlay();
+  }
+
+  /**
    * Einblendung ueber der Buehne.
    *
    * `full` deckt den Spiegel ab, `badge` legt eine kleine Karte an den unteren
    * Rand und laesst alles andere stehen.
    */
   #showOverlay(title: string, code: string | null, hint: string, variant: 'full' | 'badge' = 'full'): void {
+    const signature = `${variant}|${title}|${code ?? ''}|${hint}`;
+    if (signature === this.#overlaySignature) return;
+    this.#overlaySignature = signature;
+
     const card = document.createElement('div');
     card.className = 'overlay__card';
 
@@ -1072,12 +1143,12 @@ export class MirrorApp {
     this.#overlay.replaceChildren(card);
     this.#overlay.classList.toggle('overlay--badge', variant === 'badge');
     this.#overlay.classList.add('overlay--visible');
-    this.#overlayVariant = variant;
   }
 
   #hideOverlay(): void {
+    if (this.#overlaySignature === null) return;
     this.#overlay.classList.remove('overlay--visible', 'overlay--badge');
-    this.#overlayVariant = null;
+    this.#overlaySignature = null;
   }
 
   #startBurnInProtection(): void {

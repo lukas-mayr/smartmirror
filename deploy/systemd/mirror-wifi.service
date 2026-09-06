@@ -1,0 +1,31 @@
+[Unit]
+Description=Smartmirror WLAN (verbinden, vergessen, Einrichtungs-WLAN)
+# Nach NetworkManager: davor gibt es nichts zu schalten und nichts zu melden.
+After=NetworkManager.service
+Wants=NetworkManager.service
+
+[Service]
+Type=oneshot
+# Laeuft als root, weil er Netzwerkprofile anlegt und Verbindungen schaltet.
+# Zusammen mit Updater, Neustart und Startbild der vierte Teil mit Root-Rechten
+# – und wie die uebrigen einer, der genau ein paar Auftragswoerter kennt.
+User=root
+Environment=MIRROR_INSTALL_ROOT=/opt/smartmirror
+Environment=MIRROR_DATA_DIR=/opt/smartmirror/data
+ExecStart=/bin/bash /opt/smartmirror/current/deploy/mirror-wifi.sh
+
+# Ueber /bin/bash und nicht direkt: das Ausfuehrungsrecht am Skript im Release
+# haengt daran, wie das Archiv entpackt wurde. Der Aufruf ueber die Shell ist
+# davon unabhaengig – dieselbe Ueberlegung wie bei mirror-guard.service.
+
+# Grosszuegig bemessen: ein Verbindungsversuch wartet bis zu 45 Sekunden auf
+# das Netz, ein Suchlauf einige davor. Laenger darf es nicht dauern, sonst
+# ueberholt der naechste Timer-Lauf diesen hier.
+TimeoutStartSec=120
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mirror-wifi
+
+# Kein [Install]: gestartet wird dieser Dienst von mirror-wifi.path und
+# mirror-wifi.timer, nie beim Booten selbst.

@@ -7,6 +7,7 @@ import {
   FONT_STACKS,
   normalizeGrid,
   normalizeInsets,
+  normalizeNetwork,
   normalizeNightMode,
   normalizeRotation,
   normalizeScreens,
@@ -196,6 +197,8 @@ function normalize(input: Record<string, unknown>): MirrorConfig {
     (rule) => typeof rule?.on === 'string' && typeof rule?.off === 'string' && Array.isArray(rule?.days),
   );
 
+  const network = normalizeNetwork({ ...defaults.network, ...(source.network ?? {}) });
+
   const update = { ...defaults.update, ...(source.update ?? {}) };
   update.checkIntervalMinutes = clamp(update.checkIntervalMinutes, 5, 1440);
   if (update.channel !== 'beta') update.channel = 'stable';
@@ -210,6 +213,7 @@ function normalize(input: Record<string, unknown>): MirrorConfig {
     display,
     power,
     update,
+    network,
     setup: normalizeSetup(source.setup),
   };
 }

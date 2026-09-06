@@ -19,6 +19,7 @@ import {
   INSET_SIDE_OPTIONS,
   INSET_STEP,
   insetsEqual,
+  isValidPassphrase,
   insetToPixels,
   normalizeRotation,
   rectFor,
@@ -52,6 +53,8 @@ import {
   type ScreenInsets,
   type SetupStep,
   type WidgetSize,
+  type WifiNetwork,
+  type WifiStatus,
 } from '@mirror/sdk';
 import { store, type StoreSnapshot } from '../store.js';
 import './schema-form.js';
@@ -152,6 +155,8 @@ export class MirrorRemote extends LitElement {
     notice: { state: true },
     toasts: { state: true },
     code: { state: true },
+    wifiTarget: { state: true },
+    wifiPass: { state: true },
   };
 
   declare snapshot: StoreSnapshot;
@@ -175,6 +180,14 @@ export class MirrorRemote extends LitElement {
    */
   declare toasts: Toast[];
   declare code: string;
+  /**
+   * Netz, an dem gerade gearbeitet wird – aufgeklappt mit Passwortfeld.
+   *
+   * Nicht mehrere gleichzeitig: ein Passwort einzutippen ist auf dem Handy
+   * fummelig genug, ohne dass daneben noch drei weitere Felder offen stehen.
+   */
+  declare wifiTarget: string | null;
+  declare wifiPass: string;
 
   constructor() {
     super();
@@ -187,6 +200,8 @@ export class MirrorRemote extends LitElement {
     this.notice = null;
     this.toasts = [];
     this.code = '';
+    this.wifiTarget = null;
+    this.wifiPass = '';
   }
 
   protected override createRenderRoot(): HTMLElement {
@@ -1969,6 +1984,8 @@ export class MirrorRemote extends LitElement {
         </label>
       </section>
 
+      ${this.#renderWifi()}
+
       <h2>Updates</h2>
       <section class="panel">
         <div class="update">
@@ -2051,6 +2068,280 @@ export class MirrorRemote extends LitElement {
 
       <h2>Gekoppelte Geraete</h2>
       ${this.#renderDevices()}
+    `;
+  }
+
+  /* ------------------------------------ WLAN ---------------------------------- */
+
+  /**
+   * Das WLAN des Spiegels.
+   *
+   * Steht ueber den Updates, weil es darunter liegt: ein Spiegel ohne Netz
+   * laedt kein Update, meldet keine Abfahrt und zeigt kein Wetter. Und es ist
+   * die einzige Karte hier, die man auch dann noch braucht, wenn der Spiegel
+   * gerade nirgends hinkommt – dann wird sie ueber sein eigenes
+   * Einrichtungs-WLAN ausgeliefert.
+   */
+  #renderWifi(): TemplateResult | typeof nothing {
+    const wifi = this.snapshot.wifi;
+    if (!wifi) return nothing;
+
+    if (wifi.state === 'unavailable') {
+      return html`
+        <h2>WLAN</h2>
+        <section class="panel">
+          <p class="muted small">
+            Dieser Spiegel hat kein WLAN-Geraet, das sich von hier aus steuern liesse.
+          </p>
+        </section>
+      `;
+    }
+
+    const busy = wifi.pending != null;
+    const offline = this.snapshot.status !== 'ready';
+    // Gespeichert, aber gerade nicht in Reichweite. Steht getrennt, weil es
+    // zwei verschiedene Aussagen sind: "das kannst du waehlen" und "das kennt
+    // der Spiegel schon".
+    const sichtbar = new Set(wifi.networks.map((network) => network.ssid));
+    const abwesend = wifi.known.filter((ssid) => !sichtbar.has(ssid));
+
+    return html`
+      <h2>WLAN</h2>
+      <section class="panel">
+        <div class="wifi__state">
+          <strong>${this.#wifiHeadline(wifi)}</strong>
+          <span class="muted small">${this.#wifiLabel(wifi)}</span>
+        </div>
+
+        ${wifi.lastError ? html`<p class="banner banner--error">${wifi.lastError}</p>` : nothing}
+        ${this.#renderHotspotCard(wifi)}
+
+        <div class="card__actions">
+          <button ?disabled=${busy || offline} @click=${() => store.send({ t: 'admin:wifiScan' })}>
+            ${wifi.pending === 'scan' ? 'suche …' : 'Netze suchen'}
+          </button>
+        </div>
+
+        ${wifi.networks.length === 0
+          ? html`<p class="muted small">
+              ${wifi.scannedAt
+                ? 'Beim letzten Suchlauf war kein Netz in Reichweite.'
+                : 'Noch nicht gesucht.'}
+            </p>`
+          : html`
+              <ul class="networks">
+                ${wifi.networks.map((network) => this.#renderNetwork(network, wifi))}
+              </ul>
+              ${wifi.scannedAt && wifi.state === 'hotspot'
+                ? html`<p class="muted small">
+                    Diese Liste stammt von ${formatTime(wifi.scannedAt)}. Solange das
+                    Einrichtungs-WLAN laeuft, kann der Spiegel nicht nach Netzen suchen – seine
+                    Antenne sendet gerade selbst.
+                  </p>`
+                : nothing}
+            `}
+
+        ${abwesend.length > 0
+          ? html`
+              <p class="muted small">Gespeichert, gerade nicht in Reichweite:</p>
+              <ul class="networks">
+                ${abwesend.map((ssid) =>
+                  this.#renderNetwork({ ssid, signal: 0, secured: true, known: true }, wifi),
+                )}
+              </ul>
+            `
+          : nothing}
+
+        <label class="field field--switch">
+          <span class="field__label">
+            Einrichtungs-WLAN anbieten
+            <span class="field__hint">
+              Wenn der Spiegel weder ueber WLAN noch ueber Kabel irgendwo hinkommt, macht er nach
+              ein paar Minuten ein eigenes WLAN auf. Name und Passwort stehen dann auf dem
+              Spiegel.
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            .checked=${this.snapshot.config?.network.setupHotspot !== false}
+            @change=${(event: Event) =>
+              store.send({
+                t: 'admin:setSettings',
+                patch: { network: { setupHotspot: (event.target as HTMLInputElement).checked } },
+              })}
+          />
+        </label>
+
+        <div class="card__actions">
+          <button
+            ?disabled=${busy || offline}
+            @click=${() => {
+              const an = wifi.state !== 'hotspot';
+              store.send({ t: 'admin:wifiHotspot', on: an });
+              this.#toast(an ? 'Einrichtungs-WLAN wird geoeffnet …' : 'Einrichtungs-WLAN wird geschlossen …');
+            }}
+          >
+            ${wifi.state === 'hotspot' ? 'Einrichtungs-WLAN schliessen' : 'Einrichtungs-WLAN jetzt oeffnen'}
+          </button>
+        </div>
+      </section>
+    `;
+  }
+
+  /** Die eine Zeile, die die Frage "haengt er?" beantwortet. */
+  #wifiHeadline(wifi: WifiStatus): string {
+    switch (wifi.state) {
+      case 'online':
+        return wifi.ssid ?? 'Verbunden';
+      case 'hotspot':
+        return 'Einrichtungs-WLAN offen';
+      case 'connecting':
+        return 'verbindet …';
+      default:
+        return 'Nicht verbunden';
+    }
+  }
+
+  #wifiLabel(wifi: WifiStatus): string {
+    if (wifi.pending === 'connect') return 'verbinde …';
+    if (wifi.pending === 'forget') return 'entferne …';
+    if (wifi.state === 'online') {
+      return wifi.signal === null ? 'verbunden' : `Signal ${wifi.signal} %`;
+    }
+    if (wifi.state === 'hotspot') return 'Der Spiegel sendet selbst.';
+    // Der Hinweis auf das Kabel gehoert genau hierhin: er erklaert, warum die
+    // App ueberhaupt noch erreichbar ist, obwohl "nicht verbunden" dasteht.
+    return wifi.ethernet ? 'Der Spiegel haengt am Netzwerkkabel.' : 'kein Netz';
+  }
+
+  /**
+   * Name und Passwort des Einrichtungs-WLANs.
+   *
+   * Auch dann, wenn es gerade nicht laeuft: wer weiss, wonach er suchen muss,
+   * findet den Spiegel wieder, wenn er das naechste Mal verschwindet. Genau
+   * dann laesst sich hier nichts mehr nachlesen.
+   */
+  #renderHotspotCard(wifi: WifiStatus): TemplateResult | typeof nothing {
+    const hotspot = wifi.hotspot;
+    if (!hotspot) return nothing;
+    return html`
+      <div class="hotspot ${hotspot.active ? 'is-active' : ''}">
+        <p class="muted small">
+          ${hotspot.active
+            ? 'Der Spiegel sendet gerade sein eigenes WLAN:'
+            : 'Wenn der Spiegel nirgends mehr hinkommt, sendet er dieses WLAN:'}
+        </p>
+        <dl class="hotspot__data">
+          <dt>Netz</dt>
+          <dd>${hotspot.ssid}</dd>
+          <dt>Passwort</dt>
+          <dd>${hotspot.passphrase || '–'}</dd>
+          <dt>Adresse</dt>
+          <dd>http://${hotspot.address}:8080</dd>
+        </dl>
+      </div>
+    `;
+  }
+
+  #renderNetwork(network: WifiNetwork, wifi: WifiStatus): TemplateResult {
+    const open = this.wifiTarget === network.ssid;
+    const verbunden = wifi.state === 'online' && wifi.ssid === network.ssid;
+    const busy = wifi.pending != null;
+    // Ein gespeichertes Netz braucht kein Passwort – der Spiegel hat es schon.
+    // Das Feld steht trotzdem da: ein Netz, dessen Passwort sich geaendert hat,
+    // ist genau der Fall, in dem jemand hier landet.
+    const brauchtPasswort = network.secured && !network.known;
+    const passtSoweit =
+      this.wifiPass.length === 0 ? !brauchtPasswort : isValidPassphrase(this.wifiPass);
+
+    return html`
+      <li class="network ${verbunden ? 'is-current' : ''}">
+        <button
+          class="network__head"
+          ?disabled=${busy}
+          @click=${() => {
+            this.wifiTarget = open ? null : network.ssid;
+            this.wifiPass = '';
+          }}
+        >
+          <span class="network__name">${network.ssid}</span>
+          <span class="network__meta">
+            ${network.secured ? html`<span aria-label="verschluesselt">🔒</span>` : nothing}
+            ${network.known ? html`<span class="network__tag">gespeichert</span>` : nothing}
+            ${network.signal > 0 ? html`<span class="muted small">${network.signal} %</span>` : nothing}
+          </span>
+        </button>
+
+        ${open
+          ? html`
+              ${network.secured
+                ? html`
+                    <label class="field">
+                      <span class="field__label">
+                        Passwort
+                        ${network.known
+                          ? html`<span class="field__hint">
+                              Leer lassen, um das gespeicherte zu verwenden.
+                            </span>`
+                          : nothing}
+                      </span>
+                      <input
+                        type="password"
+                        autocomplete="off"
+                        .value=${this.wifiPass}
+                        @input=${(event: Event) => {
+                          this.wifiPass = (event.target as HTMLInputElement).value;
+                        }}
+                      />
+                    </label>
+                  `
+                : nothing}
+
+              <p class="muted small">
+                Der Spiegel wechselt dabei das Netz und ist einen Moment nicht erreichbar.
+                ${wifi.state === 'hotspot'
+                  ? html` Diese App laeuft gerade ueber sein Einrichtungs-WLAN – sie bricht also
+                      ab. Klappt es, ist der Spiegel danach unter
+                      <b>http://smartmirror.local:8080</b> im Heimnetz zu finden; klappt es nicht,
+                      kommt das Einrichtungs-WLAN von selbst zurueck.`
+                  : nothing}
+              </p>
+
+              <div class="card__actions">
+                <button @click=${() => (this.wifiTarget = null)}>Abbrechen</button>
+                ${network.known
+                  ? html`<button
+                      class="danger"
+                      @click=${() => {
+                        this.wifiTarget = null;
+                        store.send({ t: 'admin:wifiForget', ssid: network.ssid });
+                        this.#toast(`"${network.ssid}" wird entfernt …`);
+                      }}
+                    >
+                      Entfernen
+                    </button>`
+                  : nothing}
+                <button
+                  class="primary"
+                  ?disabled=${busy || !passtSoweit}
+                  @click=${() => {
+                    const ssid = network.ssid;
+                    const passphrase = this.wifiPass;
+                    this.wifiTarget = null;
+                    this.wifiPass = '';
+                    store.send({ t: 'admin:wifiConnect', ssid, passphrase });
+                    // Die Bestaetigung muss von hier kommen: gleich darauf
+                    // wechselt der Spiegel das Netz, und ueber die alte
+                    // Verbindung sagt er nichts mehr.
+                    this.#toast(`Verbinde mit "${ssid}" …`);
+                  }}
+                >
+                  Verbinden
+                </button>
+              </div>
+            `
+          : nothing}
+      </li>
     `;
   }
 

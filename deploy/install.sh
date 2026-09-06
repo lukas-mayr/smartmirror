@@ -514,13 +514,44 @@ systemctl daemon-reload
 # blieben wirkungslos, ohne dass irgendwo etwas davon stand.
 # mirror-system.path gehoert dazu: ohne sie bleiben die Neustart-Knoepfe in der
 # App wirkungslos – der Core schreibt seine Auftragsdatei, und niemand liest sie.
-systemctl enable mirror-guard.service mirror-core.service mirror-shell.service mirror-updater.timer mirror-updater.path mirror-system.path mirror-system.timer mirror-bootlook.service >/dev/null
+# mirror-wifi.timer ist keine blosse Rueckfallebene: dieser Dienst sieht als
+# Einziger nach, ob der Spiegel ueberhaupt noch am Netz haengt, und macht sonst
+# sein Einrichtungs-WLAN auf. Ohne den Timer gaebe es genau in dem Fall, fuer
+# den es das gibt, niemanden mehr, der danach fragt.
+systemctl enable mirror-guard.service mirror-core.service mirror-shell.service mirror-updater.timer mirror-updater.path mirror-system.path mirror-system.timer mirror-wifi.path mirror-wifi.timer mirror-bootlook.service >/dev/null
 systemctl restart mirror-core.service
 systemctl restart mirror-shell.service
 systemctl start mirror-updater.timer
+systemctl start mirror-wifi.timer
+
+# --------------------------------- WLAN ---------------------------------------
+
+# Das WLAN laesst sich ab jetzt aus der Handy-App einstellen – aber nur, wo
+# NetworkManager es verwaltet. Auf Raspberry Pi OS ab Bookworm ist das der
+# Normalfall; auf einem System mit dhcpcd oder einer eigenen Netzkonfiguration
+# waere es ein Eingriff, den ein Installer nicht ungefragt tun sollte.
+if command -v nmcli >/dev/null 2>&1; then
+  # Einmal von Hand anstossen, damit in der App sofort etwas steht und nicht
+  # erst nach dem ersten Timer-Lauf.
+  MIRROR_INSTALL_ROOT="$INSTALL_ROOT" MIRROR_DATA_DIR="$INSTALL_ROOT/data" \
+    MIRROR_SERVICE_USER="$SERVICE_USER" \
+    bash "$INSTALL_ROOT/current/deploy/mirror-wifi.sh" >/dev/null 2>&1 || true
+
+  # Ohne Landeskennung laesst der Funkchip keinen Zugangspunkt zu – und das
+  # Einrichtungs-WLAN waere genau dann nicht da, wenn es gebraucht wird.
+  if command -v iw >/dev/null 2>&1 && iw reg get 2>/dev/null | grep -q 'country 00'; then
+    warn "Keine WLAN-Landeskennung gesetzt. Ohne sie kann der Spiegel kein eigenes
+  Einrichtungs-WLAN aufmachen. Setzen mit:
+    sudo raspi-config nonint do_wifi_country CH"
+  fi
+else
+  warn "NetworkManager (nmcli) nicht gefunden – das WLAN laesst sich dann nicht aus
+  der Handy-App einstellen. Auf Raspberry Pi OS ab Bookworm ist er vorhanden."
+fi
 systemctl start mirror-updater.path
 systemctl start mirror-system.path
 systemctl start mirror-system.timer
+systemctl start mirror-wifi.path
 
 # --------------------------------- Abschluss ----------------------------------
 
@@ -554,7 +585,11 @@ Fertig. Version $BUNDLE_VERSION ist installiert.
   Drehung         ${ROTATION_NOW}°. Steht der Kopplungscode quer:
                   sudo $INSTALL_ROOT/current/deploy/rotate.sh 90
 ${CONSOLE_SUMMARY}
-  Logs            journalctl -u mirror-core -u mirror-shell -u mirror-updater -f
+  WLAN            In der App unter System -> WLAN. Kommt der Spiegel weder ueber
+                  WLAN noch ueber Kabel irgendwohin, macht er nach zwei Minuten
+                  sein eigenes WLAN auf; Name und Passwort stehen dann auf dem
+                  Spiegel, die App liegt darin unter http://10.42.0.1:8080
+  Logs            journalctl -u mirror-core -u mirror-shell -u mirror-updater -u mirror-wifi -f
   Stromausfall    Ein beschaedigtes Release faellt beim Booten von selbst auf
                   das vorige zurueck: journalctl -u mirror-guard -b
   Update von Hand systemctl start mirror-updater.service
