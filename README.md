@@ -50,7 +50,8 @@ modules/
   calendar/      ICS-Kalender (iCloud, Gemeinde, Schule), Zeitraum einstellbar
   sbb/           Abfahrten einer Haltestelle, von der Fahrplanauskunft search.ch
   notifications/ Die Fläche für Mitteilungen; den Inhalt melden die Module
-  timer/         Ein Bagger trägt einen Berg ab; ist er weg, ist die Zeit um
+  timer/         Ein Bagger trägt einen Berg ab oder eine Schildkröte weidet
+                 eine Wiese ab; ist nichts mehr da, ist die Zeit um
 deploy/      systemd-Units, Compositor-Start, Installer, Drehung, Neustart,
              WLAN, Plymouth-Thema fuer den Start, Startbildschirm unter cage,
              unsichtbarer Mauszeiger
@@ -602,7 +603,8 @@ ist kaputt. `prefers-reduced-motion` schaltet alles ab.
 Zwei Blöcke weichen bewusst ab, und beide aus demselben Grund: bei ihnen *ist*
 die Bewegung die Auskunft. Die Wettersymbole ziehen, tropfen und blitzen, weil
 eine stehende Wolke nur eine Form ist und eine ziehende ein Wetter. Der Timer
-gräbt, weil ein Bagger, der stillsteht, keine Zeit vergehen lässt. Beide halten
+gräbt (oder frisst), weil eine Maschine — und ein Tier —, die stillstehen, keine
+Zeit vergehen lassen. Beide halten
 sich dafür an die andere Hälfte der Regel: nachts steht alles still, und wer
 Bewegung abbestellt hat, bekommt keine — beim Timer, indem sein Takt auf null
 geht (`--dig-bucket`), also an der einen Stelle, an der alle Teile hängen.
@@ -615,7 +617,8 @@ erst, wenn man sie liest — ein Berg, der kleiner geworden ist, beantwortet es 
 Vorbeigehen. Deshalb steht die Restzeit im Timer-Block zweimal: als Ziffern für
 den, der hinsieht, und als Berg für den, der nur vorbeigeht. Ein Bagger trägt
 ihn ab und lädt ihn auf Lastwagen; ist der Berg weg, ist die Zeit um, und die
-Mitteilung dazu steht im Feed.
+Mitteilung dazu steht im Feed. Wer statt der Baustelle lieber das Meer sehen
+will, stellt das Bild um — dazu weiter unten.
 
 **Der Bagger arbeitet immer gleich schnell.** Ein Eimer dauert 5 s, vier Eimer
 füllen einen Lastwagen, dann fährt er und der nächste kommt — unabhängig davon,
@@ -750,7 +753,8 @@ gehoben wird. Mit einer Drehung allein ist das nicht nachzubauen, und ein
 Zylinder, der beim Heben mitwandert statt auszufahren, fällt mehr auf als einer,
 den es nicht gibt.
 
-Was zusammenpassen muss, prüfen Tests ohne Browser (`src/scene.ts`): dass jeder
+Was zusammenpassen muss, prüfen Tests ohne Browser (`src/site.ts`, für das
+zweite Bild `src/meadow.ts`): dass jeder
 Eimer gleich viel Fläche wegnimmt, dass der Zahn der Schaufel bei jedem Stand
 und in jeder Berggröße in der Wand steht, dass die Ladung nach der Drehung über
 der Mulde und nicht daneben landet, dass der Wagen erst nach dem letzten Kippen
@@ -758,7 +762,7 @@ anfährt und dass auch ganz vorgerückt nichts aus dem Feld stößt. Dieselbe
 Trennung wie bei den Wettersymbolen: die Rechnung braucht keinen Browser, das
 Zeichnen schon.
 
-**Gesetzt wird der Timer in der Handy-App** — Dauer und ein Schalter, mehr
+**Gesetzt wird der Timer in der Handy-App** — Dauer, Bild und ein Schalter, mehr
 nicht. Ein Modul hat dort keine eigene Oberfläche, und jede
 Konfigurationsänderung startet die Instanz neu: dieser Neustart *ist* der
 Startknopf. Daraus folgt eine Eigenschaft, die man kennen muss: startet der
@@ -785,6 +789,48 @@ Bitte endet mit der Zeit und nicht mit dem Block: danach steht dort weiter
 „Fertig", und das ist eine Meldung und kein Vorgang. Ein Spiegel, der auf einem
 abgelaufenen Timer stehen bliebe, wäre von einem hängenden nicht zu
 unterscheiden.
+
+### Zwei Bilder für dieselbe Zeit
+
+Der Timer zeigt seine Restzeit in einem von zwei Bildern, und welches, steht in
+seinen Einstellungen (*Bild*): die **Baustelle** oder die
+**Meeresschildkröte**. Es ist eine Frage des Zimmers und nicht der Funktion —
+ein Bagger im Flur ist etwas anderes als ein Bagger neben dem Bett.
+
+Beide beantworten dieselbe Frage und halten sich an dieselbe Regel; sie
+antworten nur verschieden. **Der Berg antwortet mit seiner Höhe, die Wiese mit
+ihrer Länge.** Ein Haufen Kies wird höher, wenn mehr darin steckt — Seegras
+nicht: es wächst nicht höher, weil länger daran gefressen wird, es wird länger.
+Ein langer Timer bekommt deshalb eine lange Wiese, und jeder Biss nimmt gleich
+viel *Strecke*, so wie jeder Eimer gleich viel Fläche nimmt.
+
+**Vier Bisse, dann muss sie atmen.** An der Stelle, an der beim Bagger der volle
+Lastwagen abfährt und der nächste kommt, steigt die Schildkröte zur Oberfläche,
+holt Luft und sinkt zurück — dieselben vier Takte (`DIG.perLoad`), dieselbe
+Bedingung: erst, wenn der letzte Biss zu Ende ist (bei 79 % der Runde), und
+zurück, bevor der nächste anfängt. Steigt sie früher, reißt sie den letzten Halm
+im Aufstieg ab. Dass ihre Nase dabei die Oberfläche erreicht und ihr Panzer
+darunter bleibt, rechnet ein Test nach — eine Schildkröte, die einen halben
+Meter unter der Oberfläche Luft holt, ist ertrunken, und eine, die herausspringt,
+ist ein Delfin.
+
+**Hinter der Fresskante bleibt Stoppel stehen.** Sie ist, was beim Bagger die
+Sohle der Grube ist: der Beweis, dass gearbeitet wurde. Ohne sie würde das Gras
+ausgeblendet und nicht gefressen. Aus drei Metern liest sich beides zusammen —
+was rechts noch steht, ist die Restzeit, was links liegt, die vergangene.
+
+**Und kein Blau, kein Grün.** Farbe braucht eine Quelle, und Wasser hat auf
+einem schwarzen Spiegel keine; eine getönte Fläche wäre hier dasselbe wie ein
+blauer Himmel über der Baustelle. Was das Bild zum Meer macht, sind die Linie
+oben, der Sand unten und ein Tier, das dazwischen schwebt. Die Wiese ist weiß,
+weil sie der Wert ist, für den der Block da ist — genau wie der Berg.
+
+Geteilt wird alles, was der Block ist: Feld, Grund, Takt, Ziffern, die drei
+Strichstärken, das Stillstehen bei Nacht und bei `prefers-reduced-motion`. Ein
+Motiv, das sich seine eigenen Maße nähme, wäre ein zweiter Block und nicht
+dasselbe Bild in anderer Sprache. Und ein drittes Motiv gäbe es nur zu diesem
+Preis: eines, das nur anders aussieht, aber nichts anderes zeigt, wäre eine
+Verkleidung.
 
 ### Nachts eine Stufe dunkler
 

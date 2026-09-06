@@ -2954,13 +2954,22 @@ body {
  * Ein Timer, den man im Vorbeigehen liest.
  *
  * Der Block zeigt die Restzeit zweimal: als Ziffern fuer den, der hinsieht,
- * und als Berg fuer den, der nur vorbeigeht. Aus drei Metern sieht man, ob
+ * und als Bild fuer den, der nur vorbeigeht. Aus drei Metern sieht man, ob
  * noch ein halber Berg steht, lange bevor man "07:12" gelesen hat — und genau
  * das ist die Frage, die man im Vorbeigehen stellt.
  *
- * Der Bagger schwenkt in einem festen Takt: `--dig-bucket` fuer einen Eimer,
- * vier davon fuer eine Ladung. Der Takt haengt *nicht* an der eingestellten
- * Dauer — laenger heisst mehr Berg, nicht langsamer graben. Das Modul rechnet
+ * Zwei Bilder stehen zur Wahl, und sie zeigen dasselbe: eine Baustelle, auf der
+ * ein Bagger einen Berg abtraegt (`.dig`), und eine Seegraswiese, die eine
+ * Meeresschildkroete abweidet (`.sea`). Was sie unterscheidet, ist die Antwort
+ * auf "wieviel noch" — der Berg antwortet mit seiner Hoehe, die Wiese mit ihrer
+ * Laenge.
+ *
+ * Beide schwingen im festen Takt des Timers: `--dig-bucket` fuer einen Eimer
+ * oder einen Biss, vier davon fuer eine Ladung oder eine Runde bis zum
+ * Atemzug. Der Takt heisst nach dem Bagger, weil es ihn zuerst gab; er gehoert
+ * aber dem Timer und nicht der Baustelle, und deshalb rechnet die Schildkroete
+ * mit denselben Zahlen. Er haengt *nicht* an der eingestellten Dauer — laenger
+ * heisst mehr Berg und mehr Wiese, nicht langsamer arbeiten. Das Modul rechnet
  * mit denselben Zahlen aus, aus wievielen Eimern der Berg besteht, und ein
  * Test haelt beide Seiten gegeneinander.
  *
@@ -3250,7 +3259,7 @@ body {
  *  66 – 82   zurueckschwenken und senken
  *  82 – 100  stehen, bevor es von vorn losgeht
  *
- * Die Winkel stehen als POSE in modules/timer/src/scene.ts, das Ende des
+ * Die Winkel stehen als POSE in modules/timer/src/site.ts, das Ende des
  * Kippens als DIG.dump im Design-System — daran haengt, wann der Wagen fahren
  * darf. Doppelt gefuehrt, weil hier keine Rechnung moeglich ist und dort kein
  * Browser; ein Test rechnet die Reihenfolge nach.
@@ -3496,10 +3505,402 @@ body {
   }
 }
 
+/* --------------------------------- Das Meer -------------------------------- */
+
 /*
- * Nachts steht die Baustelle still, und `prefers-reduced-motion` haelt sie
- * ebenso an — nicht mit `animation: none`, sondern indem der Takt auf null
- * geht.
+ * Das zweite Bild: eine Meeresschildkroete weidet eine Seegraswiese ab.
+ *
+ * Es beantwortet dieselbe Frage wie die Baustelle und beantwortet sie anders.
+ * Ein Haufen Kies wird hoeher, wenn mehr darin steckt; eine Wiese nicht —
+ * Seegras waechst nicht hoeher, weil laenger daran gefressen wird, es wird
+ * laenger. Deshalb traegt hier die Laenge die Auskunft: was rechts noch steht,
+ * ist die Restzeit, was links als Stoppel liegt, die vergangene.
+ *
+ * Alles andere ist dasselbe: dasselbe Feld, derselbe Grund, derselbe Takt,
+ * dieselben drei Staerken. Ein Motiv, das sich seine eigenen Masse naehme,
+ * waere ein zweiter Block und nicht dasselbe Bild in anderer Sprache.
+ *
+ * Nur eines ist hier ausdruecklich nicht da: eine Wasserfarbe. Wasser hat auf
+ * einem schwarzen Spiegel keine Farbe, und eine getoente Flaeche waere hier
+ * dasselbe wie ein blauer Himmel ueber der Baustelle — eine Erfindung, und
+ * genau davor warnt das Design-System. Was das Bild zum Meer macht, sind die
+ * Linie oben, der Sand unten und ein Tier, das dazwischen schwebt.
+ */
+
+.sea {
+  color: var(--mirror-fg-dim);
+}
+
+/*
+ * Die Oberflaeche ist eine Kante wie der Boden und steht so weit zurueck wie
+ * eine Achse in einem Diagramm. Sie ist trotzdem noetig: ohne sie hoert das
+ * Wasser nirgends auf, und der Atemzug — der Sinn der ganzen Runde — endet an
+ * einer Stelle, die es nicht gibt.
+ */
+.sea__surface,
+.sea__floor {
+  stroke: var(--mirror-fg-mute);
+  stroke-width: 1;
+}
+
+/*
+ * Die Wiese ist der Wert, fuer den der Block da ist — und deshalb das hellste
+ * Teil der Szene, genau wie der Berg: weisser Umriss auf einer sehr schwachen
+ * weissen Flaeche. Kein Gruen. Farbe braucht eine Quelle, und Seegras auf einem
+ * Spiegel hat keine; sie waere salbeifarben, weil Salbei gerade die Normalfarbe
+ * ist, und damit hiesse Gruen hier "Wiese" und dort "alles in Ordnung".
+ */
+.sea__meadow {
+  stroke: var(--mirror-fg);
+  stroke-width: 2;
+  fill: var(--mirror-box-soft);
+}
+
+/*
+ * Die Stoppeln hinter der Fresskante.
+ *
+ * Sie sind der Grund, warum die Wiese abgeweidet aussieht und nicht
+ * ausgeblendet — dieselbe Aufgabe wie die Sohle der Grube. Und sie stehen
+ * bewusst zurueck: sie sind die Spur der Arbeit und nicht die Arbeit.
+ */
+.sea__stubble {
+  stroke: var(--mirror-fg-mute);
+  stroke-width: 1.1;
+}
+
+/*
+ * Der Koerper: Panzer, Bauch und Kopf. Gefuellt und deckend, wie die Maschinen
+ * — steht die Schildkroete vor der Wiese, muss die Wiese hinter ihr sein, und
+ * durch einen Panzer sieht man kein Gras.
+ */
+.sea__body {
+  stroke: var(--mirror-fg-dim);
+  stroke-width: 1.8;
+  fill: var(--mirror-box);
+}
+
+/*
+ * Die Flossen stehen eine Stufe heller: sie sind das Werkzeug, dem der Blick
+ * folgt, so wie die Schaufel am Bagger. An ihnen sieht man, dass sie schwimmt
+ * und nicht auf dem Grund liegt.
+ */
+.sea__limb {
+  stroke: var(--mirror-fg-dim);
+  stroke-width: 1.6;
+  fill: #1e2124;
+}
+
+/*
+ * Die Flossen der anderen Seite liegen hinter dem Panzer und gehoeren damit in
+ * die Tiefe: schwaecherer Umriss, Fuellung der Box. Ohne sie sieht die
+ * Schildkroete aus, als haette sie einen Arm; mit ihr auf gleicher Staerke
+ * saehe sie aus, als haette sie vier.
+ */
+.sea__far .sea__limb {
+  stroke: var(--mirror-fg-mute);
+  fill: var(--mirror-box);
+}
+
+/* Beiwerk: Schilder des Panzers, Bauchnaht, Schwanz. */
+.sea__trim {
+  stroke: var(--mirror-fg-mute);
+  stroke-width: 1.1;
+}
+
+/* Das Auge steht ganz zurueck — es ist ein Loch in der Form und kein Blick. */
+.sea__eye {
+  stroke: var(--mirror-fg-mute);
+  stroke-width: 1;
+}
+
+/*
+ * Was beim Biss davontreibt und was sie an der Oberflaeche loslaesst.
+ *
+ * Die Deckkraft steht ausschliesslich in den Animationsbildern: steht das Bild
+ * still, treibt nichts davon und steigt nichts auf.
+ */
+.sea__nibble {
+  stroke: var(--mirror-fg);
+  stroke-width: 1.4;
+  opacity: 0;
+}
+
+.sea__bubbles {
+  stroke: var(--mirror-fg-mute);
+  stroke-width: 1;
+  opacity: 0;
+}
+
+/*
+ * Im flachen Block bleibt die Silhouette, wie beim Bagger: was nicht
+ * hineinpasst, faellt weg und staucht sich nicht. Die Stoppeln bleiben — sie
+ * sind Inhalt und kein Beiwerk.
+ */
+.timer--m .sea__trim,
+.timer--m .sea__eye {
+  display: none;
+}
+
+/*
+ * Der Vorschub.
+ *
+ * Ein weidendes Tier faehrt nicht vor, es schiebt sich mit jedem Biss ein
+ * Stueck weiter — deshalb springt der Wert hier einmal je Biss und nicht einmal
+ * je Runde. Der Uebergang macht daraus ein Gleiten, und er ist laenger als der
+ * Ruck des Baggers: eine Maschine setzt sich in Bewegung, eine Schildkroete
+ * treibt.
+ */
+.sea__site {
+  transition: transform 1400ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ---------------------------- Bewegung im Wasser --------------------------- */
+
+/*
+ * Ein Biss, in Prozent seiner Dauer:
+ *
+ *   0 – 7    zubeissen: der Kopf taucht in die Halme
+ *   7 – 16   abreissen; danach treibt der Fetzen davon
+ *  16 – 26   Kopf zurueck
+ *  26 – 100  schweben, mit zwei Flossenschlaegen und einem Gleiten
+ *
+ * Und eine Runde, in Prozent ihrer Dauer — vier Bisse, dann muss sie Luft
+ * holen:
+ *
+ *   0 – 79   fressen (der vierte Biss endet bei 79 %)
+ *  79 – 84   abstossen und steigen
+ *  84 – 92   oben: Nase an der Oberflaeche, Luft holen
+ *  92 – 100  sinken und wieder ueber der Kante stehen
+ *
+ * Die 79 sind keine gerundete Zahl, sondern das Ende des vierten Bisses:
+ * drei ganze Bisse und 16 % des vierten. Stiege sie frueher auf, risse sie den
+ * letzten Halm im Aufstieg ab; stiege sie spaeter, waere sie beim naechsten
+ * Biss noch nicht zurueck. Dieselbe Rechnung wie beim Lastwagen, der erst
+ * anfaehrt, wenn die Schaufel leer ist.
+ *
+ * Die Winkel stehen als SWIM und STROKE in modules/timer/src/meadow.ts —
+ * doppelt gefuehrt wie beim Bagger, weil hier keine Rechnung moeglich ist und
+ * dort kein Browser. Ein Test rechnet nach, dass die Nase dabei die Oberflaeche
+ * erreicht, der Panzer darunter bleibt und die Flosse nicht in den Grund
+ * faehrt.
+ */
+.sea.is-grazing .sea__head {
+  animation: sea-bite var(--dig-bucket) ease-in-out var(--dig-phase) infinite;
+}
+
+.sea.is-grazing .sea__flipper {
+  animation: sea-stroke var(--dig-bucket) ease-in-out var(--dig-phase) infinite;
+}
+
+/*
+ * Die Flosse der anderen Seite schlaegt versetzt.
+ *
+ * Zwei Flossen, die gleichzeitig dasselbe tun, sehen aus wie eine — und eine
+ * Schildkroete rudert nicht, sie fliegt: beide Flossen schlagen zusammen, aber
+ * die hintere liegt im Bild eine Idee zurueck. Der Versatz haengt am Takt und
+ * nicht an einer festen Zeit, sonst liefe er bei Nacht (Takt null) aus dem
+ * Bild.
+ */
+.sea.is-grazing .sea__far {
+  animation: sea-stroke var(--dig-bucket) ease-in-out
+    calc(var(--dig-phase) - var(--dig-bucket) * 0.12) infinite;
+}
+
+.sea.is-grazing .sea__nibble {
+  animation: sea-nibble var(--dig-bucket) linear var(--dig-phase) infinite;
+}
+
+/*
+ * Die Wiese steht in der Stroemung.
+ *
+ * Ein winziges Neigen, im Takt des Bisses — man sieht es nicht als Bewegung,
+ * man sieht nur, dass die Wiese lebt. Dieselbe Aufgabe wie das Nachsacken des
+ * Berges, und dieselbe Groesse: gut ein Grad.
+ */
+.sea.is-grazing .sea__meadow {
+  animation: sea-sway var(--dig-bucket) ease-in-out var(--dig-phase) infinite;
+}
+
+.sea.is-grazing .sea__turtle {
+  animation: sea-breath var(--dig-load) ease-in-out var(--dig-phase) infinite;
+}
+
+.sea.is-grazing .sea__neck {
+  animation: sea-lift var(--dig-load) ease-in-out var(--dig-phase) infinite;
+}
+
+.sea.is-grazing .sea__bubbles {
+  animation: sea-bubbles var(--dig-load) linear var(--dig-phase) infinite;
+}
+
+@keyframes sea-bite {
+  0% {
+    transform: rotate(0deg);
+  }
+  7% {
+    transform: rotate(13deg);
+  }
+  16% {
+    transform: rotate(4deg);
+  }
+  26%,
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+/*
+ * Der Flossenschlag: zwei kraeftige Zuege, dann ein Gleiten.
+ *
+ * Nicht gleichmaessig durchgeschlagen — so schwimmt keine Schildkroete. Sie
+ * zieht zweimal und laesst sich danach tragen, und genau daran erkennt man sie
+ * aus drei Metern.
+ */
+@keyframes sea-stroke {
+  0% {
+    transform: rotate(0deg);
+  }
+  12% {
+    transform: rotate(-30deg);
+  }
+  26% {
+    transform: rotate(14deg);
+  }
+  40% {
+    transform: rotate(-26deg);
+  }
+  54% {
+    transform: rotate(11deg);
+  }
+  70%,
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+/* Der abgerissene Halm treibt nach hinten weg und sinkt. */
+@keyframes sea-nibble {
+  0%,
+  5% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  9% {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+  20% {
+    opacity: 0.7;
+    transform: translate(-2px, -1.6px);
+  }
+  32%,
+  100% {
+    opacity: 0;
+    transform: translate(-3.4px, -2.6px);
+  }
+}
+
+@keyframes sea-sway {
+  0%,
+  100% {
+    transform: skewX(0deg);
+  }
+  30% {
+    transform: skewX(-1.3deg);
+  }
+  65% {
+    transform: skewX(1deg);
+  }
+}
+
+/*
+ * Der Aufstieg zum Atemzug.
+ *
+ * Sie steigt schraeg und nicht senkrecht: eine Schildkroete faehrt nicht wie
+ * ein Aufzug, sie legt sich in den Aufstieg. Oben steht sie kurz, dann kippt
+ * die Nase nach unten und sie sinkt zurueck — den ganzen Weg wieder auf die
+ * Kante, an der der naechste Biss wartet.
+ */
+@keyframes sea-breath {
+  0%,
+  79% {
+    transform: translateY(0) rotate(0deg);
+  }
+  84% {
+    transform: translateY(-11px) rotate(-26deg);
+  }
+  89%,
+  92% {
+    transform: translateY(-21px) rotate(-30deg);
+  }
+  96% {
+    transform: translateY(-8px) rotate(14deg);
+  }
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+}
+
+/*
+ * Der Kopf geht dabei voran.
+ *
+ * Er hebt sich schon im Aufstieg und steht oben fast senkrecht: so kommt die
+ * Nase ueber den Panzer hinaus und erreicht die Oberflaeche, waehrend der
+ * Panzer darunter bleibt. Ohne das Heben schwaemme sie flach unter der
+ * Oberflaeche entlang und bekaeme keine Luft.
+ */
+@keyframes sea-lift {
+  0%,
+  79% {
+    transform: rotate(0deg);
+  }
+  84% {
+    transform: rotate(-30deg);
+  }
+  89%,
+  92% {
+    transform: rotate(-55deg);
+  }
+  96% {
+    transform: rotate(-12deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+/*
+ * Die Luft, die sie loslaesst — und zwar nur, waehrend sie oben ist.
+ *
+ * Blasen steigen, sie schweben nicht: sie erscheinen an der Nase, laufen zur
+ * Oberflaeche und sind dort weg. Danach ist bis zur naechsten Runde nichts mehr
+ * zu sehen.
+ */
+@keyframes sea-bubbles {
+  0%,
+  88% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  90% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  96% {
+    opacity: 0.6;
+    transform: translateY(-9px);
+  }
+  98%,
+  100% {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+}
+
+/*
+ * Nachts stehen Baustelle und Meer still, und `prefers-reduced-motion` haelt
+ * beide ebenso an — nicht mit `animation: none`, sondern indem der Takt auf
+ * null geht.
  *
  * Das ist die verlaesslichere Fassung. Eine Regel, die die Bewegung abschaltet,
  * muesste jede einzelne der Regeln oben ueberstimmen und dafuer mindestens
@@ -3508,16 +3909,18 @@ body {
  * Stelle, an der alle haengen.
  *
  * Bei einer Dauer von null steht jedes Teil auf seinem Ausgangswert: der Arm
- * in der Grabstellung, die Mulde leer, der Wagen an seinem Platz. Der Berg
- * bleibt dabei richtig gross und der Vorschub an der richtigen Stelle — beides
- * ist Inhalt und keine Bewegung.
+ * in der Grabstellung, die Mulde leer, der Wagen an seinem Platz — und die
+ * Schildkroete ueber der Kante, den Kopf im Gras. Berg und Wiese bleiben dabei
+ * richtig gross und der Vorschub an der richtigen Stelle: beides ist Inhalt und
+ * keine Bewegung.
  */
 [data-night='1'] {
   --dig-bucket: 0s;
   --dig-load: 0s;
 }
 
-[data-night='1'] .dig__site {
+[data-night='1'] .dig__site,
+[data-night='1'] .sea__site {
   transition: none;
 }
 
@@ -3527,7 +3930,8 @@ body {
     --dig-load: 0s;
   }
 
-  .dig__site {
+  .dig__site,
+  .sea__site {
     transition: none;
   }
 }

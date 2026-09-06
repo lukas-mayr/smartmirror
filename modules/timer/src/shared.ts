@@ -11,23 +11,52 @@ import { DIG } from '@mirror/sdk';
  *
  * Was in dieser Datei steht, ist die Rechnung dahinter und kein Zeichencode:
  * wieviel Zeit noch laeuft, aus wievielen Eimern der Berg besteht und wieviel
- * von ihm noch steht. Gezeichnet wird in scene.ts, und die Bewegung liegt im
- * Stylesheet. Der Schnitt laeuft wie beim Wetter entlang der Frage, wer einen
- * Browser braucht: die Rechnung nicht, das Zeichnen schon — und nur so laesst
- * sich die Rechnung pruefen.
+ * von ihm noch steht. Gezeichnet wird in site.ts und meadow.ts, und die
+ * Bewegung liegt im Stylesheet. Der Schnitt laeuft wie beim Wetter entlang der
+ * Frage, wer einen Browser braucht: die Rechnung nicht, das Zeichnen schon —
+ * und nur so laesst sich die Rechnung pruefen.
  *
- * Die eine Regel, an der alles haengt: **der Bagger arbeitet immer gleich
- * schnell.** Ein Eimer dauert `DIG.bucket`, ob der Timer auf drei Minuten oder
- * auf zwei Stunden steht. Was sich mit der Dauer aendert, ist der Berg. Ein
- * Bagger, der bei einer Stunde in Zeitlupe schwenkt, sieht nicht nach viel
- * Arbeit aus, sondern nach einem haengenden Bildschirm.
+ * Der Berg ist dabei nur das erste von zwei Bildern. Das zweite ist eine
+ * Seegraswiese, an der eine Meeresschildkroete frisst; sie rechnet mit
+ * denselben Zahlen und antwortet mit ihrer Laenge statt mit ihrer Hoehe. Was
+ * hier steht, gilt fuer beide — deshalb steht es hier und nicht dort.
+ *
+ * Die eine Regel, an der alles haengt: **gearbeitet wird immer gleich
+ * schnell.** Ein Eimer dauert `DIG.bucket`, ein Biss ebenso, ob der Timer auf
+ * drei Minuten oder auf zwei Stunden steht. Was sich mit der Dauer aendert, ist
+ * der Berg — oder die Wiese. Ein Bagger, der bei einer Stunde in Zeitlupe
+ * schwenkt, sieht nicht nach viel Arbeit aus, sondern nach einem haengenden
+ * Bildschirm.
  */
+
+/**
+ * Die beiden Motive.
+ *
+ * Kurze Bezeichner und keine Klartextnamen: sie stehen in der Konfiguration,
+ * in einer CSS-Klasse und in einem Test, und ein Name, der uebersetzt werden
+ * koennte, waere an all diesen Stellen ein anderer.
+ */
+export type TimerMotif = 'dig' | 'sea';
 
 export interface TimerConfig {
   /** Wofuer der Timer laeuft. Steht ueber der Zeit und in der Mitteilung. */
   label: string;
   /** Dauer in Minuten. */
   minutes: number;
+  /**
+   * Das Bild, in dem die Restzeit steht.
+   *
+   * Zwei Motive, dieselbe Rechnung: eine Baustelle, auf der ein Bagger einen
+   * Berg abtraegt, und eine Seegraswiese, die eine Meeresschildkroete abweidet.
+   * Beide arbeiten im selben Takt und beantworten dieselbe Frage — das eine mit
+   * einem Berg, der niedriger wird, das andere mit einer Wiese, die kuerzer
+   * wird.
+   *
+   * Es ist eine Frage des Zimmers und nicht der Funktion: ein Bagger im Flur
+   * ist etwas anderes als ein Bagger neben dem Bett. Deshalb steht die Wahl in
+   * den Einstellungen und nicht im Code.
+   */
+  motif: TimerMotif;
   /**
    * Laeuft er?
    *
@@ -159,6 +188,18 @@ export function formatRemaining(remainingMs: number): string {
   const hours = Math.floor(total / 3600);
   const pad = (value: number): string => String(value).padStart(2, '0');
   return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${pad(minutes)}:${pad(seconds)}`;
+}
+
+/**
+ * Das gewaehlte Motiv, auf einen der beiden Werte gebracht.
+ *
+ * Aus der Konfiguration kann alles kommen — eine alte Instanz, die das Feld
+ * noch gar nicht kennt, oder ein Tippfehler aus der Hand. Beides landet auf der
+ * Baustelle: sie war zuerst da, und ein Timer, der wegen eines unbekannten
+ * Wortes gar nichts zeigt, ist schlechter als einer, der das Falsche zeigt.
+ */
+export function timerMotif(motif: unknown): TimerMotif {
+  return motif === 'sea' ? 'sea' : 'dig';
 }
 
 /** Der Name des Timers, auf ein vernuenftiges Mass gebracht. */

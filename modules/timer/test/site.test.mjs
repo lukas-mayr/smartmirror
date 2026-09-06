@@ -23,7 +23,7 @@ import {
   surfaceAt,
   tauForShare,
   toothAt,
-} from '../dist/scene.js';
+} from '../dist/site.js';
 import { mountainSize } from '../dist/shared.js';
 
 /*
@@ -304,7 +304,7 @@ test('die linke Flanke steht steiler als die rechte', () => {
   assert.ok(peak.x < 0.5, `der Gipfel steht bei ${peak.x}`);
 });
 
-/** Das Profil, wie scene.ts es liest — hier noch einmal, um es zu pruefen. */
+/** Das Profil, wie site.ts es liest — hier noch einmal, um es zu pruefen. */
 function profileHeight(u) {
   if (u <= 0 || u >= 1) return 0;
   let previous = PROFILE[0];

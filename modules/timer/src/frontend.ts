@@ -1,9 +1,8 @@
 import { html, render, svg, nothing, type TemplateResult } from 'lit';
 import { defineFrontend, DIG, setHold, type ModuleView } from '@mirror/sdk';
+import { FIELD, GROUND } from './field.js';
 import {
   ARM,
-  FIELD,
-  GROUND,
   HOUSE,
   MOUNTAIN,
   SLEW_X,
@@ -12,25 +11,46 @@ import {
   cargoPath,
   mountainPath,
   siteShift,
-} from './scene.js';
+} from './site.js';
+import {
+  MEADOW,
+  SURFACE,
+  TURTLE,
+  grazeShift,
+  meadowPath,
+  stubblePath,
+} from './meadow.js';
 import {
   digPhaseMs,
   formatRemaining,
   mountainSize,
   remainingShare,
+  timerMotif,
   timerWindow,
   type TimerConfig,
   type TimerState,
 } from './shared.js';
 
 /**
- * Der Timer im Block: Restzeit und Baustelle.
+ * Der Timer im Block: Restzeit und Bild.
  *
  * Die Restzeit steht zweimal da, und das ist kein Doppel. Die Ziffern
- * beantworten "wieviel genau", der Berg beantwortet "wieviel ueberhaupt" — und
+ * beantworten "wieviel genau", das Bild beantwortet "wieviel ueberhaupt" — und
  * die zweite Frage ist die, die man im Vorbeigehen stellt. Aus drei Metern
  * sieht man, ob noch ein halber Berg steht, lange bevor man "07:12" gelesen
  * hat.
+ *
+ * **Zwei Bilder, dieselbe Rechnung.** Auf der Baustelle traegt ein Bagger einen
+ * Berg ab, im Meer weidet eine Schildkroete eine Seegraswiese ab; welches von
+ * beiden ein Block zeigt, steht in seinen Einstellungen. Beide laufen im selben
+ * Takt, beide halten sich an dieselbe Regel — laenger heisst mehr Arbeit und
+ * nicht langsamere —, und beide teilen sich Feld, Boden und Ziffern. Was sie
+ * unterscheidet, ist die Antwort auf "wieviel noch": der Berg antwortet mit
+ * seiner Hoehe, die Wiese mit ihrer Laenge.
+ *
+ * Kein drittes Bild ohne diesen Preis: ein Motiv, das nur anders aussieht, aber
+ * nichts anderes zeigt, waere eine Verkleidung. Diese beiden zeigen zwei Arten
+ * von Arbeit, und genau deshalb duerfen es zwei sein.
  *
  * **Bewegt wird im Stylesheet, gerechnet wird hier.** Der Bagger schwenkt in
  * einem festen Takt, und ein fester Takt ist genau das, was CSS-Keyframes gut
@@ -275,33 +295,57 @@ export default defineFrontend<TimerState, TimerConfig>({
     `;
 
     /**
+     * Das Blatt, auf dem beide Motive stehen.
+     *
+     * Derselbe Ausschnitt, dasselbe Verhaeltnis, derselbe Versatz der Bewegung
+     * — der Block ist derselbe Block, und nur was darin steht, wechselt. Stuende
+     * das zweimal da, waeren es zwei Bloecke, die sich nur aehnlich sehen, und
+     * beim naechsten Mass an einem von beiden waere es vorbei.
+     *
+     * `preserveAspectRatio` haengt die Szene unten links auf: der Boden liegt
+     * auf der Blockkante, und was oben nicht hineinpasst, fehlt oben — nicht in
+     * der Mitte.
+     *
+     * Der Inhalt kommt als `svg`-Template und nicht als `html`-Template: der
+     * Namensraum haengt daran, wie eine Vorlage gelesen wird, und ein `<g>` aus
+     * einer HTML-Vorlage ist kein SVG-Element, sondern ein unbekanntes
+     * HTML-Element. Es steht dann im Baum und ist trotzdem nicht zu sehen.
+     */
+    const stage = (classes: string, content: TemplateResult): TemplateResult => html`
+      <svg
+        class=${classes}
+        viewBox=${`0 ${FIELD.top} ${FIELD.width} ${FIELD.height}`}
+        preserveAspectRatio="xMinYMax meet"
+        style=${phaseStyle}
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        role="presentation"
+        aria-hidden="true"
+      >
+        ${content}
+      </svg>
+    `;
+
+    /**
      * Die Baustelle.
      *
      * `share` ist, was vom Berg noch steht, `shift`, wie weit der Bagger der
      * Abbaukante schon nachgefahren ist. Beide kommen aus derselben Rechnung,
      * damit die Schaufel dort greift, wo gegraben wird.
      */
-    const scene = (
+    const digScene = (
       size: number,
       share: number,
       shift: number,
       digging: boolean,
     ): TemplateResult => {
       const path = mountainPath(size, share);
-      return html`
-        <svg
-          class=${`dig${digging ? ' is-digging' : ''}`}
-          viewBox=${`0 ${FIELD.top} ${FIELD.width} ${FIELD.height}`}
-          preserveAspectRatio="xMinYMax meet"
-          style=${phaseStyle}
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.5"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          role="presentation"
-          aria-hidden="true"
-        >
+      return stage(
+        `dig${digging ? ' is-digging' : ''}`,
+        svg`
           <path class="dig__ground" d=${`M0 ${GROUND}H${FIELD.width}`} />
           ${path
             ? svg`<path
@@ -313,8 +357,161 @@ export default defineFrontend<TimerState, TimerConfig>({
           <g class="dig__site" style=${`transform:translateX(${shift.toFixed(1)}px)`}>
             ${slide()} ${spill()} ${truck()} ${excavator()}
           </g>
-        </svg>
-      `;
+        `,
+      );
+    };
+
+    /* ---------------------------------- Das Meer ------------------------------ */
+
+    /**
+     * Die Schildkroete.
+     *
+     * Gezeichnet wie die Maschinen: in Koerpern und nicht in Strichen, deckend
+     * und nicht durchscheinend. Der Panzer ist ein flacher Bogen und kein Kreis
+     * — eine Suppenschildkroete ist im Seitenriss lang und niedrig, und genau
+     * daran erkennt man sie und nicht an Zeichnung oder Farbe.
+     *
+     * Vier Gruppen ineinander, weil sich vier Dinge unabhaengig voneinander
+     * bewegen: das ganze Tier steigt und neigt sich, der Hals hebt den Kopf zum
+     * Atmen, der Kopf nickt beim Biss, die Vorderflosse schlaegt. Jede Gruppe
+     * traegt ihren Drehpunkt selbst — er gehoert zur Form und nicht ins
+     * Stylesheet, wo er eine Zahl waere, die zur Zeichnung passen muss und es
+     * irgendwann nicht mehr tut.
+     *
+     * Die hintere Flosse liegt *vor* dem Panzer in der Zeichenreihenfolge, also
+     * hinter ihm im Bild, und schlaegt versetzt: sie gehoert zur anderen Seite
+     * des Tieres. Ohne sie sieht die Schildkroete aus, als haette sie einen Arm.
+     */
+    const turtle = (): TemplateResult => svg`
+      <g class="sea__turtle" style=${`transform-origin:${TURTLE.pivot.x}px ${TURTLE.pivot.y}px`}>
+        <g class="sea__far" style=${`transform-origin:${TURTLE.shoulder.x}px ${TURTLE.shoulder.y}px`}>
+          <path class="sea__limb" d="M69 51Q76 55 80 68Q75.5 64 71.5 58Q68.5 54 68 55Z" />
+        </g>
+
+        <!--
+          Panzer und Bauch in einem Zug: oben der lange flache Bogen, hinten die
+          Spitze, unten der Bauchpanzer. Flach und lang, nicht rund — eine
+          Suppenschildkroete ist im Seitenriss ein Brett und keine Kugel, und
+          eine hohe Kuppel macht daraus eine Landschildkroete.
+        -->
+        <path
+          class="sea__body"
+          d=${`M${TURTLE.tail.x} ${TURTLE.tail.y}Q50 44.5 ${TURTLE.crest.x} ${TURTLE.crest.y}Q75 45 80.5 51.5Q81.5 55 79 57Q68 61 52 60Q45.5 58 ${TURTLE.tail.x} ${TURTLE.tail.y}Z`}
+        />
+        <!-- Der Ruecken als Grat, die Randschilder als Naht darunter. -->
+        <path class="sea__trim" d="M46.5 52.5Q52 46.5 66 46Q75.5 47 79.5 52" />
+        <path class="sea__trim" d="M47.5 56.5Q60 59.5 74.5 57" />
+        <path class="sea__trim" d="M57 46.4V51.6" />
+        <path class="sea__trim" d="M68 46.2V51.4" />
+
+        <!-- Hinterflosse und Schwanz. -->
+        <path class="sea__limb" d=${`M51 57.5Q45 59.5 ${TURTLE.hind.x} ${TURTLE.hind.y}Q43.5 63.5 48 61Q50.5 59.5 51.5 58.5Z`} />
+        <path class="sea__trim" d="M44.5 55.5L40.5 57" />
+
+        <!--
+          Die Vorderflosse liegt *unter* dem Kopf in der Zeichenreihenfolge, also
+          hinter ihm im Bild. Andersherum schneidet ihr Blatt durch den Kopf und
+          aus beidem wird ein Klumpen, den man aus drei Metern fuer einen
+          Schnabel haelt.
+        -->
+        <g class="sea__flipper" style=${`transform-origin:${TURTLE.shoulder.x}px ${TURTLE.shoulder.y}px`}>
+          <path
+            class="sea__limb"
+            d=${`M70 51Q78.5 55.5 ${TURTLE.flipper.x} ${TURTLE.flipper.y}Q78 67.5 74 61Q70 56 69 55.5Z`}
+          />
+        </g>
+
+        <g class="sea__neck" style=${`transform-origin:${TURTLE.neck.x}px ${TURTLE.neck.y}px`}>
+          <g class="sea__head" style=${`transform-origin:${TURTLE.neck.x}px ${TURTLE.neck.y}px`}>
+            <!--
+              Hals und Kopf in einem: erst der schmale Hals aus dem Panzer, dann
+              der Keil mit dem Hornschnabel vorn. Der Hals muss zu sehen sein —
+              ein Kopf, der direkt am Panzer sitzt, gehoert einem Kaefer.
+            -->
+            <path
+              class="sea__body"
+              d=${`M78.5 50.5Q84 51 86.5 54.5L${TURTLE.mouth.x} ${TURTLE.mouth.y}L88.5 62.5Q83.5 62 81 58.5Q78.5 56 78 54Z`}
+            />
+            <circle class="sea__eye" cx="84.6" cy="55.4" r="1.1" />
+          </g>
+        </g>
+      </g>
+    `;
+
+    /**
+     * Was beim Biss davontreibt.
+     *
+     * Ein Maul, das Halme abreisst, laesst Fetzen zurueck; sie treiben mit der
+     * Stroemung und sinken. Drei kurze Striche, mehr braucht es nicht — aus drei
+     * Metern ist Losgerissenes eine Bewegung und keine Form. Dieselbe Aufgabe
+     * wie das Rieseln an der Boeschung: die Wiese hoert damit auf, ein Bild zu
+     * sein.
+     */
+    const nibble = (): TemplateResult => svg`
+      <g class="sea__nibble">
+        <path d="M94.5 59.5l-1.8 0.9" />
+        <path d="M95.5 63l-1.6 0.7" />
+        <path d="M93.5 56l-1.5 1" />
+      </g>
+    `;
+
+    /**
+     * Die Luft, die sie an der Oberflaeche loslaesst.
+     *
+     * Sie liegt ausserhalb des Tieres, weil sie nicht mitkippt: Blasen steigen
+     * senkrecht, egal wie die Schildkroete gerade steht. Und sie liegen dort, wo
+     * die Nase im Atemzug steht — nicht dort, wo der Kopf beim Fressen ist.
+     */
+    const bubbles = (): TemplateResult => svg`
+      <g class="sea__bubbles">
+        <circle cx="88.5" cy="27" r="1.5" />
+        <circle cx="92" cy="30" r="1.1" />
+        <circle cx="86" cy="31.5" r="0.9" />
+      </g>
+    `;
+
+    /**
+     * Die Wiese.
+     *
+     * `share` ist, was von ihr noch steht, `shift`, wie weit die Schildkroete
+     * der Fresskante nachgeschwommen ist — beide aus derselben Rechnung, damit
+     * der Schnabel dort steht, wo gefressen wird.
+     *
+     * Die Oberflaeche ist eine Linie und keine Flaeche: Wasser hat auf einem
+     * schwarzen Spiegel keine Farbe, und eine getoente Flaeche waere hier
+     * dasselbe wie ein blauer Himmel ueber der Baustelle — eine Erfindung. Was
+     * das Bild zum Meer macht, ist die Linie oben, der Sand unten und ein Tier,
+     * das dazwischen schwebt.
+     */
+    const seaScene = (
+      size: number,
+      share: number,
+      shift: number,
+      grazing: boolean,
+    ): TemplateResult => {
+      const path = meadowPath(size, share);
+      const stubble = stubblePath(size, share);
+      return stage(
+        `sea${grazing ? ' is-grazing' : ''}`,
+        svg`
+          <path
+            class="sea__surface"
+            d=${`M0 ${SURFACE}Q14 ${SURFACE - 2.6} 28 ${SURFACE}T56 ${SURFACE}T84 ${SURFACE}T112 ${SURFACE}T140 ${SURFACE}T168 ${SURFACE}T196 ${SURFACE}T${FIELD.width + 4} ${SURFACE}`}
+          />
+          <path class="sea__floor" d=${`M0 ${GROUND}H${FIELD.width}`} />
+          ${stubble ? svg`<path class="sea__stubble" d=${stubble} />` : nothing}
+          ${path
+            ? svg`<path
+                class="sea__meadow"
+                d=${path}
+                style=${`transform-origin:${MEADOW.right}px ${GROUND}px`}
+              />`
+            : nothing}
+          <g class="sea__site" style=${`transform:translateX(${shift.toFixed(1)}px)`}>
+            ${nibble()} ${bubbles()} ${turtle()}
+          </g>
+        `,
+      );
     };
 
     /* -------------------------------- Zeichnen ------------------------------- */
@@ -342,6 +539,7 @@ export default defineFrontend<TimerState, TimerConfig>({
       }
 
       const size = host.dataset.size ?? 'l';
+      const motif = timerMotif(config.motif);
       const share = done ? 0 : remainingShare(elapsed, total);
       const scale = mountainSize(total);
 
@@ -352,10 +550,19 @@ export default defineFrontend<TimerState, TimerConfig>({
        * neben der Wand entlang. Nach jedem Wagen ist der Moment dafuer: die
        * Schaufel ist leer, der naechste Wagen noch nicht da. Gerechnet wird der
        * Stand deshalb zum Beginn der laufenden Ladung.
+       *
+       * Die Schildkroete macht es andersherum, und zwar aus demselben Grund:
+       * ein weidendes Tier faehrt nicht vor, es schiebt sich mit jedem Biss ein
+       * Stueck weiter. Ihr Stand haengt deshalb am Biss und nicht an der Runde.
+       * Beides ist ein Sprung, und beide Male macht der Uebergang im Stylesheet
+       * eine Bewegung daraus.
        */
       const loadMs = DIG.bucket * DIG.perLoad;
       const settled = Math.floor(elapsed / loadMs) * loadMs;
-      const shift = siteShift(scale, done ? 0 : remainingShare(settled, total));
+      const shift =
+        motif === 'sea'
+          ? grazeShift(scale, share)
+          : siteShift(scale, done ? 0 : remainingShare(settled, total));
 
       /*
        * Die Zeichenzahl geht als Rechengroesse ins Stylesheet — dieselbe
@@ -383,7 +590,9 @@ export default defineFrontend<TimerState, TimerConfig>({
             <div class="timer__head">
               <div class="timer__value" style=${`--timer-chars:${value.length}`}>${value}</div>
             </div>
-            ${scene(scale, share, shift, !done)}
+            ${motif === 'sea'
+              ? seaScene(scale, share, shift, !done)
+              : digScene(scale, share, shift, !done)}
           </div>
         `,
         host,

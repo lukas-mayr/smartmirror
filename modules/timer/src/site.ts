@@ -6,6 +6,10 @@
  * Stylesheet). Der Schnitt ist derselbe wie bei den Wettersymbolen: die
  * Rechnung braucht keinen Browser, und nur deshalb laesst sie sich pruefen.
  *
+ * Das Feld, in dem das alles liegt, steht in `field.ts`: es gehoert nicht der
+ * Baustelle, sondern dem Block, und die Seegraswiese des zweiten Motivs steht
+ * im selben.
+ *
  * Vier Dinge muessen zusammenpassen, die unabhaengig voneinander entstanden
  * sind:
  *
@@ -25,37 +29,13 @@
  *     spiegelverkehrt), und wo die Schaufel danach haengt, ergibt sich aus
  *     Drehung und Spiegelung — nicht aus einer Zahl, die jemand geschaetzt hat.
  *
- * Alle Masse in Feldeinheiten des `viewBox`. Der Boden liegt bei `GROUND`,
- * gezaehlt wird wie in SVG von oben.
+ * Alle Masse in Feldeinheiten des `viewBox`, der Boden bei `GROUND`.
  */
 
-/**
- * Der Ausschnitt, den das `viewBox` zeigt.
- *
- * `top` schneidet oben ab, was niemand braucht: gerechnet wird von einer Null
- * ganz oben, gezeichnet wird aber erst ab dem Gipfel des groessten Berges. Ohne
- * den Schnitt stuende ueber der Baustelle ein Streifen Leere, und weil sich das
- * Bild in seinen Platz einpasst, waere die Baustelle dadurch kleiner statt der
- * Streifen schmaler.
- *
- * Breit und flach: eine Baustelle ist eine Zeile.
- */
-export const FIELD = { top: 10, width: 220, height: 74 } as const;
+import { FIELD, GROUND, round, type Box, type Point } from './field.js';
 
-/** Wo der Boden liegt. Darunter bleibt Platz fuer Raeder und Raupen. */
-export const GROUND = 80;
-
-export interface Point {
-  x: number;
-  y: number;
-}
-
-export interface Box {
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
-}
+export { FIELD, GROUND };
+export type { Box, Point };
 
 /* --------------------------------- Der Berg -------------------------------- */
 
@@ -539,9 +519,3 @@ export function cargoPath(): string {
   );
 }
 
-/* --------------------------------- Werkzeug -------------------------------- */
-
-/** Zwei Nachkommastellen. Mehr Stellen sind im Pfad nur laengerer Text. */
-function round(value: number): number {
-  return Math.round(value * 100) / 100;
-}

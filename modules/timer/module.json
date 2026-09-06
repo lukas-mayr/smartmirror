@@ -1,8 +1,8 @@
 {
   "id": "timer",
   "name": "Timer",
-  "version": "0.1.0",
-  "description": "Ein Timer, den man im Vorbeigehen liest: ein Bagger traegt einen Berg ab und verlaedt ihn auf Lastwagen. Ist der Berg weg, ist die Zeit um. Der Bagger arbeitet immer gleich schnell — laenger heisst nicht langsamer, sondern mehr Berg.",
+  "version": "0.2.0",
+  "description": "Ein Timer, den man im Vorbeigehen liest — in einem von zwei Bildern: ein Bagger traegt einen Berg ab und verlaedt ihn auf Lastwagen, oder eine Meeresschildkroete weidet eine Seegraswiese ab. Ist der Berg weg (die Wiese abgefressen), ist die Zeit um. Gearbeitet wird immer gleich schnell — laenger heisst nicht langsamer, sondern mehr Berg und mehr Wiese.",
   "author": "smartmirror",
   "permissions": [
     "notify"
@@ -24,10 +24,24 @@
         "default": "Timer",
         "maxLength": 24
       },
+      "motif": {
+        "type": "string",
+        "title": "Bild",
+        "description": "Womit die Restzeit gezeigt wird. Die Baustelle traegt einen Berg ab, die Schildkroete frisst eine Wiese leer. Beide arbeiten gleich schnell und zeigen dasselbe.",
+        "enum": [
+          "dig",
+          "sea"
+        ],
+        "enumLabels": [
+          "Baustelle",
+          "Meeresschildkroete"
+        ],
+        "default": "dig"
+      },
       "minutes": {
         "type": "integer",
         "title": "Dauer (Minuten)",
-        "description": "Der Bagger arbeitet immer gleich schnell. Eine laengere Dauer macht den Berg groesser, nicht die Bewegung langsamer.",
+        "description": "Gearbeitet wird immer gleich schnell. Eine laengere Dauer macht den Berg groesser und die Wiese laenger, nicht die Bewegung langsamer.",
         "minimum": 1,
         "maximum": 120,
         "step": 1,
