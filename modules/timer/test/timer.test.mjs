@@ -1,5 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { DIG } from '@mirror/sdk';
 import {
   bucketCount,
@@ -10,8 +13,13 @@ import {
   mountainSize,
   remainingShare,
   timerLabel,
+  timerMotif,
   timerWindow,
 } from '../dist/shared.js';
+
+const manifest = JSON.parse(
+  readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../module.json'), 'utf8'),
+);
 
 /*
  * Die eine Regel, an der dieses Modul haengt: der Bagger arbeitet immer gleich
@@ -157,4 +165,31 @@ test('eine unbrauchbare Dauer faellt auf die Voreinstellung zurueck', () => {
   assert.equal(durationMs(0), 10 * 60_000);
   assert.equal(durationMs(-5), 10 * 60_000);
   assert.equal(durationMs('Unsinn'), 10 * 60_000);
+});
+
+/* -------------------------------- Das Bild --------------------------------- */
+
+test('ein unbekanntes Motiv landet auf der Baustelle', () => {
+  /*
+   * Aus der Konfiguration kann alles kommen: eine Instanz, die vor dem zweiten
+   * Bild gestellt wurde und das Feld gar nicht kennt, oder ein Wort, das es
+   * nicht gibt. Beides zeigt die Baustelle — sie war zuerst da, und ein Timer,
+   * der wegen eines unbekannten Wortes nichts zeigt, ist schlechter als einer,
+   * der das Falsche zeigt.
+   */
+  assert.equal(timerMotif('sea'), 'sea');
+  assert.equal(timerMotif('dig'), 'dig');
+  assert.equal(timerMotif(undefined), 'dig');
+  assert.equal(timerMotif('Schildkroete'), 'dig');
+  assert.equal(timerMotif(42), 'dig');
+});
+
+test('das Motiv steht im Schema, mit beiden Werten und Klartext dazu', () => {
+  // Die Handy-App baut ihr Formular aus dem Schema: ohne `enum` waere die Wahl
+  // ein Textfeld, und ohne `enumLabels` stuende dort "dig".
+  const motif = manifest.configSchema.properties.motif;
+  assert.deepEqual(motif.enum, ['dig', 'sea']);
+  assert.equal(motif.enum.length, motif.enumLabels.length);
+  assert.equal(motif.default, 'dig');
+  assert.ok(motif.enum.includes(timerMotif(motif.default)));
 });
