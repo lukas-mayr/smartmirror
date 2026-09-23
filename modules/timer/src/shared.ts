@@ -16,10 +16,11 @@ import { DIG } from '@mirror/sdk';
  * Frage, wer einen Browser braucht: die Rechnung nicht, das Zeichnen schon —
  * und nur so laesst sich die Rechnung pruefen.
  *
- * Der Berg ist dabei nur das erste von zwei Bildern. Das zweite ist eine
+ * Der Berg ist dabei nur das erste von drei Bildern. Das zweite ist eine
  * Seegraswiese, an der eine Meeresschildkroete frisst; sie rechnet mit
- * denselben Zahlen und antwortet mit ihrer Laenge statt mit ihrer Hoehe. Was
- * hier steht, gilt fuer beide — deshalb steht es hier und nicht dort.
+ * denselben Zahlen und antwortet mit ihrer Laenge statt mit ihrer Hoehe. Das
+ * dritte ist ein Kran, der eine Pyramide stapelt (crane.ts). Was hier steht,
+ * gilt fuer alle — deshalb steht es hier und nicht dort.
  *
  * Die eine Regel, an der alles haengt: **gearbeitet wird immer gleich
  * schnell.** Ein Eimer dauert `DIG.bucket`, ein Biss ebenso, ob der Timer auf
@@ -30,13 +31,13 @@ import { DIG } from '@mirror/sdk';
  */
 
 /**
- * Die beiden Motive.
+ * Die drei Motive.
  *
  * Kurze Bezeichner und keine Klartextnamen: sie stehen in der Konfiguration,
  * in einer CSS-Klasse und in einem Test, und ein Name, der uebersetzt werden
  * koennte, waere an all diesen Stellen ein anderer.
  */
-export type TimerMotif = 'dig' | 'sea';
+export type TimerMotif = 'dig' | 'sea' | 'crane';
 
 export interface TimerConfig {
   /** Wofuer der Timer laeuft. Steht ueber der Zeit und in der Mitteilung. */
@@ -46,11 +47,12 @@ export interface TimerConfig {
   /**
    * Das Bild, in dem die Restzeit steht.
    *
-   * Zwei Motive, dieselbe Rechnung: eine Baustelle, auf der ein Bagger einen
-   * Berg abtraegt, und eine Seegraswiese, die eine Meeresschildkroete abweidet.
-   * Beide arbeiten im selben Takt und beantworten dieselbe Frage — das eine mit
-   * einem Berg, der niedriger wird, das andere mit einer Wiese, die kuerzer
-   * wird.
+   * Drei Motive, dieselbe Rechnung: eine Baustelle, auf der ein Bagger einen
+   * Berg abtraegt, eine Seegraswiese, die eine Meeresschildkroete abweidet, und
+   * ein Kran, der eine Pyramide stapelt. Alle arbeiten im selben Takt und
+   * beantworten dieselbe Frage — mit einem Berg, der niedriger wird, einer
+   * Wiese, die kuerzer wird, oder einer Pyramide, der bis zur Spitze immer
+   * weniger fehlt.
    *
    * Es ist eine Frage des Zimmers und nicht der Funktion: ein Bagger im Flur
    * ist etwas anderes als ein Bagger neben dem Bett. Deshalb steht die Wahl in
@@ -191,7 +193,7 @@ export function formatRemaining(remainingMs: number): string {
 }
 
 /**
- * Das gewaehlte Motiv, auf einen der beiden Werte gebracht.
+ * Das gewaehlte Motiv, auf einen der drei Werte gebracht.
  *
  * Aus der Konfiguration kann alles kommen — eine alte Instanz, die das Feld
  * noch gar nicht kennt, oder ein Tippfehler aus der Hand. Beides landet auf der
@@ -199,7 +201,7 @@ export function formatRemaining(remainingMs: number): string {
  * Wortes gar nichts zeigt, ist schlechter als einer, der das Falsche zeigt.
  */
 export function timerMotif(motif: unknown): TimerMotif {
-  return motif === 'sea' ? 'sea' : 'dig';
+  return motif === 'sea' || motif === 'crane' ? motif : 'dig';
 }
 
 /** Der Name des Timers, auf ein vernuenftiges Mass gebracht. */

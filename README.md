@@ -50,8 +50,9 @@ modules/
   calendar/      ICS-Kalender (iCloud, Gemeinde, Schule), Zeitraum einstellbar
   sbb/           Abfahrten einer Haltestelle, von der Fahrplanauskunft search.ch
   notifications/ Die Fläche für Mitteilungen; den Inhalt melden die Module
-  timer/         Ein Bagger trägt einen Berg ab oder eine Schildkröte weidet
-                 eine Wiese ab; ist nichts mehr da, ist die Zeit um
+  timer/         Ein Bagger trägt einen Berg ab, eine Schildkröte weidet eine
+                 Wiese ab oder ein Kran stapelt eine Pyramide; ist der Berg weg,
+                 die Wiese leer oder die Spitze gesetzt, ist die Zeit um
 deploy/      systemd-Units, Compositor-Start, Installer, Drehung, Neustart,
              WLAN, Plymouth-Thema fuer den Start, Startbildschirm unter cage,
              unsichtbarer Mauszeiger
@@ -617,8 +618,8 @@ erst, wenn man sie liest — ein Berg, der kleiner geworden ist, beantwortet es 
 Vorbeigehen. Deshalb steht die Restzeit im Timer-Block zweimal: als Ziffern für
 den, der hinsieht, und als Berg für den, der nur vorbeigeht. Ein Bagger trägt
 ihn ab und lädt ihn auf Lastwagen; ist der Berg weg, ist die Zeit um, und die
-Mitteilung dazu steht im Feed. Wer statt der Baustelle lieber das Meer sehen
-will, stellt das Bild um — dazu weiter unten.
+Mitteilung dazu steht im Feed. Wer statt der Baustelle lieber das Meer oder den
+Kran sehen will, stellt das Bild um — dazu weiter unten.
 
 **Der Bagger arbeitet immer gleich schnell.** Ein Eimer dauert 5 s, vier Eimer
 füllen einen Lastwagen, dann fährt er und der nächste kommt — unabhängig davon,
@@ -753,8 +754,8 @@ gehoben wird. Mit einer Drehung allein ist das nicht nachzubauen, und ein
 Zylinder, der beim Heben mitwandert statt auszufahren, fällt mehr auf als einer,
 den es nicht gibt.
 
-Was zusammenpassen muss, prüfen Tests ohne Browser (`src/site.ts`, für das
-zweite Bild `src/meadow.ts`): dass jeder
+Was zusammenpassen muss, prüfen Tests ohne Browser (`src/site.ts`, für die
+beiden anderen Bilder `src/meadow.ts` und `src/crane.ts`): dass jeder
 Eimer gleich viel Fläche wegnimmt, dass der Zahn der Schaufel bei jedem Stand
 und in jeder Berggröße in der Wand steht, dass die Ladung nach der Drehung über
 der Mulde und nicht daneben landet, dass der Wagen erst nach dem letzten Kippen
@@ -790,11 +791,11 @@ Bitte endet mit der Zeit und nicht mit dem Block: danach steht dort weiter
 abgelaufenen Timer stehen bliebe, wäre von einem hängenden nicht zu
 unterscheiden.
 
-### Zwei Bilder für dieselbe Zeit
+### Drei Bilder für dieselbe Zeit
 
-Der Timer zeigt seine Restzeit in einem von zwei Bildern, und welches, steht in
-seinen Einstellungen (*Bild*): die **Baustelle** oder die
-**Meeresschildkröte**. Es ist eine Frage des Zimmers und nicht der Funktion —
+Der Timer zeigt seine Restzeit in einem von drei Bildern, und welches, steht in
+seinen Einstellungen (*Bild*): die **Baustelle**, die **Meeresschildkröte** oder
+der **Kran**. Es ist eine Frage des Zimmers und nicht der Funktion —
 ein Bagger im Flur ist etwas anderes als ein Bagger neben dem Bett.
 
 Beide beantworten dieselbe Frage und halten sich an dieselbe Regel; sie
@@ -828,9 +829,28 @@ weil sie der Wert ist, für den der Block da ist — genau wie der Berg.
 Geteilt wird alles, was der Block ist: Feld, Grund, Takt, Ziffern, die drei
 Strichstärken, das Stillstehen bei Nacht und bei `prefers-reduced-motion`. Ein
 Motiv, das sich seine eigenen Maße nähme, wäre ein zweiter Block und nicht
-dasselbe Bild in anderer Sprache. Und ein drittes Motiv gäbe es nur zu diesem
-Preis: eines, das nur anders aussieht, aber nichts anderes zeigt, wäre eine
-Verkleidung.
+dasselbe Bild in anderer Sprache.
+
+**Der Kran antwortet andersherum: mit dem, was schon steht.** Ein Turmdrehkran
+holt Stein um Stein von einer Palette und stapelt sie zu einer Pyramide — ein
+Stein je Ladung (20 s), also im selben Takt, in dem beim Bagger ein Lastwagen
+voll wird. Ein langer Timer baut deshalb eine größere Pyramide und keinen
+langsameren Kran: drei Steine bei einer Minute, dreißig bei zehn, hundertachtzig
+bei einer Stunde. Bis zehn Minuten bleiben die Steine gleich groß; darüber
+werden sie kleiner, damit die Pyramide ins Bild passt.
+
+**Der letzte Stein ist die Spitze, und er sitzt, wenn die Zeit um ist.** Eine
+Pyramide mit je einem Stein weniger pro Reihe hat eine Dreieckszahl von Steinen,
+die Zahl der Ladungen ist aber selten eine. Was bis zur nächsten fehlt, liegt
+deshalb am Anfang schon da, als Fundament unten links. Einen Umriss der fertigen
+Pyramide gibt es mit Absicht nicht: das Bild zeigt, was gebaut ist, und keinen
+Plan davon.
+
+Wohin der Kran fährt, kommt für jeden Stein neu aus dem Modul (`--crane-*`), der
+Ablauf steht als Keyframes im Stylesheet. Das Ziel wechselt nur, während die
+Laufkatze über der Palette steht — dort hängt ihre Stellung an keinem Ziel, und
+die Fahrt setzt ohne Sprung ein. Ein Test rechnet nach, dass die Last über die
+Pyramide hinweggeht und jeder Stein auf zweien liegt.
 
 ### Nachts eine Stufe dunkler
 

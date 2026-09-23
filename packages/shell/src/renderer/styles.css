@@ -3897,9 +3897,299 @@ body {
   }
 }
 
+/* ------------------------------- Die Pyramide ------------------------------ */
+
 /*
- * Nachts stehen Baustelle und Meer still, und `prefers-reduced-motion` haelt
- * beide ebenso an — nicht mit `animation: none`, sondern indem der Takt auf
+ * Das dritte Bild: ein Turmdrehkran stapelt Steine zu einer Pyramide.
+ *
+ * Es beantwortet dieselbe Frage wie Berg und Wiese, nur andersherum: was
+ * steht, ist die vergangene Zeit, und die Restzeit ist das, was bis zur
+ * Spitze noch fehlt. Einen Umriss der fertigen Pyramide gibt es nicht: das
+ * Bild zeigt, was gebaut ist, und keinen Plan davon.
+ *
+ * Alles andere ist dasselbe: dasselbe Feld, derselbe Grund, derselbe Takt,
+ * dieselben drei Staerken. Ein Stein ist eine Ladung (`--dig-load`), und
+ * genau am Ende der Ladung sitzt er.
+ */
+
+.crane {
+  color: var(--mirror-fg-dim);
+}
+
+.crane__ground {
+  stroke: var(--mirror-fg-mute);
+  stroke-width: 1;
+}
+
+/*
+ * Die Steine sind der Wert, fuer den der Block da ist — und deshalb das
+ * hellste Teil der Szene, wie der Berg und die Wiese: weisser Umriss auf einer
+ * sehr schwachen weissen Flaeche. Die Strichstaerke kommt aus dem Modul: sie
+ * haengt an der Groesse der Steine, und bei einer langen Pyramide mit kleinen
+ * Steinen fuellte ein fester Strich die Fuge zu.
+ */
+.crane__stone {
+  stroke: var(--mirror-fg);
+  stroke-width: calc(var(--crane-line, 1) * 1px);
+  fill: var(--mirror-box-soft);
+}
+
+/* Stahl: Gurte des Auslegers, Eckstiele des Turms, die Turmspitze. */
+.crane__steel {
+  stroke: var(--mirror-fg-dim);
+  stroke-width: 1.4;
+}
+
+/* Gefuellte Teile: Laufkatze, Hakenblock, Fuehrerhaus, Gewicht, Palette. */
+.crane__body {
+  stroke: var(--mirror-fg-dim);
+  stroke-width: 1.4;
+  fill: var(--mirror-box);
+}
+
+/* Das Fachwerk macht den Kran erkennbar und soll ihn nicht mittragen. */
+.crane__trim {
+  stroke: var(--mirror-fg-mute);
+  stroke-width: 0.9;
+}
+
+/*
+ * Abspannung und Anschlagseile: gespannt, duenn, ganz zurueck. Die
+ * Anschlagseile bleiben auch im flachen Block — ohne sie schwebt der Stein
+ * unter dem Haken.
+ */
+.crane__tie,
+.crane__sling {
+  stroke: var(--mirror-fg-mute);
+  stroke-width: 0.7;
+}
+
+/*
+ * Das Hubseil wird beim Absenken gestreckt und nicht verschoben. Damit es dabei
+ * nicht mitwaechst, haelt es seine Staerke fest (`vector-effect` im Modul) —
+ * und ein stumpfes Ende, weil ein rundes mitgestreckt wuerde.
+ */
+.crane__rope {
+  stroke: var(--mirror-fg-dim);
+  stroke-width: 1;
+  stroke-linecap: butt;
+}
+
+.crane__pane {
+  stroke: var(--mirror-fg-mute);
+  stroke-width: 0.9;
+}
+
+/* Im flachen Block bleibt die Silhouette, wie bei Bagger und Schildkroete. */
+.timer--m .crane__trim,
+.timer--m .crane__pane,
+.timer--m .crane__tie {
+  display: none;
+}
+
+/* ----------------------------- Bewegung am Kran ---------------------------- */
+
+/*
+ * Eine Ladung, in Prozent ihrer Dauer — ein Stein:
+ *
+ *    0 – 4    absetzen: der Stein von eben sitzt, der Haken liegt noch auf
+ *    4 – 12   leeren Haken hochziehen
+ *   12 – 26   zurueck zur Palette
+ *   26 – 36   absenken
+ *   36 – 44   anschlagen
+ *   44 – 56   hochziehen
+ *   56 – 80   hinueber zur Pyramide
+ *   80 – 86   auspendeln
+ *   86 – 98   absenken; bei 98 sitzt der Stein, bei 100 gehoert er dazu
+ *
+ * Der Ablauf steht hier, der Ort im Modul: wie weit die Laufkatze faehrt und
+ * wie tief der Haken geht, kommt als `--crane-*` aus modules/timer/src/crane.ts,
+ * fuer jeden Stein neu. Der Wechsel des Ziels faellt in die Zeit ueber der
+ * Palette (40 %), dort haengt keine Stellung an ihm.
+ */
+.crane.is-building .crane__trolley {
+  animation: crane-trolley var(--dig-load) ease-in-out var(--dig-phase) infinite;
+}
+
+.crane.is-building .crane__hook {
+  animation: crane-hook var(--dig-load) ease-in-out var(--dig-phase) infinite;
+}
+
+.crane.is-building .crane__rope {
+  animation: crane-rope var(--dig-load) ease-in-out var(--dig-phase) infinite;
+}
+
+.crane.is-building .crane__swing {
+  animation: crane-swing var(--dig-load) ease-in-out var(--dig-phase) infinite;
+}
+
+.crane.is-building .crane__cargo {
+  animation: crane-cargo var(--dig-load) linear var(--dig-phase) infinite;
+}
+
+.crane.is-building .crane__waiting {
+  animation: crane-waiting var(--dig-load) linear var(--dig-phase) infinite;
+}
+
+@keyframes crane-trolley {
+  0%,
+  12% {
+    transform: translateX(var(--crane-reach));
+  }
+  26%,
+  56% {
+    transform: translateX(0);
+  }
+  80%,
+  100% {
+    transform: translateX(var(--crane-reach));
+  }
+}
+
+@keyframes crane-hook {
+  0%,
+  4% {
+    transform: translateY(var(--crane-drop));
+  }
+  12%,
+  26% {
+    transform: translateY(0);
+  }
+  36%,
+  44% {
+    transform: translateY(var(--crane-pick));
+  }
+  56%,
+  86% {
+    transform: translateY(0);
+  }
+  98%,
+  100% {
+    transform: translateY(var(--crane-drop));
+  }
+}
+
+/* Dasselbe fuer das Seil: es reicht immer genau bis zum Haken. */
+@keyframes crane-rope {
+  0%,
+  4% {
+    transform: scaleY(var(--crane-drop-k));
+  }
+  12%,
+  26% {
+    transform: scaleY(1);
+  }
+  36%,
+  44% {
+    transform: scaleY(var(--crane-pick-k));
+  }
+  56%,
+  86% {
+    transform: scaleY(1);
+  }
+  98%,
+  100% {
+    transform: scaleY(var(--crane-drop-k));
+  }
+}
+
+/*
+ * Die Last pendelt.
+ *
+ * Faehrt die Laufkatze an, bleibt die Last zurueck; haelt sie, schwingt die
+ * Last nach und kommt zur Ruhe, bevor sie abgesenkt wird. Zwei, drei Grad —
+ * mehr nicht: eine Last, die sichtbar schaukelt, ist schlecht angeschlagen.
+ */
+@keyframes crane-swing {
+  0%,
+  12% {
+    transform: rotate(0deg);
+  }
+  16% {
+    transform: rotate(2deg);
+  }
+  22% {
+    transform: rotate(1.2deg);
+  }
+  27% {
+    transform: rotate(-2.2deg);
+  }
+  31% {
+    transform: rotate(1deg);
+  }
+  35%,
+  56% {
+    transform: rotate(0deg);
+  }
+  61% {
+    transform: rotate(-2.6deg);
+  }
+  72% {
+    transform: rotate(-1.4deg);
+  }
+  81% {
+    transform: rotate(2.8deg);
+  }
+  86% {
+    transform: rotate(-1.2deg);
+  }
+  91% {
+    transform: rotate(0.4deg);
+  }
+  95%,
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+/*
+ * Die Last am Haken gibt es nur, solange sie getragen wird.
+ *
+ * Bis 4 % sitzt sie noch auf ihrem Platz in der Pyramide — dort, wo das Modul
+ * sie bei 0 % schon eingesetzt hat; die beiden decken sich, und so faellt es
+ * nicht auf, wenn die Anzeige einen Takt spaeter nachzieht. Danach ist der
+ * Haken leer, bis er bei 38 % auf dem naechsten Stein der Palette aufsitzt.
+ */
+@keyframes crane-cargo {
+  0%,
+  4% {
+    opacity: 1;
+  }
+  4.01%,
+  38% {
+    opacity: 0;
+  }
+  38.01%,
+  100% {
+    opacity: 1;
+  }
+}
+
+/*
+ * Der Stein auf der Palette.
+ *
+ * Er liegt dort, bis der Haken ihn hochzieht (44 %) — ab dann traegt ihn der
+ * Kran. Der naechste liegt bereit, sobald der vorige gesetzt ist: in diesem
+ * Moment schaut man auf die Pyramide und nicht auf die Palette.
+ */
+@keyframes crane-waiting {
+  0%,
+  6% {
+    opacity: 0;
+  }
+  6.01%,
+  44% {
+    opacity: 1;
+  }
+  44.01%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/*
+ * Nachts stehen Baustelle, Meer und Kran still, und `prefers-reduced-motion`
+ * haelt alle drei ebenso an — nicht mit `animation: none`, sondern indem der Takt auf
  * null geht.
  *
  * Das ist die verlaesslichere Fassung. Eine Regel, die die Bewegung abschaltet,

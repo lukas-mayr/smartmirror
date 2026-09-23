@@ -178,17 +178,18 @@ test('ein unbekanntes Motiv landet auf der Baustelle', () => {
    * der das Falsche zeigt.
    */
   assert.equal(timerMotif('sea'), 'sea');
+  assert.equal(timerMotif('crane'), 'crane');
   assert.equal(timerMotif('dig'), 'dig');
   assert.equal(timerMotif(undefined), 'dig');
   assert.equal(timerMotif('Schildkroete'), 'dig');
   assert.equal(timerMotif(42), 'dig');
 });
 
-test('das Motiv steht im Schema, mit beiden Werten und Klartext dazu', () => {
+test('das Motiv steht im Schema, mit allen Werten und Klartext dazu', () => {
   // Die Handy-App baut ihr Formular aus dem Schema: ohne `enum` waere die Wahl
   // ein Textfeld, und ohne `enumLabels` stuende dort "dig".
   const motif = manifest.configSchema.properties.motif;
-  assert.deepEqual(motif.enum, ['dig', 'sea']);
+  assert.deepEqual(motif.enum, ['dig', 'sea', 'crane']);
   assert.equal(motif.enum.length, motif.enumLabels.length);
   assert.equal(motif.default, 'dig');
   assert.ok(motif.enum.includes(timerMotif(motif.default)));
