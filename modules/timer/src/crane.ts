@@ -256,7 +256,21 @@ export function carriedAt(plan: Plan, elapsedMs: number): number {
   return Math.min(plan.total - 1, plan.laid + cycle);
 }
 
-/** Die ganze Szene in ihrer groessten Ausdehnung — fuer den Test, dass sie ins Feld passt. */
-export function craneBox(): Box {
-  return { left: JIB.tip, top: TOWER.apex, right: JIB.tail, bottom: GROUND };
+/**
+ * Wie weit die ganze Szene in den flachen Bloecken nach rechts rueckt.
+ *
+ * Dort stehen die Ziffern *auf* der Szene, oben links — und genau dort laege
+ * sonst die Spitze des Auslegers. Der quadratische Block hat die Ziffern
+ * darueber und behaelt die Mitte; in den flachen rueckt der Kran so weit nach
+ * rechts, wie das Feld es zulaesst, und links bleibt Himmel fuer die Zeit.
+ * Kran, Palette und Pyramide ruecken zusammen: es ist *ein* Ort.
+ */
+export const FLAT_SHIFT = 38;
+
+/**
+ * Die ganze Szene in ihrer groessten Ausdehnung, um `shift` verschoben — fuer
+ * den Test, dass sie ins Feld passt.
+ */
+export function craneBox(shift = 0): Box {
+  return { left: JIB.tip + shift, top: TOWER.apex, right: JIB.tail + shift, bottom: GROUND };
 }

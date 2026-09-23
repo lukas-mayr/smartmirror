@@ -22,6 +22,7 @@ import {
 } from './meadow.js';
 import {
   CAB,
+  FLAT_SHIFT,
   HOOK,
   JIB,
   PALLET,
@@ -668,12 +669,18 @@ export default defineFrontend<TimerState, TimerConfig>({
      * den Ablauf, die Variablen den Ort. Aendert sich das Ziel, faehrt die
      * laufende Bewegung ohne Neustart zum neuen — und das Ziel wechselt nur,
      * waehrend die Laufkatze ueber der Palette steht (siehe `SWITCH`).
+     *
+     * `shift` rueckt Kran, Palette und Pyramide gemeinsam nach rechts — in den
+     * flachen Bloecken, in denen die Ziffern oben links auf der Szene stehen
+     * (siehe `FLAT_SHIFT`). Der Boden bleibt, wo er ist: er reicht ohnehin
+     * ueber die ganze Breite.
      */
     const craneScene = (
       plan: Plan,
       laid: number,
       carried: number,
       building: boolean,
+      shift: number,
     ): TemplateResult => {
       const reach = reachFor(plan, carried);
       const line = Math.min(1.4, Math.max(0.5, plan.stone * 0.2));
@@ -689,8 +696,8 @@ export default defineFrontend<TimerState, TimerConfig>({
       return stage(
         `crane${building ? ' is-building' : ''}`,
         svg`
-          <g style=${vars}>
-            <path class="crane__ground" d=${`M0 ${GROUND}H${FIELD.width}`} />
+          <path class="crane__ground" d=${`M0 ${GROUND}H${FIELD.width}`} />
+          <g style=${vars} transform=${`translate(${shift} 0)`}>
             ${stones ? svg`<path class="crane__stone crane__stones" d=${stones} />` : nothing}
             ${crane(plan, building && carried >= 0, building)}
           </g>
@@ -776,7 +783,13 @@ export default defineFrontend<TimerState, TimerConfig>({
               <div class="timer__value" style=${`--timer-chars:${value.length}`}>${value}</div>
             </div>
             ${motif === 'crane'
-              ? craneScene(plan, done ? plan.total : laidAt(plan, elapsed), carriedAt(plan, elapsed), !done)
+              ? craneScene(
+                  plan,
+                  done ? plan.total : laidAt(plan, elapsed),
+                  carriedAt(plan, elapsed),
+                  !done,
+                  size === 'l' ? 0 : FLAT_SHIFT,
+                )
               : motif === 'sea'
                 ? seaScene(scale, share, shift, !done)
                 : digScene(scale, share, shift, !done)}

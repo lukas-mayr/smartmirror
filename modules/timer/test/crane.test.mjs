@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { DIG } from '@mirror/sdk';
 import {
   FIELD,
+  FLAT_SHIFT,
   GROUND,
   HOOK,
   JIB,
@@ -144,8 +145,18 @@ test('das Ziel wechselt nur, waehrend die Laufkatze ueber der Palette steht', ()
   }
 });
 
-test('der ganze Kran passt ins Feld', () => {
-  const box = craneBox();
-  assert.ok(box.left >= 0 && box.right <= FIELD.width);
-  assert.ok(box.top >= FIELD.top && box.bottom <= FIELD.top + FIELD.height);
+test('der ganze Kran passt ins Feld, auch nach rechts gerueckt', () => {
+  for (const shift of [0, FLAT_SHIFT]) {
+    const box = craneBox(shift);
+    assert.ok(box.left >= 0 && box.right <= FIELD.width, `um ${shift} gerueckt ragt er hinaus`);
+    assert.ok(box.top >= FIELD.top && box.bottom <= FIELD.top + FIELD.height);
+  }
+});
+
+test('in den flachen Bloecken bleibt links Platz fuer die Ziffern', () => {
+  /*
+   * Die Ziffern stehen dort oben links auf der Szene und sind rund ein Drittel
+   * des Blocks breit. Die Spitze des Auslegers muss rechts davon liegen.
+   */
+  assert.ok(craneBox(FLAT_SHIFT).left >= FIELD.width * 0.36);
 });
