@@ -2,7 +2,7 @@
   "id": "timer",
   "name": "Timer",
   "version": "0.2.0",
-  "description": "Ein Timer, den man im Vorbeigehen liest — in einem von zwei Bildern: ein Bagger traegt einen Berg ab und verlaedt ihn auf Lastwagen, oder eine Meeresschildkroete weidet eine Seegraswiese ab. Ist der Berg weg (die Wiese abgefressen), ist die Zeit um. Gearbeitet wird immer gleich schnell — laenger heisst nicht langsamer, sondern mehr Berg und mehr Wiese.",
+  "description": "Ein Timer, den man im Vorbeigehen liest — in einem von drei Bildern: ein Bagger traegt einen Berg ab und verlaedt ihn auf Lastwagen, eine Meeresschildkroete weidet eine Seegraswiese ab, oder ein Kran stapelt Steine zu einer Pyramide. Ist der Berg weg, die Wiese abgefressen oder die Spitze gesetzt, ist die Zeit um. Gearbeitet wird immer gleich schnell — laenger heisst nicht langsamer, sondern mehr Berg, mehr Wiese und mehr Steine.",
   "author": "smartmirror",
   "permissions": [
     "notify"
@@ -27,21 +27,23 @@
       "motif": {
         "type": "string",
         "title": "Bild",
-        "description": "Womit die Restzeit gezeigt wird. Die Baustelle traegt einen Berg ab, die Schildkroete frisst eine Wiese leer. Beide arbeiten gleich schnell und zeigen dasselbe.",
+        "description": "Womit die Restzeit gezeigt wird. Die Baustelle traegt einen Berg ab, die Schildkroete frisst eine Wiese leer, der Kran baut eine Pyramide. Alle drei arbeiten gleich schnell und zeigen dasselbe.",
         "enum": [
           "dig",
-          "sea"
+          "sea",
+          "crane"
         ],
         "enumLabels": [
           "Baustelle",
-          "Meeresschildkroete"
+          "Meeresschildkroete",
+          "Kran"
         ],
         "default": "dig"
       },
       "minutes": {
         "type": "integer",
         "title": "Dauer (Minuten)",
-        "description": "Gearbeitet wird immer gleich schnell. Eine laengere Dauer macht den Berg groesser und die Wiese laenger, nicht die Bewegung langsamer.",
+        "description": "Gearbeitet wird immer gleich schnell. Eine laengere Dauer macht den Berg groesser, die Wiese laenger und die Pyramide hoeher, nicht die Bewegung langsamer.",
         "minimum": 1,
         "maximum": 120,
         "step": 1,

@@ -21,6 +21,20 @@ import {
   stubblePath,
 } from './meadow.js';
 import {
+  CAB,
+  HOOK,
+  JIB,
+  PALLET,
+  TOWER,
+  WEIGHT,
+  carriedAt,
+  laidAt,
+  pyramidPlan,
+  reachFor,
+  stonesPath,
+  type Plan,
+} from './crane.js';
+import {
   digPhaseMs,
   formatRemaining,
   mountainSize,
@@ -40,17 +54,18 @@ import {
  * sieht man, ob noch ein halber Berg steht, lange bevor man "07:12" gelesen
  * hat.
  *
- * **Zwei Bilder, dieselbe Rechnung.** Auf der Baustelle traegt ein Bagger einen
- * Berg ab, im Meer weidet eine Schildkroete eine Seegraswiese ab; welches von
- * beiden ein Block zeigt, steht in seinen Einstellungen. Beide laufen im selben
- * Takt, beide halten sich an dieselbe Regel — laenger heisst mehr Arbeit und
- * nicht langsamere —, und beide teilen sich Feld, Boden und Ziffern. Was sie
- * unterscheidet, ist die Antwort auf "wieviel noch": der Berg antwortet mit
- * seiner Hoehe, die Wiese mit ihrer Laenge.
+ * **Drei Bilder, dieselbe Rechnung.** Auf der Baustelle traegt ein Bagger einen
+ * Berg ab, im Meer weidet eine Schildkroete eine Seegraswiese ab, und ein Kran
+ * stapelt Steine zu einer Pyramide; welches davon ein Block zeigt, steht in
+ * seinen Einstellungen. Alle laufen im selben Takt, alle halten sich an
+ * dieselbe Regel — laenger heisst mehr Arbeit und nicht langsamere —, und alle
+ * teilen sich Feld, Boden und Ziffern. Was sie unterscheidet, ist die Antwort
+ * auf "wieviel noch": der Berg antwortet mit seiner Hoehe, die Wiese mit ihrer
+ * Laenge, die Pyramide mit dem, was bis zur Spitze noch fehlt.
  *
- * Kein drittes Bild ohne diesen Preis: ein Motiv, das nur anders aussieht, aber
- * nichts anderes zeigt, waere eine Verkleidung. Diese beiden zeigen zwei Arten
- * von Arbeit, und genau deshalb duerfen es zwei sein.
+ * Kein weiteres Bild ohne diesen Preis: ein Motiv, das nur anders aussieht,
+ * aber nichts anderes zeigt, waere eine Verkleidung. Diese drei zeigen drei
+ * Arten von Arbeit — abtragen, abweiden, aufbauen.
  *
  * **Bewegt wird im Stylesheet, gerechnet wird hier.** Der Bagger schwenkt in
  * einem festen Takt, und ein fester Takt ist genau das, was CSS-Keyframes gut
@@ -514,6 +529,175 @@ export default defineFrontend<TimerState, TimerConfig>({
       );
     };
 
+    /* -------------------------------- Die Pyramide ---------------------------- */
+
+    /**
+     * Ein Gitter aus Diagonalen zwischen zwei Gurten.
+     *
+     * Ein Kran ist ein Fachwerk und kein Balken: aus drei Metern ist das Zickzack
+     * das, woran man ihn erkennt — ein voller Balken an seiner Stelle liest sich
+     * als Strich, und ein Strich traegt keine Last.
+     */
+    const lattice = (
+      from: number,
+      to: number,
+      a: number,
+      b: number,
+      step: number,
+      vertical = false,
+    ): string => {
+      const count = Math.max(1, Math.round(Math.abs(to - from) / step));
+      const size = (to - from) / count;
+      const points: string[] = [];
+      for (let index = 0; index <= count; index += 1) {
+        const along = (from + size * index).toFixed(2);
+        const across = index % 2 === 0 ? a : b;
+        points.push(vertical ? `${across} ${along}` : `${along} ${across}`);
+      }
+      return `M${points.join('L')}`;
+    };
+
+    /** Ein Stein an seinem Platz, mit derselben Fuge wie in der Pyramide. */
+    const stoneAt = (left: number, top: number, stone: number): string => {
+      const inset = stone * 0.07;
+      const size = (stone - 2 * inset).toFixed(2);
+      return `M${(left + inset).toFixed(2)} ${(top + inset).toFixed(2)}h${size}v${size}h-${size}Z`;
+    };
+
+    /**
+     * Der Turmdrehkran.
+     *
+     * Turm, Ausleger, Gegenausleger mit Gewicht, Turmspitze mit Abspannung,
+     * Fuehrerhaus — und die Laufkatze mit Seil, Hakenblock und Last. Nur die
+     * Laufkatze bewegt sich; ein Turmdrehkran dreht zwar, aber im Seitenriss ist
+     * das eine Spiegelung, und ein Kran, der sich zwischen Palette und Pyramide
+     * umdreht, faehrt einen Umweg, den niemand faehrt.
+     *
+     * Drei Gruppen ineinander, weil drei Dinge sich unabhaengig voneinander
+     * bewegen: die Laufkatze faehrt, die Last pendelt am Seil, der Haken hebt und
+     * senkt. Das Seil wird dabei laenger — es wird gestreckt und nicht
+     * verschoben, und damit es dabei nicht dicker wird, haelt es seine
+     * Strichstaerke fest.
+     */
+    const crane = (plan: Plan, carrying: boolean, waiting: boolean): TemplateResult => {
+      const stone = plan.stone;
+      const mid = (TOWER.left + TOWER.right) / 2;
+      const x = PALLET.x;
+      const palletTop = GROUND - PALLET.height;
+      const sling = stone * 0.4;
+      return svg`
+        <!-- Die Palette mit ihrem Vorrat. -->
+        <path
+          class="crane__body"
+          d=${`M${x - PALLET.width / 2} ${GROUND}V${palletTop}H${x + PALLET.width / 2}V${GROUND}`}
+        />
+        <path
+          class="crane__stone"
+          d=${stoneAt(x - stone, palletTop - stone, stone) + stoneAt(x, palletTop - stone, stone)}
+        />
+        ${waiting
+          ? svg`<path class="crane__stone crane__waiting" d=${stoneAt(x - stone / 2, palletTop - 2 * stone, stone)} />`
+          : nothing}
+
+        <!-- Fundament, Turm, Turmspitze. -->
+        <path class="crane__body" d=${`M${TOWER.left - 4} ${GROUND}V77.5H${TOWER.right + 4}V${GROUND}Z`} />
+        <path class="crane__steel" d=${`M${TOWER.left} 77.5V${JIB.bottom}M${TOWER.right} 77.5V${JIB.bottom}`} />
+        <path class="crane__trim" d=${lattice(77.5, JIB.bottom, TOWER.left, TOWER.right, 5.5, true)} />
+        <path class="crane__steel" d=${`M${TOWER.left} ${JIB.top}L${mid} ${TOWER.apex}L${TOWER.right} ${JIB.top}`} />
+        <path class="crane__tie" d=${`M${mid} ${TOWER.apex}L96 ${JIB.top}M${mid} ${TOWER.apex}L${JIB.tail} ${JIB.top}`} />
+
+        <!-- Ausleger und Gegenausleger: zwei Gurte und das Fachwerk dazwischen. -->
+        <path
+          class="crane__steel"
+          d=${`M${JIB.tip} ${JIB.top}H${JIB.tail}V21H${TOWER.right}M${JIB.tip} ${JIB.top}V${JIB.bottom}H${TOWER.left}`}
+        />
+        <path class="crane__trim" d=${lattice(JIB.tip, TOWER.left, JIB.top, JIB.bottom, 4)} />
+        <path class="crane__trim" d=${lattice(TOWER.right, JIB.tail, JIB.top, 21, 4)} />
+
+        <!-- Gegengewicht und Fuehrerhaus. -->
+        <path
+          class="crane__body"
+          d=${`M${WEIGHT.left} ${WEIGHT.top}H${WEIGHT.right}V${WEIGHT.bottom}H${WEIGHT.left}Z`}
+        />
+        <path
+          class="crane__trim"
+          d=${`M${WEIGHT.left} ${WEIGHT.top + 2.7}H${WEIGHT.right}M${WEIGHT.left} ${WEIGHT.top + 5.3}H${WEIGHT.right}`}
+        />
+        <path
+          class="crane__body"
+          d=${`M${CAB.left} ${CAB.top}V${CAB.bottom - 1.5}Q${CAB.left} ${CAB.bottom} ${CAB.left + 1.5} ${CAB.bottom}H${CAB.right}V${CAB.top}Z`}
+        />
+        <path class="crane__pane" d=${`M${CAB.left + 1.5} ${CAB.top + 1.2}H${CAB.right - 1.5}V${CAB.top + 4}H${CAB.left + 1.5}Z`} />
+
+        <!-- Die Laufkatze, und was an ihr haengt. -->
+        <g class="crane__trolley">
+          <path class="crane__body" d=${`M${x - 3} ${JIB.bottom + 0.2}H${x + 3}V${HOOK.rope}H${x - 3}Z`} />
+          <g class="crane__swing" style=${`transform-origin:${x}px ${HOOK.rope}px`}>
+            <path
+              class="crane__rope"
+              d=${`M${x} ${HOOK.rope}V${HOOK.block}`}
+              vector-effect="non-scaling-stroke"
+              style=${`transform-origin:${x}px ${HOOK.rope}px`}
+            />
+            <g class="crane__hook">
+              <path class="crane__body" d=${`M${x - 1.4} ${HOOK.block}H${x + 1.4}V${HOOK.block + 2.2}H${x - 1.4}Z`} />
+              <path class="crane__trim" d=${`M${x} ${HOOK.block + 2.2}V${HOOK.block + 3.2}`} />
+              ${carrying
+                ? svg`<g class="crane__cargo">
+                    <path
+                      class="crane__sling"
+                      d=${`M${x} ${HOOK.block + 3}L${x - sling} ${HOOK.carry}M${x} ${HOOK.block + 3}L${x + sling} ${HOOK.carry}`}
+                    />
+                    <path class="crane__stone" d=${stoneAt(x - stone / 2, HOOK.carry, stone)} />
+                  </g>`
+                : nothing}
+            </g>
+          </g>
+        </g>
+      `;
+    };
+
+    /**
+     * Die Pyramide.
+     *
+     * `laid` ist, wieviele Steine liegen, `carried` der Stein, den der Kran
+     * gerade bewegt (oder -1). Beide aus derselben Rechnung, damit der Stein
+     * genau dort in der Pyramide erscheint, wo der Kran ihn eben abgesetzt hat.
+     *
+     * Wohin der Kran faehrt, steht als Variablen am Blatt: die Keyframes kennen
+     * den Ablauf, die Variablen den Ort. Aendert sich das Ziel, faehrt die
+     * laufende Bewegung ohne Neustart zum neuen — und das Ziel wechselt nur,
+     * waehrend die Laufkatze ueber der Palette steht (siehe `SWITCH`).
+     */
+    const craneScene = (
+      plan: Plan,
+      laid: number,
+      carried: number,
+      building: boolean,
+    ): TemplateResult => {
+      const reach = reachFor(plan, carried);
+      const line = Math.min(1.4, Math.max(0.5, plan.stone * 0.2));
+      const vars = [
+        `--crane-reach:${reach.reach}px`,
+        `--crane-drop:${reach.drop}px`,
+        `--crane-pick:${reach.pick}px`,
+        `--crane-drop-k:${reach.dropScale}`,
+        `--crane-pick-k:${reach.pickScale}`,
+        `--crane-line:${line.toFixed(2)}`,
+      ].join(';');
+      const stones = stonesPath(plan, laid);
+      return stage(
+        `crane${building ? ' is-building' : ''}`,
+        svg`
+          <g style=${vars}>
+            <path class="crane__ground" d=${`M0 ${GROUND}H${FIELD.width}`} />
+            ${stones ? svg`<path class="crane__stone crane__stones" d=${stones} />` : nothing}
+            ${crane(plan, building && carried >= 0, building)}
+          </g>
+        `,
+      );
+    };
+
     /* -------------------------------- Zeichnen ------------------------------- */
 
     const draw = (): void => {
@@ -542,6 +726,7 @@ export default defineFrontend<TimerState, TimerConfig>({
       const motif = timerMotif(config.motif);
       const share = done ? 0 : remainingShare(elapsed, total);
       const scale = mountainSize(total);
+      const plan = pyramidPlan(total);
 
       /*
        * Vorgerueckt wird einmal je Ladung und nicht laufend.
@@ -590,9 +775,11 @@ export default defineFrontend<TimerState, TimerConfig>({
             <div class="timer__head">
               <div class="timer__value" style=${`--timer-chars:${value.length}`}>${value}</div>
             </div>
-            ${motif === 'sea'
-              ? seaScene(scale, share, shift, !done)
-              : digScene(scale, share, shift, !done)}
+            ${motif === 'crane'
+              ? craneScene(plan, done ? plan.total : laidAt(plan, elapsed), carriedAt(plan, elapsed), !done)
+              : motif === 'sea'
+                ? seaScene(scale, share, shift, !done)
+                : digScene(scale, share, shift, !done)}
           </div>
         `,
         host,
