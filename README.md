@@ -846,11 +846,33 @@ deshalb am Anfang schon da, als Fundament unten links. Einen Umriss der fertigen
 Pyramide gibt es mit Absicht nicht: das Bild zeigt, was gebaut ist, und keinen
 Plan davon.
 
+**Der Oberwagen dreht sich, und die Steine reisen von rechts nach links.** Die
+Palette steht rechts vom Turm, die Pyramide links davon. Pro Stein fährt die
+Laufkatze an die Achse heran, der Oberwagen (Ausleger, Gegenausleger mit Gewicht,
+Führerhaus, Turmspitze) schwenkt zur Palette, die Last wird angeschlagen, und
+der Oberwagen schwenkt mit ihr zurück. Im Seitenriss ist eine halbe Umdrehung
+eine Spiegelung durch die Senkrechte, dazwischen steht der Ausleger quer zum
+Blick und wird schmal; die Laufkatze samt Haken und Stein wird dabei mitgenommen
+und nicht mitgestaucht. Gedreht wird nur im festen Abstand `SLEW` von der
+Achse: dort ist die Drehung dieselbe Zahl, mit der sich auch die Laufkatze
+verschiebt, und die Keyframes brauchen kein Produkt zweier Bewegungen.
+
 Wohin der Kran fährt, kommt für jeden Stein neu aus dem Modul (`--crane-*`), der
-Ablauf steht als Keyframes im Stylesheet. Das Ziel wechselt nur, während die
-Laufkatze über der Palette steht — dort hängt ihre Stellung an keinem Ziel, und
-die Fahrt setzt ohne Sprung ein. Ein Test rechnet nach, dass die Last über die
-Pyramide hinweggeht und jeder Stein auf zweien liegt.
+Ablauf steht als Keyframes im Stylesheet. Das Ziel wechselt nur, während der Kran
+an der Palette steht — dort hängt seine Stellung an keinem Ziel, die Fahrt setzt
+ohne Sprung ein, und der Wechsel hat nach beiden Seiten mehrere Sekunden Luft
+für einen verspäteten Takt der Anzeige.
+
+**Ein Stein verschwindet nie.** Zwischen Palette, Haken und Pyramide wird der
+Stein immer so übergeben, dass er für einen Moment an beiden Orten steht:
+Palettenstein und Last decken sich beim Anschlagen, Last und Stein in der
+Pyramide decken sich ab dem Aufsetzen (94 %) bis zu 8 % der nächsten Ladung —
+fast drei Sekunden, in denen die Anzeige den Stein in die Pyramide setzen darf.
+Last und Palettenstein sind außerdem immer im DOM, solange gebaut wird: wären sie
+ein- und ausgehängt, finge ihre Animation beim Einhängen von vorn an und liefe
+dem Kran davon. Tests rechnen nach, dass die Last über die Pyramide
+hinweggeht, jeder Stein auf zweien liegt, die Palette in Reichweite des
+gedrehten Auslegers steht und Drehung und Laufkatze im Gleichschritt laufen.
 
 ### Nachts eine Stufe dunkler
 

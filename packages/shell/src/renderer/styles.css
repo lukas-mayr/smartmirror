@@ -3992,21 +3992,34 @@ body {
 /*
  * Eine Ladung, in Prozent ihrer Dauer — ein Stein:
  *
- *    0 – 4    absetzen: der Stein von eben sitzt, der Haken liegt noch auf
- *    4 – 12   leeren Haken hochziehen
- *   12 – 26   zurueck zur Palette
- *   26 – 36   absenken
- *   36 – 44   anschlagen
- *   44 – 56   hochziehen
- *   56 – 80   hinueber zur Pyramide
- *   80 – 86   auspendeln
- *   86 – 98   absenken; bei 98 sitzt der Stein, bei 100 gehoert er dazu
+ *    0 –  8   absetzen: der Stein von eben sitzt, der Haken liegt noch auf
+ *    8 – 16   leeren Haken hochziehen
+ *   12 – 26   an die Achse heranfahren
+ *   26 – 40   schwenken: der Oberwagen dreht sich zur Palette (links -> rechts)
+ *   40 – 48   hinaus bis ueber die Palette
+ *   46 – 54   absenken
+ *   54 – 59   anschlagen
+ *   59 – 67   hochziehen
+ *   66 – 72   an die Achse heranfahren
+ *   72 – 84   schwenken: zurueck zur Pyramide (rechts -> links)
+ *   84 – 91   hinaus bis ueber den Platz
+ *   87 – 94   absenken; bei 94 sitzt der Stein, bei 100 gehoert er dazu
  *
  * Der Ablauf steht hier, der Ort im Modul: wie weit die Laufkatze faehrt und
  * wie tief der Haken geht, kommt als `--crane-*` aus modules/timer/src/crane.ts,
- * fuer jeden Stein neu. Der Wechsel des Ziels faellt in die Zeit ueber der
- * Palette (40 %), dort haengt keine Stellung an ihm.
+ * fuer jeden Stein neu. Der Wechsel des Ziels faellt in die Zeit an der
+ * Palette (50 %), dort haengt keine Stellung an ihm.
+ *
+ * Alles laeuft auf *einer* Uhr: jedes Teil hat dieselbe Dauer und dieselbe
+ * Phase (`--dig-phase`). Was der Kran hier uebergibt, uebergibt er deshalb
+ * zwischen zwei Teilen, die sich nicht auseinanderschieben koennen — den
+ * einzigen Uebergang, der von der Anzeige abhaengt, dem Stein in der Pyramide,
+ * deckt die Last mit einem langen Vorlauf und Nachlauf (94 – 108 %) ab.
  */
+.crane.is-building .crane__upper {
+  animation: crane-slew var(--dig-load) ease-in-out var(--dig-phase) infinite;
+}
+
 .crane.is-building .crane__trolley {
   animation: crane-trolley var(--dig-load) ease-in-out var(--dig-phase) infinite;
 }
@@ -4031,16 +4044,73 @@ body {
   animation: crane-waiting var(--dig-load) linear var(--dig-phase) infinite;
 }
 
+/*
+ * Ohne Bewegung (bei Nacht, bei `prefers-reduced-motion`) steht jedes Teil auf
+ * seinem Ausgangswert: der Kran mit dem Ausleger nach links, der Haken oben —
+ * und keine Last, weil dort keiner ist, der sie traegt.
+ */
+.crane__cargo {
+  opacity: 0;
+}
+
+/*
+ * Die Drehung des Oberwagens.
+ *
+ * Im Seitenriss ist eine halbe Umdrehung eine Spiegelung, und dazwischen steht
+ * der Ausleger quer zum Blick und wird schmal — deshalb geht die Skalierung
+ * durch die Null. 1 heisst: der Ausleger zeigt nach links, zur Pyramide.
+ *
+ * Die Laufkatze faehrt dabei im Gleichschritt mit (`crane-trolley`): dieselben
+ * Stuetzstellen, dieselbe Kurve, und ihr Weg ist dieselbe Spiegelung, nur als
+ * Verschiebung gerechnet. Wer hier eine Zeit aendert, aendert sie dort mit —
+ * ein Test vergleicht die beiden.
+ */
+@keyframes crane-slew {
+  0%,
+  26% {
+    transform: scaleX(1);
+  }
+  40%,
+  72% {
+    transform: scaleX(-1);
+  }
+  84%,
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+/*
+ * Die Laufkatze, von ihrer Zeichenstellung aus gerechnet (links der Achse, im
+ * Abstand, in dem sie dreht):
+ *
+ *   --crane-reach    ueber dem Platz in der Pyramide
+ *   0                an der Achse, der Abstand, in dem der Ausleger dreht
+ *   --crane-turn     dieselbe Stelle auf der anderen Seite der Achse
+ *   --crane-pallet   ueber der Palette
+ */
 @keyframes crane-trolley {
   0%,
   12% {
     transform: translateX(var(--crane-reach));
   }
-  26%,
-  56% {
+  26% {
     transform: translateX(0);
   }
-  80%,
+  40% {
+    transform: translateX(var(--crane-turn));
+  }
+  48%,
+  66% {
+    transform: translateX(var(--crane-pallet));
+  }
+  72% {
+    transform: translateX(var(--crane-turn));
+  }
+  84% {
+    transform: translateX(0);
+  }
+  91%,
   100% {
     transform: translateX(var(--crane-reach));
   }
@@ -4048,22 +4118,22 @@ body {
 
 @keyframes crane-hook {
   0%,
-  4% {
+  8% {
     transform: translateY(var(--crane-drop));
   }
-  12%,
-  26% {
+  16%,
+  46% {
     transform: translateY(0);
   }
-  36%,
-  44% {
+  54%,
+  59% {
     transform: translateY(var(--crane-pick));
   }
-  56%,
-  86% {
+  67%,
+  87% {
     transform: translateY(0);
   }
-  98%,
+  94%,
   100% {
     transform: translateY(var(--crane-drop));
   }
@@ -4072,22 +4142,22 @@ body {
 /* Dasselbe fuer das Seil: es reicht immer genau bis zum Haken. */
 @keyframes crane-rope {
   0%,
-  4% {
+  8% {
     transform: scaleY(var(--crane-drop-k));
   }
-  12%,
-  26% {
+  16%,
+  46% {
     transform: scaleY(1);
   }
-  36%,
-  44% {
+  54%,
+  59% {
     transform: scaleY(var(--crane-pick-k));
   }
-  56%,
-  86% {
+  67%,
+  87% {
     transform: scaleY(1);
   }
-  98%,
+  94%,
   100% {
     transform: scaleY(var(--crane-drop-k));
   }
@@ -4097,69 +4167,97 @@ body {
  * Die Last pendelt.
  *
  * Faehrt die Laufkatze an, bleibt die Last zurueck; haelt sie, schwingt die
- * Last nach und kommt zur Ruhe, bevor sie abgesenkt wird. Zwei, drei Grad —
- * mehr nicht: eine Last, die sichtbar schaukelt, ist schlecht angeschlagen.
+ * Last nach und kommt zur Ruhe, bevor sie abgesenkt wird. Ein positiver Winkel
+ * ist ein Nachlaufen nach links, die Laufkatze fuhr also nach rechts. Zwei,
+ * drei Grad — mehr nicht: eine Last, die sichtbar schaukelt, ist schlecht
+ * angeschlagen.
+ *
+ * Bei 91 % steht sie still und bleibt es bis zum Aufsetzen: bei einem Seil von
+ * bis zu 50 Einheiten waere schon ein Grad Pendeln eine Einheit daneben, und
+ * der Stein soll genau dort sitzen, wo ihn die Pyramide erwartet.
  */
 @keyframes crane-swing {
   0%,
   12% {
     transform: rotate(0deg);
   }
-  16% {
-    transform: rotate(2deg);
-  }
-  22% {
+  18% {
     transform: rotate(1.2deg);
   }
-  27% {
-    transform: rotate(-2.2deg);
+  24% {
+    transform: rotate(-0.6deg);
   }
-  31% {
-    transform: rotate(1deg);
-  }
-  35%,
-  56% {
-    transform: rotate(0deg);
-  }
-  61% {
-    transform: rotate(-2.6deg);
-  }
-  72% {
-    transform: rotate(-1.4deg);
-  }
-  81% {
-    transform: rotate(2.8deg);
-  }
-  86% {
-    transform: rotate(-1.2deg);
-  }
-  91% {
+  28% {
     transform: rotate(0.4deg);
   }
-  95%,
+  30% {
+    transform: rotate(2.2deg);
+  }
+  35% {
+    transform: rotate(0.8deg);
+  }
+  40% {
+    transform: rotate(-1.8deg);
+  }
+  44% {
+    transform: rotate(0.9deg);
+  }
+  48% {
+    transform: rotate(-0.4deg);
+  }
+  52%,
+  67% {
+    transform: rotate(0deg);
+  }
+  70% {
+    transform: rotate(-1.6deg);
+  }
+  74% {
+    transform: rotate(-0.8deg);
+  }
+  77% {
+    transform: rotate(-3.2deg);
+  }
+  81% {
+    transform: rotate(-1.4deg);
+  }
+  84% {
+    transform: rotate(2.8deg);
+  }
+  88% {
+    transform: rotate(-1.2deg);
+  }
+  91%,
   100% {
     transform: rotate(0deg);
   }
 }
 
 /*
- * Die Last am Haken gibt es nur, solange sie getragen wird.
+ * Der Stein am Haken.
  *
- * Bis 4 % sitzt sie noch auf ihrem Platz in der Pyramide — dort, wo das Modul
- * sie bei 0 % schon eingesetzt hat; die beiden decken sich, und so faellt es
- * nicht auf, wenn die Anzeige einen Takt spaeter nachzieht. Danach ist der
- * Haken leer, bis er bei 38 % auf dem naechsten Stein der Palette aufsitzt.
+ * Er haengt ab dem Anschlagen (54 %) am Haken und bleibt dort bis 8 % der
+ * naechsten Ladung: so lange sitzt er schon in der Pyramide, und der Haken
+ * liegt noch auf. Dieses Ende ist der Uebergang, der von der Anzeige abhaengt —
+ * sie setzt den Stein bei 100 %, und das auf einen Takt von 250 ms genau, im
+ * schlechten Fall auch eine Sekunde spaeter. Die Last bleibt deshalb von 94 %
+ * (aufgesetzt) bis 108 % sichtbar: fast drei Sekunden, in denen der Stein
+ * *beide* Male da ist und genau uebereinander steht.
+ *
+ * `--crane-held` ist 0, wo es noch keinen gibt: vor dem ersten Stein eines
+ * Timers ohne Fundament. Die Anzeige setzt den Wert um, waehrend der Kran an
+ * der Palette steht — dort wird er nicht gelesen.
  */
 @keyframes crane-cargo {
   0%,
-  4% {
-    opacity: 1;
+  8% {
+    opacity: var(--crane-held, 1);
   }
-  4.01%,
-  38% {
+  8.01%,
+  53.99% {
     opacity: 0;
   }
-  38.01%,
+  54%,
   100% {
     opacity: 1;
   }
@@ -4168,20 +4266,23 @@ body {
 /*
  * Der Stein auf der Palette.
  *
- * Er liegt dort, bis der Haken ihn hochzieht (44 %) — ab dann traegt ihn der
- * Kran. Der naechste liegt bereit, sobald der vorige gesetzt ist: in diesem
- * Moment schaut man auf die Pyramide und nicht auf die Palette.
+ * Er liegt dort, bis der Haken ihn hat (54 %) — ab 57 % traegt ihn der Kran,
+ * und bis dahin sitzt die Last schon auf ihm, die beiden decken sich. Der
+ * naechste kommt dazu, waehrend der Kran an der Pyramide absetzt (4 – 10 %):
+ * in diesem Moment schaut man auf die Pyramide und nicht auf die Palette.
+ * Er blendet ein und springt nicht, damit es nach Nachschub aussieht und nicht
+ * nach einem Stein, der es sich anders ueberlegt.
  */
 @keyframes crane-waiting {
   0%,
-  6% {
+  4% {
     opacity: 0;
   }
-  6.01%,
-  44% {
+  10%,
+  57% {
     opacity: 1;
   }
-  44.01%,
+  57.01%,
   100% {
     opacity: 0;
   }
