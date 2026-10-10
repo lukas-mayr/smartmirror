@@ -658,6 +658,33 @@ export default defineFrontend<TimerState, TimerConfig>({
           <path class="crane__pane" d=${`M${CAB.left + 1.5} ${CAB.top + 1.2}H${CAB.right - 1.5}V${CAB.top + 4}H${CAB.left + 1.5}Z`} />
         </g>
 
+        <!--
+          Der Oberwagen, von vorn: genau quer zum Blick hat er keine Breite, und
+          ein Kran, dessen Kopf fuer einen Augenblick fehlt, sieht kaputt aus und
+          nicht gedreht. Von vorn sieht man den Ausleger als kleinen Kasten, die
+          Turmspitze als Strich, dahinter das Gewicht und davor das Fuehrerhaus.
+          Er blendet nur im Schwenken ein (crane-edge im Stylesheet) und liegt sonst unsichtbar.
+        -->
+        <g class="crane__edge">
+          <path class="crane__steel" d=${`M${AXIS} ${TOWER.apex}V${JIB.top}`} />
+          <path
+            class="crane__body"
+            d=${`M${AXIS - 3} ${WEIGHT.top}H${AXIS + 3}V${WEIGHT.bottom}H${AXIS - 3}Z`}
+          />
+          <path
+            class="crane__body"
+            d=${`M${AXIS - 2.4} ${JIB.top}H${AXIS + 2.4}V${JIB.bottom}H${AXIS - 2.4}Z`}
+          />
+          <path
+            class="crane__trim"
+            d=${`M${AXIS - 2.4} ${JIB.top}L${AXIS + 2.4} ${JIB.bottom}M${AXIS + 2.4} ${JIB.top}L${AXIS - 2.4} ${JIB.bottom}`}
+          />
+          <path
+            class="crane__body"
+            d=${`M${AXIS - 2.2} ${CAB.top + 0.4}H${AXIS + 2.2}V${CAB.bottom}H${AXIS - 2.2}Z`}
+          />
+        </g>
+
         <!-- Die Laufkatze, und was an ihr haengt. -->
         <g class="crane__trolley">
           <path class="crane__body" d=${`M${trolley - 3} ${JIB.bottom + 0.2}H${trolley + 3}V${HOOK.rope}H${trolley - 3}Z`} />

@@ -852,8 +852,10 @@ Laufkatze an die Achse heran, der Oberwagen (Ausleger, Gegenausleger mit Gewicht
 Führerhaus, Turmspitze) schwenkt zur Palette, die Last wird angeschlagen, und
 der Oberwagen schwenkt mit ihr zurück. Im Seitenriss ist eine halbe Umdrehung
 eine Spiegelung durch die Senkrechte, dazwischen steht der Ausleger quer zum
-Blick und wird schmal; die Laufkatze samt Haken und Stein wird dabei mitgenommen
-und nicht mitgestaucht. Gedreht wird nur im festen Abstand `SLEW` von der
+Blick und wird schmal — genau quer hat er keine Breite, und dort steht
+stattdessen seine Vorderansicht (ein kleiner Kasten auf dem Turm), damit dem Kran
+nie der Kopf fehlt. Die Laufkatze samt Haken und Stein wird mitgenommen und nicht
+mitgestaucht. Gedreht wird nur im festen Abstand `SLEW` von der
 Achse: dort ist die Drehung dieselbe Zahl, mit der sich auch die Laufkatze
 verschiebt, und die Keyframes brauchen kein Produkt zweier Bewegungen.
 
