@@ -276,3 +276,29 @@ test('Drehung und Laufkatze laufen im Gleichschritt', () => {
     assert.ok(/--crane-reach|translateX\(0\)/.test(at(percent) ?? ''), `bei ${percent} % aufrecht, die Laufkatze nicht`);
   }
 });
+
+test('quer zum Blick steht die Vorderansicht des Oberwagens, nicht nichts', () => {
+  /*
+   * Gespiegelt hat der Oberwagen genau in der Mitte jedes Schwenks keine Breite.
+   * Die Vorderansicht (`crane-edge`) muss dort ihre volle Deckung haben und
+   * davor und danach nicht — sonst fehlt dem Kran fuer einen Augenblick der Kopf.
+   */
+  const styles = readFileSync(new URL('../../../packages/shell/src/renderer/styles.css', import.meta.url), 'utf8');
+  const body = styles.match(/@keyframes crane-edge \{([\s\S]*?)\n\}/)?.[1] ?? '';
+  const frames = [...body.matchAll(/([\d.%,\s]+)\{\s*opacity:\s*([\d.]+);/g)].map((match) => ({
+    at: match[1].split(',').map((value) => Number.parseFloat(value)),
+    opacity: Number(match[2]),
+  }));
+  const peaks = frames.filter((frame) => frame.opacity === 1).flatMap((frame) => frame.at);
+  const slew = styles.match(/@keyframes crane-slew \{([\s\S]*?)\n\}/)?.[1] ?? '';
+  const stops = [...slew.matchAll(/([\d.%,\s]+)\{\s*transform:\s*scaleX\((-?1)\)/g)].map((match) => ({
+    at: match[1].split(',').map((value) => Number.parseFloat(value)),
+    side: Number(match[2]),
+  }));
+  // Jeder Schwenk geht von einer Stellung zur naechsten: von der letzten Stuetzstelle der einen zur ersten der naechsten.
+  const middles = [];
+  for (let index = 0; index + 1 < stops.length; index += 1) {
+    middles.push((Math.max(...stops[index].at) + Math.min(...stops[index + 1].at)) / 2);
+  }
+  assert.deepEqual(peaks, middles, 'die Vorderansicht steht nicht in der Mitte der Schwenks');
+});

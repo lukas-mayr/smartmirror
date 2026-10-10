@@ -4020,6 +4020,10 @@ body {
   animation: crane-slew var(--dig-load) ease-in-out var(--dig-phase) infinite;
 }
 
+.crane.is-building .crane__edge {
+  animation: crane-edge var(--dig-load) linear var(--dig-phase) infinite;
+}
+
 .crane.is-building .crane__trolley {
   animation: crane-trolley var(--dig-load) ease-in-out var(--dig-phase) infinite;
 }
@@ -4049,7 +4053,8 @@ body {
  * seinem Ausgangswert: der Kran mit dem Ausleger nach links, der Haken oben —
  * und keine Last, weil dort keiner ist, der sie traegt.
  */
-.crane__cargo {
+.crane__cargo,
+.crane__edge {
   opacity: 0;
 }
 
@@ -4077,6 +4082,37 @@ body {
   84%,
   100% {
     transform: scaleX(1);
+  }
+}
+
+/*
+ * Der Oberwagen von vorn.
+ *
+ * Genau quer zum Blick (die Mitte der beiden Schwenks, 33 % und 78 %) hat der
+ * gespiegelte Oberwagen keine Breite, und der Kran haette fuer einen Augenblick
+ * keinen Kopf. Dort steht stattdessen seine Vorderansicht (`crane__edge`) —
+ * sie blendet ein, sobald der Kopf schmal wird, und aus, wenn er wieder breit
+ * ist. Die beiden Spitzen liegen in der Mitte der Schwenks; ein Test haelt sie
+ * dagegen.
+ */
+@keyframes crane-edge {
+  0%,
+  28% {
+    opacity: 0;
+  }
+  33% {
+    opacity: 1;
+  }
+  38%,
+  73% {
+    opacity: 0;
+  }
+  78% {
+    opacity: 1;
+  }
+  83%,
+  100% {
+    opacity: 0;
   }
 }
 
