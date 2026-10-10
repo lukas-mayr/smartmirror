@@ -21,12 +21,14 @@ import {
   stubblePath,
 } from './meadow.js';
 import {
+  AXIS,
   CAB,
   FLAT_SHIFT,
   HOOK,
   JIB,
   PALLET,
   TOWER,
+  TROLLEY,
   WEIGHT,
   carriedAt,
   laidAt,
@@ -568,24 +570,36 @@ export default defineFrontend<TimerState, TimerConfig>({
     /**
      * Der Turmdrehkran.
      *
-     * Turm, Ausleger, Gegenausleger mit Gewicht, Turmspitze mit Abspannung,
-     * Fuehrerhaus — und die Laufkatze mit Seil, Hakenblock und Last. Nur die
-     * Laufkatze bewegt sich; ein Turmdrehkran dreht zwar, aber im Seitenriss ist
-     * das eine Spiegelung, und ein Kran, der sich zwischen Palette und Pyramide
-     * umdreht, faehrt einen Umweg, den niemand faehrt.
+     * Zwei Teile, die sich verschieden bewegen: der Turm steht, der Oberwagen
+     * dreht sich auf ihm. Zum Oberwagen gehoeren Ausleger, Gegenausleger mit
+     * Gewicht, Fuehrerhaus und Turmspitze mit Abspannung — alles, was auf der
+     * Drehscheibe sitzt. Im Seitenriss ist eine halbe Umdrehung eine Spiegelung
+     * durch die Achse des Turms (`crane__upper`), und dazwischen steht der
+     * Ausleger quer zum Blick und wird schmal. Das ist die richtige Ansicht
+     * und kein Trick: genau so sieht eine Drehung von der Seite aus.
+     *
+     * Die Laufkatze gehoert *nicht* in diese Gruppe. Sie wird mitgenommen —
+     * ihr Weg ist dieselbe Spiegelung, nur als Verschiebung gerechnet —, aber
+     * nicht mitgestaucht: ein Stein, der beim Schwenken schmal wird und fuer
+     * einen Moment ganz fehlt, ist genau das, was nicht passieren soll.
      *
      * Drei Gruppen ineinander, weil drei Dinge sich unabhaengig voneinander
      * bewegen: die Laufkatze faehrt, die Last pendelt am Seil, der Haken hebt und
      * senkt. Das Seil wird dabei laenger — es wird gestreckt und nicht
      * verschoben, und damit es dabei nicht dicker wird, haelt es seine
      * Strichstaerke fest.
+     *
+     * Last und Palettenstein stehen immer da, solange gebaut wird, und ihre
+     * Sichtbarkeit gehoert dem Stylesheet. Wuerde die Last hier ein- und
+     * ausgehaengt, finge ihre Animation bei jedem Einhaengen von vorn an — und
+     * liefe der Bewegung des Krans davon.
      */
-    const crane = (plan: Plan, carrying: boolean, waiting: boolean): TemplateResult => {
+    const crane = (plan: Plan, building: boolean): TemplateResult => {
       const stone = plan.stone;
-      const mid = (TOWER.left + TOWER.right) / 2;
       const x = PALLET.x;
       const palletTop = GROUND - PALLET.height;
       const sling = stone * 0.4;
+      const trolley = TROLLEY.x;
       return svg`
         <!-- Die Palette mit ihrem Vorrat. -->
         <path
@@ -596,61 +610,75 @@ export default defineFrontend<TimerState, TimerConfig>({
           class="crane__stone"
           d=${stoneAt(x - stone, palletTop - stone, stone) + stoneAt(x, palletTop - stone, stone)}
         />
-        ${waiting
+        ${building
           ? svg`<path class="crane__stone crane__waiting" d=${stoneAt(x - stone / 2, palletTop - 2 * stone, stone)} />`
           : nothing}
 
-        <!-- Fundament, Turm, Turmspitze. -->
+        <!-- Fundament, Turm und Drehscheibe: das, was stehen bleibt. -->
         <path class="crane__body" d=${`M${TOWER.left - 4} ${GROUND}V77.5H${TOWER.right + 4}V${GROUND}Z`} />
         <path class="crane__steel" d=${`M${TOWER.left} 77.5V${JIB.bottom}M${TOWER.right} 77.5V${JIB.bottom}`} />
         <path class="crane__trim" d=${lattice(77.5, JIB.bottom, TOWER.left, TOWER.right, 5.5, true)} />
-        <path class="crane__steel" d=${`M${TOWER.left} ${JIB.top}L${mid} ${TOWER.apex}L${TOWER.right} ${JIB.top}`} />
-        <path class="crane__tie" d=${`M${mid} ${TOWER.apex}L96 ${JIB.top}M${mid} ${TOWER.apex}L${JIB.tail} ${JIB.top}`} />
-
-        <!-- Ausleger und Gegenausleger: zwei Gurte und das Fachwerk dazwischen. -->
-        <path
-          class="crane__steel"
-          d=${`M${JIB.tip} ${JIB.top}H${JIB.tail}V21H${TOWER.right}M${JIB.tip} ${JIB.top}V${JIB.bottom}H${TOWER.left}`}
-        />
-        <path class="crane__trim" d=${lattice(JIB.tip, TOWER.left, JIB.top, JIB.bottom, 4)} />
-        <path class="crane__trim" d=${lattice(TOWER.right, JIB.tail, JIB.top, 21, 4)} />
-
-        <!-- Gegengewicht und Fuehrerhaus. -->
         <path
           class="crane__body"
-          d=${`M${WEIGHT.left} ${WEIGHT.top}H${WEIGHT.right}V${WEIGHT.bottom}H${WEIGHT.left}Z`}
+          d=${`M${TOWER.left - 1.2} ${JIB.bottom}H${TOWER.right + 1.2}V${JIB.bottom + 1.4}H${TOWER.left - 1.2}Z`}
         />
-        <path
-          class="crane__trim"
-          d=${`M${WEIGHT.left} ${WEIGHT.top + 2.7}H${WEIGHT.right}M${WEIGHT.left} ${WEIGHT.top + 5.3}H${WEIGHT.right}`}
-        />
-        <path
-          class="crane__body"
-          d=${`M${CAB.left} ${CAB.top}V${CAB.bottom - 1.5}Q${CAB.left} ${CAB.bottom} ${CAB.left + 1.5} ${CAB.bottom}H${CAB.right}V${CAB.top}Z`}
-        />
-        <path class="crane__pane" d=${`M${CAB.left + 1.5} ${CAB.top + 1.2}H${CAB.right - 1.5}V${CAB.top + 4}H${CAB.left + 1.5}Z`} />
+
+        <!--
+          Der Oberwagen: Turmspitze, Ausleger und Gegenausleger, Gewicht,
+          Fuehrerhaus. Er dreht sich um die Achse des Turms.
+        -->
+        <g class="crane__upper" style=${`transform-origin:${AXIS}px 50px`}>
+          <path class="crane__steel" d=${`M${TOWER.left} ${JIB.top}L${AXIS} ${TOWER.apex}L${TOWER.right} ${JIB.top}`} />
+          <path
+            class="crane__tie"
+            d=${`M${AXIS} ${TOWER.apex}L${AXIS - 31} ${JIB.top}M${AXIS} ${TOWER.apex}L${JIB.tail} ${JIB.top}`}
+          />
+
+          <!-- Ausleger und Gegenausleger: zwei Gurte und das Fachwerk dazwischen. -->
+          <path
+            class="crane__steel"
+            d=${`M${JIB.tip} ${JIB.top}H${JIB.tail}V21H${TOWER.right}M${JIB.tip} ${JIB.top}V${JIB.bottom}H${TOWER.left}`}
+          />
+          <path class="crane__trim" d=${lattice(JIB.tip, TOWER.left, JIB.top, JIB.bottom, 4)} />
+          <path class="crane__trim" d=${lattice(TOWER.right, JIB.tail, JIB.top, 21, 4)} />
+
+          <!-- Gegengewicht und Fuehrerhaus. -->
+          <path
+            class="crane__body"
+            d=${`M${WEIGHT.left} ${WEIGHT.top}H${WEIGHT.right}V${WEIGHT.bottom}H${WEIGHT.left}Z`}
+          />
+          <path
+            class="crane__trim"
+            d=${`M${WEIGHT.left} ${WEIGHT.top + 2.7}H${WEIGHT.right}M${WEIGHT.left} ${WEIGHT.top + 5.3}H${WEIGHT.right}`}
+          />
+          <path
+            class="crane__body"
+            d=${`M${CAB.left} ${CAB.top}V${CAB.bottom - 1.5}Q${CAB.left} ${CAB.bottom} ${CAB.left + 1.5} ${CAB.bottom}H${CAB.right}V${CAB.top}Z`}
+          />
+          <path class="crane__pane" d=${`M${CAB.left + 1.5} ${CAB.top + 1.2}H${CAB.right - 1.5}V${CAB.top + 4}H${CAB.left + 1.5}Z`} />
+        </g>
 
         <!-- Die Laufkatze, und was an ihr haengt. -->
         <g class="crane__trolley">
-          <path class="crane__body" d=${`M${x - 3} ${JIB.bottom + 0.2}H${x + 3}V${HOOK.rope}H${x - 3}Z`} />
-          <g class="crane__swing" style=${`transform-origin:${x}px ${HOOK.rope}px`}>
+          <path class="crane__body" d=${`M${trolley - 3} ${JIB.bottom + 0.2}H${trolley + 3}V${HOOK.rope}H${trolley - 3}Z`} />
+          <g class="crane__swing" style=${`transform-origin:${trolley}px ${HOOK.rope}px`}>
             <path
               class="crane__rope"
-              d=${`M${x} ${HOOK.rope}V${HOOK.block}`}
+              d=${`M${trolley} ${HOOK.rope}V${HOOK.block}`}
               vector-effect="non-scaling-stroke"
-              style=${`transform-origin:${x}px ${HOOK.rope}px`}
+              style=${`transform-origin:${trolley}px ${HOOK.rope}px`}
             />
             <g class="crane__hook">
-              <path class="crane__body" d=${`M${x - 1.4} ${HOOK.block}H${x + 1.4}V${HOOK.block + 2.2}H${x - 1.4}Z`} />
-              <path class="crane__trim" d=${`M${x} ${HOOK.block + 2.2}V${HOOK.block + 3.2}`} />
-              ${carrying
-                ? svg`<g class="crane__cargo">
+              <path class="crane__body" d=${`M${trolley - 1.4} ${HOOK.block}H${trolley + 1.4}V${HOOK.block + 2.2}H${trolley - 1.4}Z`} />
+              <path class="crane__trim" d=${`M${trolley} ${HOOK.block + 2.2}V${HOOK.block + 3.2}`} />
+              ${building
+                ? svg`
                     <path
                       class="crane__sling"
-                      d=${`M${x} ${HOOK.block + 3}L${x - sling} ${HOOK.carry}M${x} ${HOOK.block + 3}L${x + sling} ${HOOK.carry}`}
+                      d=${`M${trolley} ${HOOK.block + 3}L${trolley - sling} ${HOOK.carry}M${trolley} ${HOOK.block + 3}L${trolley + sling} ${HOOK.carry}`}
                     />
-                    <path class="crane__stone" d=${stoneAt(x - stone / 2, HOOK.carry, stone)} />
-                  </g>`
+                    <path class="crane__stone crane__cargo" d=${stoneAt(trolley - stone / 2, HOOK.carry, stone)} />
+                  `
                 : nothing}
             </g>
           </g>
@@ -668,7 +696,11 @@ export default defineFrontend<TimerState, TimerConfig>({
      * Wohin der Kran faehrt, steht als Variablen am Blatt: die Keyframes kennen
      * den Ablauf, die Variablen den Ort. Aendert sich das Ziel, faehrt die
      * laufende Bewegung ohne Neustart zum neuen — und das Ziel wechselt nur,
-     * waehrend die Laufkatze ueber der Palette steht (siehe `SWITCH`).
+     * waehrend der Kran an der Palette steht (siehe `SWITCH`).
+     *
+     * `--crane-held` sagt, ob am Anfang einer Ladung schon ein Stein am Haken
+     * haengt: der von eben, der noch nicht in der Pyramide liegt. Vor dem ersten
+     * Stein eines Timers ohne Fundament gibt es keinen.
      *
      * `shift` rueckt Kran, Palette und Pyramide gemeinsam nach rechts — in den
      * flachen Bloecken, in denen die Ziffern oben links auf der Szene stehen
@@ -686,10 +718,13 @@ export default defineFrontend<TimerState, TimerConfig>({
       const line = Math.min(1.4, Math.max(0.5, plan.stone * 0.2));
       const vars = [
         `--crane-reach:${reach.reach}px`,
+        `--crane-turn:${TROLLEY.turn}px`,
+        `--crane-pallet:${TROLLEY.pallet}px`,
         `--crane-drop:${reach.drop}px`,
         `--crane-pick:${reach.pick}px`,
         `--crane-drop-k:${reach.dropScale}`,
         `--crane-pick-k:${reach.pickScale}`,
+        `--crane-held:${carried >= 0 ? 1 : 0}`,
         `--crane-line:${line.toFixed(2)}`,
       ].join(';');
       const stones = stonesPath(plan, laid);
@@ -699,7 +734,7 @@ export default defineFrontend<TimerState, TimerConfig>({
           <path class="crane__ground" d=${`M0 ${GROUND}H${FIELD.width}`} />
           <g style=${vars} transform=${`translate(${shift} 0)`}>
             ${stones ? svg`<path class="crane__stone crane__stones" d=${stones} />` : nothing}
-            ${crane(plan, building && carried >= 0, building)}
+            ${crane(plan, building)}
           </g>
         `,
       );

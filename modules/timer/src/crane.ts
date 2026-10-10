@@ -19,7 +19,14 @@
  * fertigen Pyramide steht mit Absicht nicht da: das Bild zeigt, was gebaut
  * ist, und nicht einen Plan davon. Die genaue Restzeit sagen die Ziffern.
  *
- * Drei Dinge muessen dabei zusammenpassen:
+ * **Der Kran dreht sich.** Die Pyramide steht links vom Turm, die Palette mit
+ * den Steinen rechts davon — und der Oberwagen (Ausleger, Gegenausleger,
+ * Fuehrerhaus, Turmspitze) schwenkt auf dem Turm von der einen zur anderen. Die
+ * Steine reisen also von rechts nach links. Im Seitenriss ist eine halbe
+ * Umdrehung eine Spiegelung durch die Senkrechte; dazwischen steht der Ausleger
+ * quer zum Blick und wird schmal.
+ *
+ * Vier Dinge muessen dabei zusammenpassen:
  *
  *  1. Jeder Stein landet genau auf seinem Platz. Der Kran rechnet nicht mit,
  *     er faehrt dorthin, wohin ihn diese Datei schickt — und dort setzt die
@@ -27,7 +34,11 @@
  *  2. Der letzte Stein, die Spitze, sitzt genau dann, wenn die Zeit um ist.
  *     Nicht eine Ladung frueher und nicht eine spaeter.
  *  3. Was der Kran traegt, stoesst nirgends an: nicht an die Pyramide, nicht
- *     an den Turm und nicht oben aus dem Bild.
+ *     an den Turm und nicht oben aus dem Bild — auch nicht, wenn der Ausleger
+ *     nach rechts zeigt und das Bild dort endet.
+ *  4. Ein Stein verschwindet nie. Er wechselt zwischen Palette, Haken und
+ *     Pyramide immer so, dass er in dem Moment an beiden Orten steht
+ *     (`SWITCH`, und die Zeiten im Stylesheet).
  *
  * Alle Masse in Feldeinheiten des `viewBox`, der Grund bei `GROUND`.
  */
@@ -42,46 +53,85 @@ export type { Box, Point };
 /* -------------------------------- Der Kran --------------------------------- */
 
 /**
- * Der Turm.
+ * Die Achse des Turms — die Senkrechte, um die sich der Oberwagen dreht.
  *
- * Rechts im Bild und nicht links: in den flachen Bloecken stehen die Ziffern
- * oben links, und ein Turm, der hinter ihnen hochragt, waere das Einzige, was
- * man von ihm sieht. Rechts steht er frei, und der Ausleger reicht nach links
- * ueber die Pyramide.
+ * Sie steht zwischen Pyramide und Palette: links die Pyramide, rechts die
+ * Palette. Der Ausleger zeigt einmal nach links und einmal nach rechts, und
+ * alles, was er traegt, faehrt dabei ueber die Achse. Gezeichnet ist der Kran
+ * mit dem Ausleger nach links (zur Pyramide); die andere Stellung ist dessen
+ * Spiegelbild an dieser Senkrechten.
  */
-export const TOWER = { left: 146, right: 153, apex: 11 } as const;
+export const AXIS = 112;
+
+/** Der Turm. Er dreht sich nicht mit. */
+export const TOWER = { left: AXIS - 3.5, right: AXIS + 3.5, apex: 11 } as const;
 
 /**
  * Der Ausleger, auf dem die Laufkatze faehrt, und der Gegenausleger dahinter.
  *
- * Hoch genug, dass die Last ueber die fertige Pyramide hinweggeht; tief genug,
- * dass die Turmspitze darueber noch ins Feld passt.
+ * Lang genug, dass die Last bis zum aeussersten Stein der untersten Reihe
+ * reicht — auch bei der groessten Pyramide, deren Steine am kleinsten sind und
+ * am weitesten aussen liegen. Hoch genug, dass sie ueber die fertige Pyramide
+ * hinweggeht; tief genug, dass die Turmspitze darueber noch ins Feld passt.
+ *
+ * Gedreht zeigt der Ausleger nach rechts und der Gegenausleger nach links: die
+ * Szene braucht deshalb auf beiden Seiten der Achse Platz, und zwar `tip` weit
+ * (siehe `craneBox`).
  */
-export const JIB = { tip: 46, top: 18, bottom: 22, tail: 178 } as const;
+export const JIB = { tip: AXIS - 62, top: 18, bottom: 22, tail: AXIS + 30 } as const;
 
-/** Das Gegengewicht am Ende des Gegenauslegers. */
-export const WEIGHT = { left: 167, right: 177, top: 21, bottom: 29 } as const;
+/** Das Gegengewicht am Ende des Gegenauslegers. Es dreht sich mit. */
+export const WEIGHT = { left: AXIS + 19, right: AXIS + 29, top: 21, bottom: 29 } as const;
 
-/** Das Fuehrerhaus, am Fuss des Auslegers. */
-export const CAB = { left: 139, right: 146, top: 22, bottom: 28.5 } as const;
+/** Das Fuehrerhaus, am Fuss des Auslegers. Es dreht sich mit. */
+export const CAB = { left: AXIS - 10.5, right: AXIS - 3.5, top: 22, bottom: 28.5 } as const;
 
 /**
  * Die Palette, von der die Steine kommen.
  *
- * Zwischen Pyramide und Turm: so faehrt die Laufkatze nie ueber den Turm
- * hinaus, und der Weg zur Pyramide ist der kuerzeste. `x` ist die Mitte, und
- * genau dort steht die Laufkatze, wenn sie nicht faehrt.
+ * Rechts vom Turm, wo sonst nichts steht: der Ausleger dreht sich zu ihr hin,
+ * und die Steine reisen von dort ueber den Turm hinweg nach links zur Pyramide.
+ * `x` ist die Mitte, und genau dort steht die Laufkatze beim Anschlagen.
  */
-export const PALLET = { x: 128, width: 14, height: 2 } as const;
+export const PALLET = { x: AXIS + 30, width: 14, height: 2 } as const;
 
 /**
- * Laufkatze und Haken, in Ruhestellung ueber der Palette.
+ * Laufkatze und Haken.
  *
  * `rope` ist das Ende der Laufkatze, an dem das Seil haengt, `block` der
  * Hakenblock, `carry` die Oberkante der Last. In dieser Hoehe faehrt die Last —
  * und das ist die Hoehe, die ueber die Pyramide hinweg muss.
  */
 export const HOOK = { rope: 24.5, block: 27, carry: 31.5 } as const;
+
+/**
+ * Wo die Laufkatze dreht.
+ *
+ * Gedreht wird nur bei kurzem Ausleger: die Laufkatze faehrt erst bis `SLEW` an
+ * die Achse heran, dann schwenkt der Oberwagen, dann faehrt sie wieder hinaus.
+ * Das ist keine Vorsicht, sondern Rechnung: waehrend der Ausleger sich dreht,
+ * liegt die Laufkatze bei `Achse - SLEW * Spiegelung`, und diese Spiegelung ist
+ * dieselbe Zahl, mit der das Stylesheet den Oberwagen skaliert. Ein Kran, der
+ * gleichzeitig dreht und faehrt, braeuchte das Produkt zweier Bewegungen — und
+ * das kann ein Keyframe nicht.
+ *
+ * Der Abstand ist so gross, dass die Last am Haken dabei am Fuehrerhaus und am
+ * Turm vorbeigeht und so klein, dass die Palette dahinter noch Platz hat.
+ */
+export const SLEW = 16;
+
+/**
+ * Die Laufkatze, wie sie gezeichnet ist: auf dem Ausleger nach links, `SLEW` von
+ * der Achse entfernt. Von hier aus sind alle Wege gerechnet.
+ *
+ * `turn` ist der Weg nach rechts, auf die andere Seite der Achse (die Spiegelung
+ * derselben Stelle), `pallet` der Weg bis ueber die Palette.
+ */
+export const TROLLEY = {
+  x: AXIS - SLEW,
+  turn: 2 * SLEW,
+  pallet: PALLET.x - (AXIS - SLEW),
+} as const;
 
 /* ------------------------------ Die Pyramide ------------------------------- */
 
@@ -92,8 +142,10 @@ export const HOOK = { rope: 24.5, block: 27, carry: 31.5 } as const;
  * erreichen darf: darueber faehrt die Last. `stone` die groesste Kantenlaenge
  * eines Steins — bis zu ihr bleiben die Steine gleich gross und die Pyramide
  * waechst; darueber werden sie kleiner, damit sie ins Bild passt.
+ *
+ * Links vom Turm, mit einer Handbreit Luft zu seinem Fundament.
  */
-export const PYRAMID = { center: 80, height: 44, stone: 6 } as const;
+export const PYRAMID = { center: AXIS - 34, height: 44, stone: 6 } as const;
 
 /**
  * Die Pyramide eines Timers: wieviele Reihen, wie gross ein Stein, und wieviele
@@ -134,8 +186,8 @@ export function pyramidPlan(totalMs: number): Plan {
  * Wo der k-te Stein liegt, in der Reihenfolge, in der er gesetzt wird.
  *
  * Reihe um Reihe von unten, in jeder Reihe von links nach rechts — also vom
- * Kran weg zu ihm hin. Jede Reihe ist um einen halben Stein eingerueckt, so
- * dass jeder Stein auf zweien liegt.
+ * aeusseren Ende des Auslegers zum Turm hin. Jede Reihe ist um einen halben
+ * Stein eingerueckt, so dass jeder Stein auf zweien liegt.
  */
 export function stoneBox(plan: Plan, index: number): Box {
   let row = 0;
@@ -187,10 +239,11 @@ export function stonesPath(plan: Plan, laid: number): string {
 /**
  * Wie weit der Kran fahren muss, um einen Stein zu setzen.
  *
- * `reach` ist der Weg der Laufkatze von der Palette zur Mitte des Platzes
- * (negativ: nach links), `drop` der Weg der Last nach unten, bis sie aufsitzt.
- * `pick` ist derselbe Weg an der Palette. Die beiden `…Scale` sagen, wie lang
- * das Seil dabei wird, als Vielfaches seiner Ruhelaenge.
+ * `reach` ist der Weg der Laufkatze von ihrer Zeichenstellung (`TROLLEY.x`) zur
+ * Mitte des Platzes (negativ: nach links), `drop` der Weg der Last nach unten,
+ * bis sie aufsitzt. `pick` ist derselbe Weg an der Palette. Die beiden
+ * `…Scale` sagen, wie lang das Seil dabei wird, als Vielfaches seiner
+ * Ruhelaenge.
  *
  * Alle fuenf Zahlen gehen als Variablen ins Stylesheet: die Keyframes kennen
  * den Ablauf, diese Zahlen kennen den Ort.
@@ -211,19 +264,20 @@ export function palletTop(plan: Plan): number {
 export function reachFor(plan: Plan, index: number): Reach {
   const rope = HOOK.block - HOOK.rope;
   const pick = palletTop(plan) - HOOK.carry;
+  const pickScale = round((rope + pick) / rope);
   if (index < 0) {
     // Vor dem ersten Stein gibt es keinen Platz, von dem der Kran kommt: er
-    // steht ueber der Palette.
-    return { reach: 0, drop: pick, pick, dropScale: (rope + pick) / rope, pickScale: (rope + pick) / rope };
+    // steht an der Stelle, an der er dreht, den Haken oben.
+    return { reach: 0, drop: 0, pick: round(pick), dropScale: 1, pickScale };
   }
   const box = stoneBox(plan, index);
   const drop = box.top - HOOK.carry;
   return {
-    reach: round((box.left + box.right) / 2 - PALLET.x),
+    reach: round((box.left + box.right) / 2 - TROLLEY.x),
     drop: round(drop),
     pick: round(pick),
     dropScale: round((rope + drop) / rope),
-    pickScale: round((rope + pick) / rope),
+    pickScale,
   };
 }
 
@@ -232,22 +286,27 @@ export function reachFor(plan: Plan, index: number): Reach {
  *
  * Eine Ladung, in Prozent ihrer Dauer (so steht sie auch im Stylesheet):
  *
- *    0 – 4    absetzen: der Stein von eben sitzt, der Haken liegt noch auf
- *    4 – 12   leeren Haken hochziehen
- *   12 – 26   zurueck zur Palette
- *   26 – 36   absenken
- *   36 – 44   anschlagen
- *   44 – 56   hochziehen
- *   56 – 80   hinueber zur Pyramide
- *   80 – 86   auspendeln
- *   86 – 98   absenken; bei 98 sitzt der Stein, bei 100 gehoert er dazu
+ *    0 –  8   absetzen: der Stein von eben sitzt, der Haken liegt noch auf
+ *    8 – 16   leeren Haken hochziehen
+ *   12 – 26   an die Achse heranfahren
+ *   26 – 40   schwenken: der Ausleger dreht sich zur Palette
+ *   40 – 48   hinaus bis ueber die Palette
+ *   46 – 54   absenken
+ *   54 – 59   anschlagen
+ *   59 – 67   hochziehen
+ *   66 – 72   an die Achse heranfahren
+ *   72 – 84   schwenken: zurueck zur Pyramide
+ *   84 – 91   hinaus bis ueber den Platz
+ *   87 – 94   absenken; bei 94 sitzt der Stein, bei 100 gehoert er dazu
  *
- * Bis 26 % arbeitet der Kran also noch am Stein der vorigen Ladung, ab dort am
- * naechsten. Der Wechsel faellt in die Zeit, in der die Laufkatze ueber der
- * Palette steht (`SWITCH`) — dort haengt ihre Stellung an keinem Ziel, und der
- * neue Weg setzt ohne Sprung ein.
+ * Bis 50 % arbeitet der Kran also noch am Stein der vorigen Ladung, ab dort am
+ * naechsten. Der Wechsel faellt in die Zeit, in der er an der Palette steht
+ * (`SWITCH`): dort haengt keine Stellung an einem Ziel, und der neue Weg setzt
+ * ohne Sprung ein. Ab 84 % und bis 12 % der naechsten Ladung dagegen *haengt*
+ * sie am Ziel — dort darf nichts wechseln, und der Abstand zu beiden Seiten
+ * ist gross genug, dass ein verspaeteter Takt im Browser nichts ausmacht.
  */
-export const SWITCH = 0.4;
+export const SWITCH = 0.5;
 
 export function carriedAt(plan: Plan, elapsedMs: number): number {
   const loadMs = DIG.bucket * DIG.perLoad;
@@ -262,15 +321,26 @@ export function carriedAt(plan: Plan, elapsedMs: number): number {
  * Dort stehen die Ziffern *auf* der Szene, oben links — und genau dort laege
  * sonst die Spitze des Auslegers. Der quadratische Block hat die Ziffern
  * darueber und behaelt die Mitte; in den flachen rueckt der Kran so weit nach
- * rechts, wie das Feld es zulaesst, und links bleibt Himmel fuer die Zeit.
- * Kran, Palette und Pyramide ruecken zusammen: es ist *ein* Ort.
+ * rechts, wie das Feld es zulaesst (der gedrehte Ausleger reicht ebenso weit
+ * nach rechts, wie der Ausleger nach links), und links bleibt Himmel fuer die
+ * Zeit. Kran, Palette und Pyramide ruecken zusammen: es ist *ein* Ort.
  */
 export const FLAT_SHIFT = 38;
 
 /**
  * Die ganze Szene in ihrer groessten Ausdehnung, um `shift` verschoben — fuer
  * den Test, dass sie ins Feld passt.
+ *
+ * Gross heisst: mit dem Ausleger in beiden Stellungen. Nach links reicht die
+ * Spitze des Auslegers (oder, gedreht, das Ende des Gegenauslegers), nach
+ * rechts dasselbe, an der Achse gespiegelt.
  */
 export function craneBox(shift = 0): Box {
-  return { left: JIB.tip + shift, top: TOWER.apex, right: JIB.tail + shift, bottom: GROUND };
+  const mirror = (x: number): number => 2 * AXIS - x;
+  return {
+    left: Math.min(JIB.tip, mirror(JIB.tail)) + shift,
+    top: TOWER.apex,
+    right: Math.max(JIB.tail, mirror(JIB.tip)) + shift,
+    bottom: GROUND,
+  };
 }
